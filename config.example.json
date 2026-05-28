@@ -1,0 +1,25 @@
+{
+  "google": {
+    "client_secret_file": "client_secret.json",
+    "token_file": "token.json",
+    "album_cache_file": "album_cache.json"
+  },
+  "paths": {
+    "inbox_dir": "inbox",
+    "processed_dir": "processed"
+  },
+  "classification": {
+    "mode": "ai",
+    "default_product": "Unsorted",
+    "labels_file": "product_labels.json",
+    "catalog_file": "product_catalog.json",
+    "similarity_threshold": 0.82,
+    "ai_provider": "openai",
+    "openai_model": "gpt-4.1-mini",
+    "gemini_model": "gemini-2.5-flash"
+  },
+  "pixel": {
+    "adb_serial": "",
+    "camera_dir": "/sdcard/DCIM/Camera"
+  }
+}

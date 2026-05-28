@@ -1,0 +1,16 @@
+{
+  "products": [
+    {
+      "name": "Unsorted",
+      "keywords": []
+    },
+    {
+      "name": "Sample Product A",
+      "keywords": ["sample-a", "product-a", "sku-a"]
+    },
+    {
+      "name": "Sample Product B",
+      "keywords": ["sample-b", "product-b", "sku-b"]
+    }
+  ]
+}

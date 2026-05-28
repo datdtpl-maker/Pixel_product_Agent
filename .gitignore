@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+client_secret.json
+token.json
+album_cache.json
+config.json
+.env
+
+inbox/
+processed/
+samples/
+logs/
