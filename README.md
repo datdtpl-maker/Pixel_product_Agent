@@ -127,16 +127,32 @@ Stop auto-start:
 
 The Pixel Agent uses port `8765`, so it will not conflict with VietDub AI on port `3210`.
 
+## Production Readiness
+
+This repo is currently a local operator app / edge-agent prototype. For thousands of users, keep the Pixel/ADB capture worker local, but move shared product data and user management to a proper backend.
+
+Recommended additions before multi-user production:
+
+- authentication and role-based access control;
+- per-user/per-device OAuth token storage with encryption;
+- database-backed catalog instead of local `product_catalog.json`;
+- background job queue for capture/classification/upload work;
+- audit logs for every upload and classification decision;
+- production WSGI server instead of Flask's development server;
+- centralized error monitoring and retry policy;
+- per-customer Google Photos/Drive quota handling;
+- device registration so one user's browser cannot control another user's Pixel.
+
 Recommended product folder layout:
 
 ```text
 products/
-├── Product A/
-│   ├── front.jpg
-│   └── barcode.jpg
-├── Product B/
-│   └── sample.jpg
-└── product-list.txt
+|-- Product A/
+|   |-- front.jpg
+|   `-- barcode.jpg
+|-- Product B/
+|   `-- sample.jpg
+`-- product-list.txt
 ```
 
 Docs supported for product-name extraction: `.txt`, `.csv`, `.json`, `.docx`, `.pdf`. Images under a product folder are added as samples for that folder name.

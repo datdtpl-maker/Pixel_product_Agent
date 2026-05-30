@@ -25,95 +25,402 @@ HTML = r"""
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pixel Product Capture</title>
+  <title>Pixel Product Agent</title>
   <style>
-    :root { color-scheme: light; font-family: Arial, sans-serif; }
-    body { margin: 0; background: #f5f6f8; color: #1f2937; }
-    header { background: #ffffff; border-bottom: 1px solid #d7dce3; padding: 16px 24px; }
-    main { max-width: 1120px; margin: 0 auto; padding: 24px; display: grid; gap: 18px; }
-    section { background: #ffffff; border: 1px solid #d7dce3; border-radius: 8px; padding: 18px; }
-    h1 { margin: 0; font-size: 22px; }
-    h2 { margin: 0 0 14px; font-size: 17px; }
-    label { display: block; font-weight: 700; margin-bottom: 8px; }
-    input, select, button { font: inherit; }
-    input, select { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #aeb7c4; border-radius: 6px; }
-    button { border: 0; border-radius: 6px; padding: 10px 14px; background: #155eef; color: white; cursor: pointer; font-weight: 700; }
-    button.secondary { background: #475467; }
-    button:disabled { opacity: .55; cursor: wait; }
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-    .row { display: flex; gap: 10px; align-items: end; }
-    .row > div { flex: 1; }
-    .status { white-space: pre-wrap; background: #111827; color: #e5e7eb; padding: 14px; border-radius: 6px; min-height: 120px; overflow: auto; }
-    .pill { display: inline-block; background: #eef2ff; color: #3730a3; border-radius: 999px; padding: 4px 9px; margin: 3px; font-size: 13px; }
-    .muted { color: #667085; font-size: 13px; }
-    @media (max-width: 780px) { .grid, .row { grid-template-columns: 1fr; display: grid; } }
+    :root {
+      color-scheme: light;
+      --bg: #f3f5f7;
+      --panel: #ffffff;
+      --panel-soft: #f8fafc;
+      --text: #172033;
+      --muted: #64748b;
+      --line: #d8dee8;
+      --line-strong: #b9c2d0;
+      --brand: #155eef;
+      --brand-strong: #0f47c5;
+      --ok-bg: #eaf7ef;
+      --ok: #137333;
+      --warn-bg: #fff6e5;
+      --warn: #a15c00;
+      --dark: #101828;
+      --shadow: 0 10px 30px rgba(16, 24, 40, 0.08);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    button, input, select { font: inherit; }
+    button {
+      min-height: 40px;
+      border: 0;
+      border-radius: 7px;
+      padding: 10px 14px;
+      background: var(--brand);
+      color: #ffffff;
+      cursor: pointer;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    button:hover { background: var(--brand-strong); }
+    button.secondary { background: #455468; }
+    button.secondary:hover { background: #344054; }
+    button.ghost { background: #eef2f7; color: #243041; }
+    button.ghost:hover { background: #e2e8f0; }
+    button:disabled { opacity: .56; cursor: wait; }
+    input, select {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      background: #ffffff;
+      padding: 10px 12px;
+      color: var(--text);
+      outline: none;
+    }
+    input:focus, select:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(21, 94, 239, .12);
+    }
+    label { display: block; margin-bottom: 7px; color: #1f2937; font-weight: 700; }
+    .app-shell { min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
+    .sidebar {
+      background: #0f172a;
+      color: #e5e7eb;
+      padding: 20px 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+    .brand { display: grid; gap: 4px; padding-bottom: 22px; border-bottom: 1px solid rgba(255,255,255,.12); }
+    .brand-title { font-size: 18px; font-weight: 800; letter-spacing: 0; }
+    .brand-subtitle { color: #a9b4c7; font-size: 13px; line-height: 1.4; }
+    .nav { display: grid; gap: 6px; margin-top: 22px; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 11px;
+      border-radius: 7px;
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+    .nav-item.active { background: rgba(255,255,255,.10); color: #ffffff; }
+    .main { min-width: 0; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 18px 26px;
+      background: rgba(255,255,255,.86);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      backdrop-filter: blur(10px);
+    }
+    .topbar h1 { margin: 0; font-size: 22px; line-height: 1.15; }
+    .topbar p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .content { max-width: 1220px; margin: 0 auto; padding: 24px 26px 38px; display: grid; gap: 18px; }
+    .status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: var(--shadow);
+      min-height: 94px;
+    }
+    .metric-label { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .metric-value { margin-top: 8px; font-size: 18px; font-weight: 800; overflow-wrap: anywhere; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .badge.ok { background: var(--ok-bg); color: var(--ok); }
+    .badge.warn { background: var(--warn-bg); color: var(--warn); }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(340px, .75fr); gap: 18px; align-items: start; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: start;
+    }
+    .panel-title { margin: 0; font-size: 17px; }
+    .panel-subtitle { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .panel-body { padding: 18px; display: grid; gap: 16px; }
+    .field-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+    .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .button-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .hint { color: var(--muted); font-size: 13px; line-height: 1.45; margin-top: 7px; }
+    .steps { display: grid; gap: 10px; }
+    .step {
+      display: grid;
+      grid-template-columns: 32px minmax(0, 1fr);
+      gap: 11px;
+      padding: 12px;
+      background: var(--panel-soft);
+      border: 1px solid #e5eaf1;
+      border-radius: 8px;
+    }
+    .step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-weight: 800;
+    }
+    .step-title { font-weight: 800; margin-bottom: 2px; }
+    .step-text { color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .products {
+      min-height: 90px;
+      display: flex;
+      align-content: flex-start;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      max-width: 100%;
+      min-height: 28px;
+      background: #eef2ff;
+      color: #3730a3;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 13px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+    .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+    .log-wrap { background: var(--dark); border-radius: 8px; overflow: hidden; border: 1px solid #1f2937; }
+    .log-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      color: #d0d5dd;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .status {
+      white-space: pre-wrap;
+      color: #e5e7eb;
+      padding: 14px;
+      min-height: 240px;
+      max-height: 460px;
+      overflow: auto;
+      font: 13px/1.55 Consolas, "Cascadia Mono", monospace;
+    }
+    @media (max-width: 980px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; }
+      .status-grid, .layout, .two-col, .field-row { grid-template-columns: 1fr; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .top-actions { width: 100%; }
+      .top-actions button { flex: 1; }
+    }
+    @media (max-width: 560px) {
+      .content, .topbar { padding-left: 16px; padding-right: 16px; }
+      .button-row, .top-actions { display: grid; grid-template-columns: 1fr; width: 100%; }
+      button { width: 100%; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Pixel Product Capture</h1>
-    <div class="muted">Chụp từ Google Pixel, AI nhận diện sản phẩm, tạo album Google Photos và upload tự động.</div>
-  </header>
-  <main>
-    <section>
-      <h2>Trạng Thái</h2>
-      <div id="health" class="muted">Đang kiểm tra...</div>
-    </section>
-
-    <section>
-      <h2>Nạp Dữ Liệu Sản Phẩm</h2>
-      <div class="row">
-        <div>
-          <label for="sourcePath">Đường dẫn thư mục tài liệu / hình ảnh sản phẩm</label>
-          <input id="sourcePath" placeholder="Ví dụ: D:\product-data">
-          <div class="muted">Gợi ý: mỗi sản phẩm một thư mục riêng, ví dụ <b>products\Tên Sản Phẩm\anh1.jpg</b>. File .txt/.csv/.json/.docx/.pdf có thể chứa tên sản phẩm mỗi dòng.</div>
-        </div>
-        <button id="ingestBtn" onclick="ingest()">Quét Dữ Liệu</button>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-title">Pixel Product Agent</div>
+        <div class="brand-subtitle">T&#7921; &#273;&#7897;ng ch&#7909;p, nh&#7853;n di&#7879;n v&#224; l&#432;u &#7843;nh s&#7843;n ph&#7849;m.</div>
       </div>
-      <div style="height:10px"></div>
-      <button class="secondary" onclick="resetCatalog()">Xóa Catalog Và Quét Lại</button>
-    </section>
+      <nav class="nav" aria-label="Main">
+        <div class="nav-item active"><span>B&#7843;ng &#273;i&#7873;u khi&#7875;n</span><span>Live</span></div>
+        <div class="nav-item"><span>D&#7919; li&#7879;u s&#7843;n ph&#7849;m</span><span id="navProductCount">0</span></div>
+        <div class="nav-item"><span>Google Photos</span><span id="navGoogle">...</span></div>
+        <div class="nav-item"><span>Pixel ADB</span><span id="navAdb">...</span></div>
+      </nav>
+    </aside>
 
-    <section>
-      <h2>Chụp Và Upload</h2>
-      <div class="grid">
+    <div class="main">
+      <header class="topbar">
         <div>
-          <label for="provider">AI provider</label>
-          <select id="provider">
-            <option value="openai">OpenAI</option>
-            <option value="gemini">Gemini</option>
-            <option value="offline">Offline mẫu ảnh</option>
-          </select>
+          <h1>Trung t&#226;m ch&#7909;p &#7843;nh s&#7843;n ph&#7849;m</h1>
+          <p>Qu&#7843;n l&#253; catalog, &#273;i&#7873;u khi&#7875;n Pixel v&#224; upload Google Photos t&#7915; m&#7897;t giao di&#7879;n.</p>
         </div>
-        <div>
-          <label for="forcedProduct">Ép tên sản phẩm nếu muốn test</label>
-          <input id="forcedProduct" placeholder="Để trống để AI tự nhận diện">
+        <div class="top-actions">
+          <button class="ghost" onclick="refresh()">L&#224;m m&#7899;i</button>
+          <button id="topCaptureBtn" onclick="captureUpload()">Ch&#7909;p v&#224; upload</button>
         </div>
-      </div>
-      <div style="height:12px"></div>
-      <div class="row">
-        <button id="captureBtn" onclick="captureUpload()">Chụp Từ Pixel Và Upload</button>
-        <button class="secondary" onclick="classifyLatest()">Nhận Diện Ảnh Mới Nhất</button>
-      </div>
-    </section>
+      </header>
 
-    <section>
-      <h2>Sản Phẩm Đã Nạp</h2>
-      <div id="products"></div>
-    </section>
+      <main class="content">
+        <section class="status-grid" aria-label="System status">
+          <div class="metric">
+            <div class="metric-label">Pixel ADB</div>
+            <div id="adbMetric" class="metric-value"><span class="badge warn">Dang kiem tra</span></div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Google token</div>
+            <div id="googleMetric" class="metric-value"><span class="badge warn">Dang kiem tra</span></div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">AI provider</div>
+            <div id="aiMetric" class="metric-value">...</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">S&#7843;n ph&#7849;m &#273;&#227; n&#7841;p</div>
+            <div id="productMetric" class="metric-value">0</div>
+          </div>
+        </section>
 
-    <section>
-      <h2>Log</h2>
-      <div id="log" class="status"></div>
-    </section>
-  </main>
+        <section class="layout">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">N&#7841;p d&#7919; li&#7879;u s&#7843;n ph&#7849;m</h2>
+                <p class="panel-subtitle">Ch&#7885;n th&#432; m&#7909;c ch&#7913;a &#7843;nh m&#7857;t tr&#432;&#7899;c, m&#7857;t sau, barcode v&#224; t&#224;i li&#7879;u t&#234;n s&#7843;n ph&#7849;m.</p>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="field-row">
+                <div>
+                  <label for="sourcePath">&#272;&#432;&#7901;ng d&#7851;n th&#432; m&#7909;c</label>
+                  <input id="sourcePath" placeholder="V&#237; d&#7909;: D:\product-data">
+                  <div class="hint">M&#7895;i s&#7843;n ph&#7849;m n&#234;n l&#224; m&#7897;t th&#432; m&#7909;c ri&#234;ng. File .txt/.csv/.json/.docx/.pdf c&#243; th&#7875; ch&#7913;a t&#234;n s&#7843;n ph&#7849;m m&#7895;i d&#242;ng.</div>
+                </div>
+                <button id="ingestBtn" onclick="ingest()">Qu&#233;t d&#7919; li&#7879;u</button>
+              </div>
+              <div class="button-row">
+                <button class="secondary" onclick="resetCatalog()">X&#243;a catalog v&#224; qu&#233;t l&#7841;i</button>
+                <button class="ghost" onclick="classifyLatest()">Nh&#7853;n di&#7879;n &#7843;nh m&#7899;i nh&#7845;t</button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Quy tr&#236;nh v&#7853;n h&#224;nh</h2>
+                <p class="panel-subtitle">D&#7919; li&#7879;u c&#224;ng r&#245;, AI c&#224;ng &#237;t nh&#7847;m album.</p>
+              </div>
+            </div>
+            <div class="panel-body steps">
+              <div class="step">
+                <div class="step-num">1</div>
+                <div><div class="step-title">N&#7841;p catalog</div><div class="step-text">Qu&#233;t th&#432; m&#7909;c s&#7843;n ph&#7849;m v&#224; &#7843;nh m&#7851;u.</div></div>
+              </div>
+              <div class="step">
+                <div class="step-num">2</div>
+                <div><div class="step-title">Ch&#7909;p t&#7915; Pixel</div><div class="step-text">ADB m&#7903; camera, ch&#7909;p &#7843;nh v&#224; k&#233;o file v&#7873; m&#225;y.</div></div>
+              </div>
+              <div class="step">
+                <div class="step-num">3</div>
+                <div><div class="step-title">AI ph&#226;n lo&#7841;i</div><div class="step-text">H&#7879; th&#7889;ng ch&#7885;n s&#7843;n ph&#7849;m, t&#7841;o album v&#224; upload Google Photos.</div></div>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Ch&#7909;p v&#224; upload</h2>
+              <p class="panel-subtitle">&#272;&#7875; tr&#7889;ng t&#234;n s&#7843;n ph&#7849;m n&#7871;u mu&#7889;n AI t&#7921; nh&#7853;n di&#7879;n.</p>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="two-col">
+              <div>
+                <label for="provider">AI provider</label>
+                <select id="provider">
+                  <option value="openai">OpenAI</option>
+                  <option value="gemini">Gemini</option>
+                  <option value="offline">Offline m&#7851;u &#7843;nh</option>
+                </select>
+              </div>
+              <div>
+                <label for="forcedProduct">&#201;p t&#234;n s&#7843;n ph&#7849;m khi test</label>
+                <input id="forcedProduct" placeholder="&#272;&#7875; tr&#7889;ng &#273;&#7875; AI t&#7921; nh&#7853;n di&#7879;n">
+              </div>
+            </div>
+            <div class="button-row">
+              <button id="captureBtn" onclick="captureUpload()">Ch&#7909;p t&#7915; Pixel v&#224; upload</button>
+              <button class="secondary" onclick="classifyLatest()">Nh&#7853;n di&#7879;n &#7843;nh m&#7899;i nh&#7845;t</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">S&#7843;n ph&#7849;m &#273;&#227; n&#7841;p</h2>
+              <p class="panel-subtitle">Danh s&#225;ch n&#224;y l&#224; t&#7853;p t&#234;n m&#224; AI &#273;&#432;&#7907;c ph&#233;p ch&#7885;n khi upload.</p>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div id="products" class="products"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Nh&#7853;t k&#253; x&#7917; l&#253;</h2>
+              <p class="panel-subtitle">Hi&#7875;n th&#7883; k&#7871;t qu&#7843; qu&#233;t catalog, nh&#7853;n di&#7879;n v&#224; upload.</p>
+            </div>
+            <button class="ghost" onclick="clearLog()">X&#243;a log</button>
+          </div>
+          <div class="panel-body">
+            <div class="log-wrap">
+              <div class="log-head"><span>Event stream</span><span id="logCount">0 events</span></div>
+              <div id="log" class="status"></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
 
   <script>
     const logBox = document.getElementById("log");
+    let eventCount = 0;
+
     function log(value) {
       const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
-      logBox.textContent = text + "\n\n" + logBox.textContent;
+      const time = new Date().toLocaleTimeString();
+      eventCount += 1;
+      document.getElementById("logCount").textContent = `${eventCount} events`;
+      logBox.textContent = `[${time}]\n${text}\n\n` + logBox.textContent;
     }
+
+    function clearLog() {
+      eventCount = 0;
+      document.getElementById("logCount").textContent = "0 events";
+      logBox.textContent = "";
+    }
+
     async function api(path, body) {
       const res = await fetch(path, {
         method: body ? "POST" : "GET",
@@ -124,27 +431,58 @@ HTML = r"""
       if (!res.ok) throw data;
       return data;
     }
+
+    function setBusy(isBusy) {
+      document.getElementById("ingestBtn").disabled = isBusy;
+      document.getElementById("captureBtn").disabled = isBusy;
+      document.getElementById("topCaptureBtn").disabled = isBusy;
+    }
+
+    function renderStatus(data) {
+      const hasAdb = Boolean(data.adb_device);
+      const hasGoogle = Boolean(data.google_token);
+      const products = data.products || [];
+
+      document.getElementById("adbMetric").innerHTML = hasAdb
+        ? `<span class="badge ok">${data.adb_device}</span>`
+        : `<span class="badge warn">Chưa thấy Pixel</span>`;
+      document.getElementById("googleMetric").innerHTML = hasGoogle
+        ? `<span class="badge ok">Đã kết nối</span>`
+        : `<span class="badge warn">Chưa có token</span>`;
+      document.getElementById("aiMetric").textContent = data.ai_provider || "...";
+      document.getElementById("productMetric").textContent = products.filter(p => p !== "Unsorted").length;
+      document.getElementById("navProductCount").textContent = products.filter(p => p !== "Unsorted").length;
+      document.getElementById("navGoogle").textContent = hasGoogle ? "OK" : "Thiếu";
+      document.getElementById("navAdb").textContent = hasAdb ? "OK" : "Offline";
+      document.getElementById("provider").value = data.ai_provider;
+      document.getElementById("products").innerHTML = products.length
+        ? products.map(p => `<span class="pill">${p}</span>`).join("")
+        : "<span class='empty'>Chưa có sản phẩm</span>";
+    }
+
     async function refresh() {
       try {
-        const data = await api("/api/status");
-        document.getElementById("health").textContent =
-          `ADB: ${data.adb_device || "chưa thấy Pixel"} | Google token: ${data.google_token ? "có" : "chưa có"} | AI: ${data.ai_provider}`;
-        document.getElementById("provider").value = data.ai_provider;
-        document.getElementById("products").innerHTML = data.products.map(p => `<span class="pill">${p}</span>`).join("") || "<span class='muted'>Chưa có sản phẩm</span>";
-      } catch (err) { log(err); }
+        renderStatus(await api("/api/status"));
+      } catch (err) {
+        log(err);
+      }
     }
+
     async function ingest() {
-      const btn = document.getElementById("ingestBtn");
-      btn.disabled = true;
+      setBusy(true);
       try {
         const data = await api("/api/ingest", {source_path: document.getElementById("sourcePath").value});
         log(data);
         await refresh();
-      } catch (err) { log(err); } finally { btn.disabled = false; }
+      } catch (err) {
+        log(err);
+      } finally {
+        setBusy(false);
+      }
     }
+
     async function captureUpload() {
-      const btn = document.getElementById("captureBtn");
-      btn.disabled = true;
+      setBusy(true);
       try {
         const data = await api("/api/capture-upload", {
           provider: document.getElementById("provider").value,
@@ -152,22 +490,37 @@ HTML = r"""
         });
         log(data);
         await refresh();
-      } catch (err) { log(err); } finally { btn.disabled = false; }
+      } catch (err) {
+        log(err);
+      } finally {
+        setBusy(false);
+      }
     }
+
     async function classifyLatest() {
+      setBusy(true);
       try {
-        const data = await api("/api/classify-latest", {provider: document.getElementById("provider").value});
-        log(data);
-      } catch (err) { log(err); }
+        log(await api("/api/classify-latest", {provider: document.getElementById("provider").value}));
+      } catch (err) {
+        log(err);
+      } finally {
+        setBusy(false);
+      }
     }
+
     async function resetCatalog() {
       if (!confirm("Xóa toàn bộ catalog sản phẩm đã nạp?")) return;
+      setBusy(true);
       try {
-        const data = await api("/api/reset-catalog", {});
-        log(data);
+        log(await api("/api/reset-catalog", {}));
         await refresh();
-      } catch (err) { log(err); }
+      } catch (err) {
+        log(err);
+      } finally {
+        setBusy(false);
+      }
     }
+
     refresh();
   </script>
 </body>
