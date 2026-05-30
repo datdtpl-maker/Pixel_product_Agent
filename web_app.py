@@ -124,6 +124,7 @@ HTML = r"""
     .top-actions { display: flex; align-items: center; gap: 10px; }
     .content { max-width: 1220px; margin: 0 auto; padding: 24px 26px 38px; display: grid; gap: 18px; }
     .status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .status-grid.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     .metric {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -248,7 +249,7 @@ HTML = r"""
     @media (max-width: 980px) {
       .app-shell { grid-template-columns: 1fr; }
       .sidebar { position: static; height: auto; }
-      .status-grid, .layout, .two-col, .field-row { grid-template-columns: 1fr; }
+      .status-grid, .status-grid.five, .layout, .two-col, .field-row { grid-template-columns: 1fr; }
       .field-row button { margin-top: 0; width: 100%; }
       .topbar { align-items: flex-start; flex-direction: column; }
       .top-actions { width: 100%; }
@@ -290,7 +291,7 @@ HTML = r"""
       </header>
 
       <main class="content">
-        <section class="status-grid" aria-label="System status">
+        <section class="status-grid five" aria-label="System status">
           <div class="metric">
             <div class="metric-label">Pixel ADB</div>
             <div id="adbMetric" class="metric-value"><span class="badge warn">Dang kiem tra</span></div>
@@ -302,6 +303,10 @@ HTML = r"""
           <div class="metric">
             <div class="metric-label">AI provider</div>
             <div id="aiMetric" class="metric-value">...</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">GPT API</div>
+            <div id="gptMetric" class="metric-value"><span class="badge warn">Chưa kiểm tra</span></div>
           </div>
           <div class="metric">
             <div class="metric-label">S&#7843;n ph&#7849;m &#273;&#227; n&#7841;p</div>
@@ -411,8 +416,13 @@ HTML = r"""
                 <input id="openaiApiKey" type="password" autocomplete="off" placeholder="sk-... ho&#7863;c sk-proj-...">
                 <div id="apiKeyStatus" class="hint">Tr&#7841;ng th&#225;i key: &#273;ang ki&#7875;m tra...</div>
               </div>
-              <button id="saveOpenAiKeyBtn" onclick="saveOpenAiKey()">L&#432;u key</button>
+              <button id="saveOpenAiKeyBtn" onclick="saveOpenAiKey()">L&#432;u server</button>
             </div>
+            <div class="button-row">
+              <button class="ghost" onclick="saveOpenAiKeyToBrowser()">L&#432;u t&#7841;i tr&#236;nh duy&#7879;t</button>
+              <button class="secondary" onclick="checkGptApi()">Ki&#7875;m tra GPT API</button>
+            </div>
+            <div class="hint">L&#432;u server ghi key v&#224;o file .env &#273;&#7875; app d&#249;ng khi ch&#7909;p/quay. L&#432;u t&#7841;i tr&#236;nh duy&#7879;t ch&#7881; gi&#7919; key trong browser &#273;&#7875; t&#7921; &#273;i&#7873;n l&#7841;i.</div>
           </div>
         </section>
 
@@ -496,6 +506,9 @@ HTML = r"""
         ? `<span class="badge ok">Đã kết nối</span>`
         : `<span class="badge warn">Chưa có token</span>`;
       document.getElementById("aiMetric").textContent = data.ai_provider || "...";
+      document.getElementById("gptMetric").innerHTML = data.openai_key
+        ? `<span class="badge ok">Đã có key</span>`
+        : `<span class="badge warn">Thiếu key</span>`;
       document.getElementById("apiKeyStatus").textContent = data.openai_key
         ? `Trạng thái key: đã lưu (${data.openai_key_masked})`
         : "Trạng thái key: chưa có OpenAI API key";
@@ -583,6 +596,31 @@ HTML = r"""
       }
     }
 
+    function saveOpenAiKeyToBrowser() {
+      const keyInput = document.getElementById("openaiApiKey");
+      const apiKey = keyInput.value.trim();
+      if (!apiKey) {
+        log("Vui lòng nhập OpenAI API key trước khi lưu tại trình duyệt.");
+        return;
+      }
+      localStorage.setItem("pixel_agent_openai_api_key", apiKey);
+      log({status: "saved_in_browser", provider: "openai"});
+    }
+
+    async function checkGptApi() {
+      const apiKey = document.getElementById("openaiApiKey").value.trim();
+      try {
+        const data = await api("/api/settings/check-openai", {api_key: apiKey});
+        document.getElementById("gptMetric").innerHTML = data.ok
+          ? `<span class="badge ok">GPT OK</span>`
+          : `<span class="badge warn">${data.status}</span>`;
+        log(data);
+      } catch (err) {
+        document.getElementById("gptMetric").innerHTML = `<span class="badge warn">Lỗi</span>`;
+        log(err);
+      }
+    }
+
     async function classifyLatest() {
       setBusy(true);
       try {
@@ -607,6 +645,10 @@ HTML = r"""
       }
     }
 
+    const browserKey = localStorage.getItem("pixel_agent_openai_api_key");
+    if (browserKey) {
+      document.getElementById("openaiApiKey").value = browserKey;
+    }
     refresh();
   </script>
 </body>
@@ -659,6 +701,25 @@ def masked_key(value: str | None) -> str:
     if len(value) <= 12:
         return "*" * len(value)
     return f"{value[:7]}...{value[-4:]}"
+
+
+def check_openai_key(api_key: str) -> dict[str, Any]:
+    import requests
+
+    if not api_key:
+        raise ValueError("Chua co OpenAI API key de kiem tra.")
+    response = requests.get(
+        "https://api.openai.com/v1/models",
+        headers={"Authorization": f"Bearer {api_key}"},
+        timeout=30,
+    )
+    if response.status_code == 200:
+        return {"ok": True, "status": "connected", "message": "GPT API dang hoat dong."}
+    if response.status_code in {401, 403}:
+        return {"ok": False, "status": "auth_error", "message": "Key khong hop le hoac khong co quyen truy cap."}
+    if response.status_code == 429:
+        return {"ok": False, "status": "rate_or_quota", "message": "Key bi gioi han toc do hoac het quota."}
+    return {"ok": False, "status": f"http_{response.status_code}", "message": response.text[:500]}
 
 
 def error_response(exc: Exception, status: int = 500):
@@ -794,6 +855,21 @@ def api_save_api_key():
         values["OPENAI_API_KEY"] = api_key
         save_env_values(values)
         return jsonify({"status": "saved", "provider": provider, "openai_key_masked": masked_key(api_key)})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/settings/check-openai")
+def api_check_openai():
+    try:
+        payload = request.json or {}
+        api_key = (payload.get("api_key") or "").strip()
+        if not api_key:
+            values = load_env_values()
+            api_key = os.environ.get("OPENAI_API_KEY") or values.get("OPENAI_API_KEY", "")
+        result = check_openai_key(api_key)
+        result["openai_key_masked"] = masked_key(api_key)
+        return jsonify(result)
     except Exception as exc:
         return error_response(exc, 400)
 
