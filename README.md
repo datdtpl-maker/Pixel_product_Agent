@@ -67,16 +67,18 @@ Default AI settings live in `config.json`:
 
 ```json
 "mode": "ai",
-"ai_provider": "openai",
+"ai_provider": "both",
 "openai_model": "gpt-4.1-mini",
 "gemini_model": "gemini-2.5-flash"
 ```
 
-To use Gemini instead, set:
+To use only Gemini instead, set:
 
 ```json
 "ai_provider": "gemini"
 ```
+
+Supported values are `both`, `openai`, `gemini`, and `offline` from the web UI. In `both` mode, OpenAI and Gemini classify the same reference image; matching results are treated as agreement, and if one provider fails the other can still be used.
 
 ## Test Modes
 

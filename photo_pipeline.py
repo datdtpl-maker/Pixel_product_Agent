@@ -417,6 +417,31 @@ def classify_with_gemini(settings: Settings, image_path: Path, names: list[str])
 def classify_by_ai(settings: Settings, image_path: Path) -> tuple[str, float | None, str]:
     names = product_names(settings)
     provider = settings.ai_provider.lower()
+    if provider in {"both", "openai+gemini", "dual"}:
+        results: list[tuple[str, float | None, str, str]] = []
+        errors: list[str] = []
+        for name, classifier in (("openai", classify_with_openai), ("gemini", classify_with_gemini)):
+            try:
+                product, confidence, reason = classifier(settings, image_path, names)
+                results.append((name, product, confidence, reason))
+            except Exception as exc:
+                errors.append(f"{name}: {exc}")
+        if not results:
+            raise RuntimeError("; ".join(errors) or "No AI provider returned a result.")
+
+        non_unsorted = [result for result in results if result[1] != settings.default_product]
+        if len(non_unsorted) >= 2 and len({result[1] for result in non_unsorted}) == 1:
+            provider_names = "+".join(result[0] for result in non_unsorted)
+            confidence_values = [result[2] for result in non_unsorted if isinstance(result[2], int | float)]
+            avg_confidence = sum(confidence_values) / len(confidence_values) if confidence_values else None
+            return non_unsorted[0][1], avg_confidence, f"{provider_names} agreed: {non_unsorted[0][3]}"
+
+        chosen = max(
+            results,
+            key=lambda result: (result[1] != settings.default_product, float(result[2] or 0)),
+        )
+        extra = f"; errors: {'; '.join(errors)}" if errors else ""
+        return chosen[1], chosen[2], f"{chosen[0]} selected; dual results={[(r[0], r[1], r[2]) for r in results]}{extra}"
     if provider == "gemini":
         return classify_with_gemini(settings, image_path, names)
     if provider == "openai":

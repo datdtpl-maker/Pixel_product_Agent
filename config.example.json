@@ -14,7 +14,7 @@
     "labels_file": "product_labels.json",
     "catalog_file": "product_catalog.json",
     "similarity_threshold": 0.82,
-    "ai_provider": "openai",
+    "ai_provider": "both",
     "openai_model": "gpt-4.1-mini",
     "gemini_model": "gemini-2.5-flash"
   },

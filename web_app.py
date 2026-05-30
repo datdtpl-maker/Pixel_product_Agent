@@ -125,6 +125,7 @@ HTML = r"""
     .content { max-width: 1220px; margin: 0 auto; padding: 24px 26px 38px; display: grid; gap: 18px; }
     .status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
     .status-grid.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .status-grid.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
     .metric {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -249,7 +250,7 @@ HTML = r"""
     @media (max-width: 980px) {
       .app-shell { grid-template-columns: 1fr; }
       .sidebar { position: static; height: auto; }
-      .status-grid, .status-grid.five, .layout, .two-col, .field-row { grid-template-columns: 1fr; }
+      .status-grid, .status-grid.five, .status-grid.six, .layout, .two-col, .field-row { grid-template-columns: 1fr; }
       .field-row button { margin-top: 0; width: 100%; }
       .topbar { align-items: flex-start; flex-direction: column; }
       .top-actions { width: 100%; }
@@ -291,7 +292,7 @@ HTML = r"""
       </header>
 
       <main class="content">
-        <section class="status-grid five" aria-label="System status">
+        <section class="status-grid six" aria-label="System status">
           <div class="metric">
             <div class="metric-label">Pixel ADB</div>
             <div id="adbMetric" class="metric-value"><span class="badge warn">Dang kiem tra</span></div>
@@ -307,6 +308,10 @@ HTML = r"""
           <div class="metric">
             <div class="metric-label">GPT API</div>
             <div id="gptMetric" class="metric-value"><span class="badge warn">Chưa kiểm tra</span></div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Gemini API</div>
+            <div id="geminiMetric" class="metric-value"><span class="badge warn">Chưa kiểm tra</span></div>
           </div>
           <div class="metric">
             <div class="metric-label">S&#7843;n ph&#7849;m &#273;&#227; n&#7841;p</div>
@@ -373,6 +378,7 @@ HTML = r"""
               <div>
                 <label for="provider">AI provider</label>
                 <select id="provider">
+                  <option value="both">OpenAI + Gemini</option>
                   <option value="openai">OpenAI</option>
                   <option value="gemini">Gemini</option>
                   <option value="offline">Offline m&#7851;u &#7843;nh</option>
@@ -421,6 +427,18 @@ HTML = r"""
             <div class="button-row">
               <button class="ghost" onclick="saveOpenAiKeyToBrowser()">L&#432;u t&#7841;i tr&#236;nh duy&#7879;t</button>
               <button class="secondary" onclick="checkGptApi()">Ki&#7875;m tra GPT API</button>
+            </div>
+            <div class="field-row">
+              <div>
+                <label for="geminiApiKey">Gemini API key</label>
+                <input id="geminiApiKey" type="password" autocomplete="off" placeholder="AIza...">
+                <div id="geminiKeyStatus" class="hint">Tr&#7841;ng th&#225;i key Gemini: &#273;ang ki&#7875;m tra...</div>
+              </div>
+              <button id="saveGeminiKeyBtn" onclick="saveGeminiKey()">L&#432;u server</button>
+            </div>
+            <div class="button-row">
+              <button class="ghost" onclick="saveGeminiKeyToBrowser()">L&#432;u t&#7841;i tr&#236;nh duy&#7879;t</button>
+              <button class="secondary" onclick="checkGeminiApi()">Ki&#7875;m tra Gemini API</button>
             </div>
             <div class="hint">L&#432;u server ghi key v&#224;o file .env &#273;&#7875; app d&#249;ng khi ch&#7909;p/quay. L&#432;u t&#7841;i tr&#236;nh duy&#7879;t ch&#7881; gi&#7919; key trong browser &#273;&#7875; t&#7921; &#273;i&#7873;n l&#7841;i.</div>
           </div>
@@ -509,9 +527,15 @@ HTML = r"""
       document.getElementById("gptMetric").innerHTML = data.openai_key
         ? `<span class="badge ok">Đã có key</span>`
         : `<span class="badge warn">Thiếu key</span>`;
+      document.getElementById("geminiMetric").innerHTML = data.gemini_key
+        ? `<span class="badge ok">Đã có key</span>`
+        : `<span class="badge warn">Thiếu key</span>`;
       document.getElementById("apiKeyStatus").textContent = data.openai_key
         ? `Trạng thái key: đã lưu (${data.openai_key_masked})`
         : "Trạng thái key: chưa có OpenAI API key";
+      document.getElementById("geminiKeyStatus").textContent = data.gemini_key
+        ? "Trạng thái key Gemini: đã lưu"
+        : "Trạng thái key Gemini: chưa có Gemini API key";
       document.getElementById("productMetric").textContent = products.filter(p => p !== "Unsorted").length;
       document.getElementById("navProductCount").textContent = products.filter(p => p !== "Unsorted").length;
       document.getElementById("navGoogle").textContent = hasGoogle ? "OK" : "Thiếu";
@@ -596,6 +620,26 @@ HTML = r"""
       }
     }
 
+    async function saveGeminiKey() {
+      const keyInput = document.getElementById("geminiApiKey");
+      const apiKey = keyInput.value.trim();
+      if (!apiKey) {
+        log("Vui lòng nhập Gemini API key trước khi lưu.");
+        return;
+      }
+      document.getElementById("saveGeminiKeyBtn").disabled = true;
+      try {
+        const data = await api("/api/settings/api-key", {provider: "gemini", api_key: apiKey});
+        keyInput.value = "";
+        log(data);
+        await refresh();
+      } catch (err) {
+        log(err);
+      } finally {
+        document.getElementById("saveGeminiKeyBtn").disabled = false;
+      }
+    }
+
     function saveOpenAiKeyToBrowser() {
       const keyInput = document.getElementById("openaiApiKey");
       const apiKey = keyInput.value.trim();
@@ -605,6 +649,17 @@ HTML = r"""
       }
       localStorage.setItem("pixel_agent_openai_api_key", apiKey);
       log({status: "saved_in_browser", provider: "openai"});
+    }
+
+    function saveGeminiKeyToBrowser() {
+      const keyInput = document.getElementById("geminiApiKey");
+      const apiKey = keyInput.value.trim();
+      if (!apiKey) {
+        log("Vui lòng nhập Gemini API key trước khi lưu tại trình duyệt.");
+        return;
+      }
+      localStorage.setItem("pixel_agent_gemini_api_key", apiKey);
+      log({status: "saved_in_browser", provider: "gemini"});
     }
 
     async function checkGptApi() {
@@ -617,6 +672,20 @@ HTML = r"""
         log(data);
       } catch (err) {
         document.getElementById("gptMetric").innerHTML = `<span class="badge warn">Lỗi</span>`;
+        log(err);
+      }
+    }
+
+    async function checkGeminiApi() {
+      const apiKey = document.getElementById("geminiApiKey").value.trim();
+      try {
+        const data = await api("/api/settings/check-gemini", {api_key: apiKey});
+        document.getElementById("geminiMetric").innerHTML = data.ok
+          ? `<span class="badge ok">Gemini OK</span>`
+          : `<span class="badge warn">${data.status}</span>`;
+        log(data);
+      } catch (err) {
+        document.getElementById("geminiMetric").innerHTML = `<span class="badge warn">Lỗi</span>`;
         log(err);
       }
     }
@@ -648,6 +717,10 @@ HTML = r"""
     const browserKey = localStorage.getItem("pixel_agent_openai_api_key");
     if (browserKey) {
       document.getElementById("openaiApiKey").value = browserKey;
+    }
+    const browserGeminiKey = localStorage.getItem("pixel_agent_gemini_api_key");
+    if (browserGeminiKey) {
+      document.getElementById("geminiApiKey").value = browserGeminiKey;
     }
     refresh();
   </script>
@@ -716,6 +789,25 @@ def check_openai_key(api_key: str) -> dict[str, Any]:
     if response.status_code == 200:
         return {"ok": True, "status": "connected", "message": "GPT API dang hoat dong."}
     if response.status_code in {401, 403}:
+        return {"ok": False, "status": "auth_error", "message": "Key khong hop le hoac khong co quyen truy cap."}
+    if response.status_code == 429:
+        return {"ok": False, "status": "rate_or_quota", "message": "Key bi gioi han toc do hoac het quota."}
+    return {"ok": False, "status": f"http_{response.status_code}", "message": response.text[:500]}
+
+
+def check_gemini_key(api_key: str) -> dict[str, Any]:
+    import requests
+
+    if not api_key:
+        raise ValueError("Chua co Gemini API key de kiem tra.")
+    response = requests.get(
+        "https://generativelanguage.googleapis.com/v1beta/models",
+        params={"key": api_key},
+        timeout=30,
+    )
+    if response.status_code == 200:
+        return {"ok": True, "status": "connected", "message": "Gemini API dang hoat dong."}
+    if response.status_code in {400, 401, 403}:
         return {"ok": False, "status": "auth_error", "message": "Key khong hop le hoac khong co quyen truy cap."}
     if response.status_code == 429:
         return {"ok": False, "status": "rate_or_quota", "message": "Key bi gioi han toc do hoac het quota."}
@@ -834,6 +926,7 @@ def api_status():
             "openai_key": bool(os.environ.get("OPENAI_API_KEY") or load_env_values().get("OPENAI_API_KEY")),
             "openai_key_masked": masked_key(os.environ.get("OPENAI_API_KEY") or load_env_values().get("OPENAI_API_KEY")),
             "gemini_key": bool(os.environ.get("GEMINI_API_KEY") or load_env_values().get("GEMINI_API_KEY")),
+            "gemini_key_masked": masked_key(os.environ.get("GEMINI_API_KEY") or load_env_values().get("GEMINI_API_KEY")),
             "ai_provider": cfg.ai_provider if cfg.classification_mode == "ai" else "offline",
             "products": pipeline.product_names(cfg),
         }
@@ -846,15 +939,18 @@ def api_save_api_key():
         payload = request.json or {}
         provider = (payload.get("provider") or "openai").lower().strip()
         api_key = (payload.get("api_key") or "").strip()
-        if provider != "openai":
-            raise ValueError("Hien tai chi ho tro luu OpenAI API key tu giao dien nay.")
-        if not api_key.startswith(("sk-", "sk-proj-")):
+        if provider == "openai" and not api_key.startswith(("sk-", "sk-proj-")):
             raise ValueError("OpenAI API key khong dung dinh dang mong doi.")
+        if provider == "gemini" and not api_key.startswith("AIza"):
+            raise ValueError("Gemini API key khong dung dinh dang mong doi.")
+        if provider not in {"openai", "gemini"}:
+            raise ValueError("Provider khong hop le.")
 
         values = load_env_values()
-        values["OPENAI_API_KEY"] = api_key
+        env_name = "OPENAI_API_KEY" if provider == "openai" else "GEMINI_API_KEY"
+        values[env_name] = api_key
         save_env_values(values)
-        return jsonify({"status": "saved", "provider": provider, "openai_key_masked": masked_key(api_key)})
+        return jsonify({"status": "saved", "provider": provider, "key_masked": masked_key(api_key)})
     except Exception as exc:
         return error_response(exc, 400)
 
@@ -869,6 +965,21 @@ def api_check_openai():
             api_key = os.environ.get("OPENAI_API_KEY") or values.get("OPENAI_API_KEY", "")
         result = check_openai_key(api_key)
         result["openai_key_masked"] = masked_key(api_key)
+        return jsonify(result)
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/settings/check-gemini")
+def api_check_gemini():
+    try:
+        payload = request.json or {}
+        api_key = (payload.get("api_key") or "").strip()
+        if not api_key:
+            values = load_env_values()
+            api_key = os.environ.get("GEMINI_API_KEY") or values.get("GEMINI_API_KEY", "")
+        result = check_gemini_key(api_key)
+        result["gemini_key_masked"] = masked_key(api_key)
         return jsonify(result)
     except Exception as exc:
         return error_response(exc, 400)
