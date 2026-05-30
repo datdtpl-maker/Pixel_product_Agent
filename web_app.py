@@ -895,6 +895,10 @@ def set_provider(cfg: pipeline.Settings, provider: str) -> None:
     if provider == "offline":
         cfg.classification_mode = "image_similarity"
         return
+    if provider in {"both", "openai+gemini", "dual"}:
+        cfg.classification_mode = "ai"
+        cfg.ai_provider = "both"
+        return
     if provider in {"openai", "gemini"}:
         cfg.classification_mode = "ai"
         cfg.ai_provider = provider
