@@ -400,6 +400,25 @@ HTML = r"""
         <section class="panel">
           <div class="panel-header">
             <div>
+              <h2 class="panel-title">C&#7845;u h&#236;nh API AI</h2>
+              <p class="panel-subtitle">Nh&#7853;p OpenAI API key m&#7899;i khi key c&#361; h&#7871;t h&#7841;n, b&#7883; revoke ho&#7863;c kh&#244;ng c&#242;n quota. Key &#273;&#432;&#7907;c l&#432;u c&#7909;c b&#7897; trong file .env v&#224; kh&#244;ng hi&#7875;n th&#7883; l&#7841;i tr&#234;n giao di&#7879;n.</p>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="field-row">
+              <div>
+                <label for="openaiApiKey">OpenAI API key</label>
+                <input id="openaiApiKey" type="password" autocomplete="off" placeholder="sk-... ho&#7863;c sk-proj-...">
+                <div id="apiKeyStatus" class="hint">Tr&#7841;ng th&#225;i key: &#273;ang ki&#7875;m tra...</div>
+              </div>
+              <button id="saveOpenAiKeyBtn" onclick="saveOpenAiKey()">L&#432;u key</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
               <h2 class="panel-title">S&#7843;n ph&#7849;m &#273;&#227; n&#7841;p</h2>
               <p class="panel-subtitle">Danh s&#225;ch n&#224;y l&#224; t&#7853;p t&#234;n m&#224; AI &#273;&#432;&#7907;c ph&#233;p ch&#7885;n khi upload.</p>
             </div>
@@ -477,6 +496,9 @@ HTML = r"""
         ? `<span class="badge ok">Đã kết nối</span>`
         : `<span class="badge warn">Chưa có token</span>`;
       document.getElementById("aiMetric").textContent = data.ai_provider || "...";
+      document.getElementById("apiKeyStatus").textContent = data.openai_key
+        ? `Trạng thái key: đã lưu (${data.openai_key_masked})`
+        : "Trạng thái key: chưa có OpenAI API key";
       document.getElementById("productMetric").textContent = products.filter(p => p !== "Unsorted").length;
       document.getElementById("navProductCount").textContent = products.filter(p => p !== "Unsorted").length;
       document.getElementById("navGoogle").textContent = hasGoogle ? "OK" : "Thiếu";
@@ -541,6 +563,26 @@ HTML = r"""
       }
     }
 
+    async function saveOpenAiKey() {
+      const keyInput = document.getElementById("openaiApiKey");
+      const apiKey = keyInput.value.trim();
+      if (!apiKey) {
+        log("Vui lòng nhập OpenAI API key trước khi lưu.");
+        return;
+      }
+      document.getElementById("saveOpenAiKeyBtn").disabled = true;
+      try {
+        const data = await api("/api/settings/api-key", {provider: "openai", api_key: apiKey});
+        keyInput.value = "";
+        log(data);
+        await refresh();
+      } catch (err) {
+        log(err);
+      } finally {
+        document.getElementById("saveOpenAiKeyBtn").disabled = false;
+      }
+    }
+
     async function classifyLatest() {
       setBusy(true);
       try {
@@ -577,6 +619,46 @@ def settings() -> pipeline.Settings:
     pipeline.load_dotenv(loaded.root)
     pipeline.ensure_dirs(loaded)
     return loaded
+
+
+def env_path() -> Path:
+    return ROOT / ".env"
+
+
+def load_env_values() -> dict[str, str]:
+    values: dict[str, str] = {}
+    path = env_path()
+    if not path.exists():
+        return values
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
+def save_env_values(values: dict[str, str]) -> None:
+    ordered_keys = ["OPENAI_API_KEY", "GEMINI_API_KEY"]
+    lines: list[str] = []
+    for key in ordered_keys:
+        if values.get(key):
+            lines.append(f"{key}={values[key]}")
+    for key in sorted(k for k in values if k not in ordered_keys and values[k]):
+        lines.append(f"{key}={values[key]}")
+    env_path().write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    for key, value in values.items():
+        if value:
+            os.environ[key] = value
+
+
+def masked_key(value: str | None) -> str:
+    if not value:
+        return ""
+    if len(value) <= 12:
+        return "*" * len(value)
+    return f"{value[:7]}...{value[-4:]}"
 
 
 def error_response(exc: Exception, status: int = 500):
@@ -687,11 +769,33 @@ def api_status():
     return jsonify(
         {
             "adb_device": devices[0] if devices else "",
-            "google_token": cfg.token_file.exists(),
+      "google_token": cfg.token_file.exists(),
+            "openai_key": bool(os.environ.get("OPENAI_API_KEY") or load_env_values().get("OPENAI_API_KEY")),
+            "openai_key_masked": masked_key(os.environ.get("OPENAI_API_KEY") or load_env_values().get("OPENAI_API_KEY")),
+            "gemini_key": bool(os.environ.get("GEMINI_API_KEY") or load_env_values().get("GEMINI_API_KEY")),
             "ai_provider": cfg.ai_provider if cfg.classification_mode == "ai" else "offline",
             "products": pipeline.product_names(cfg),
         }
     )
+
+
+@app.post("/api/settings/api-key")
+def api_save_api_key():
+    try:
+        payload = request.json or {}
+        provider = (payload.get("provider") or "openai").lower().strip()
+        api_key = (payload.get("api_key") or "").strip()
+        if provider != "openai":
+            raise ValueError("Hien tai chi ho tro luu OpenAI API key tu giao dien nay.")
+        if not api_key.startswith(("sk-", "sk-proj-")):
+            raise ValueError("OpenAI API key khong dung dinh dang mong doi.")
+
+        values = load_env_values()
+        values["OPENAI_API_KEY"] = api_key
+        save_env_values(values)
+        return jsonify({"status": "saved", "provider": provider, "openai_key_masked": masked_key(api_key)})
+    except Exception as exc:
+        return error_response(exc, 400)
 
 
 @app.post("/api/ingest")
