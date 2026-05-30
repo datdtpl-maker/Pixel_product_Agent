@@ -164,9 +164,21 @@ HTML = r"""
     .panel-title { margin: 0; font-size: 17px; }
     .panel-subtitle { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
     .panel-body { padding: 18px; display: grid; gap: 16px; }
-    .field-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+    .field-row { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 10px; align-items: start; }
+    .field-row button { margin-top: 29px; width: 132px; }
     .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     .button-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .test-tools {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px;
+      background: var(--panel-soft);
+      border: 1px solid #e5eaf1;
+      border-radius: 8px;
+    }
     .hint { color: var(--muted); font-size: 13px; line-height: 1.45; margin-top: 7px; }
     .steps { display: grid; gap: 10px; }
     .step {
@@ -237,6 +249,7 @@ HTML = r"""
       .app-shell { grid-template-columns: 1fr; }
       .sidebar { position: static; height: auto; }
       .status-grid, .layout, .two-col, .field-row { grid-template-columns: 1fr; }
+      .field-row button { margin-top: 0; width: 100%; }
       .topbar { align-items: flex-start; flex-direction: column; }
       .top-actions { width: 100%; }
       .top-actions button { flex: 1; }
@@ -315,7 +328,6 @@ HTML = r"""
               </div>
               <div class="button-row">
                 <button class="secondary" onclick="resetCatalog()">X&#243;a catalog v&#224; qu&#233;t l&#7841;i</button>
-                <button class="ghost" onclick="classifyLatest()">Nh&#7853;n di&#7879;n &#7843;nh m&#7899;i nh&#7845;t</button>
               </div>
             </div>
           </div>
@@ -374,7 +386,13 @@ HTML = r"""
             <div class="button-row">
               <button id="captureBtn" onclick="captureUpload()">Ch&#7909;p &#7843;nh t&#7915; Pixel v&#224; upload</button>
               <button id="recordBtn" onclick="recordUpload()">Quay video t&#7915; Pixel v&#224; upload</button>
-              <button class="secondary" onclick="classifyLatest()">Nh&#7853;n di&#7879;n &#7843;nh m&#7899;i nh&#7845;t</button>
+            </div>
+            <div class="test-tools">
+              <div>
+                <div class="step-title">Ki&#7875;m th&#7917; AI</div>
+                <div class="step-text">Ch&#7841;y nh&#7853;n di&#7879;n tr&#234;n &#7843;nh m&#7899;i nh&#7845;t trong inbox, kh&#244;ng ch&#7909;p m&#7899;i v&#224; kh&#244;ng upload.</div>
+              </div>
+              <button class="ghost" onclick="classifyLatest()">Test nh&#7853;n di&#7879;n &#7843;nh m&#7899;i nh&#7845;t</button>
             </div>
           </div>
         </section>
