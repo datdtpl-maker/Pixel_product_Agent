@@ -190,6 +190,42 @@ def create_media_item(creds: Credentials, upload_token: str, album_id: str, desc
     return response.json()
 
 
+def media_item_error_status(result: dict[str, Any]) -> str:
+    media_results = result.get("newMediaItemResults", [])
+    if not media_results:
+        return ""
+    return media_results[0].get("status", {}).get("message", "")
+
+
+def create_media_item_with_album_retry(
+    settings: Settings,
+    creds: Credentials,
+    upload_token: str,
+    album_title: str,
+    description: str,
+) -> tuple[str, dict[str, Any]]:
+    album_id = get_or_create_album(settings, creds, album_title)
+    try:
+        result = create_media_item(creds, upload_token, album_id, description)
+    except RuntimeError as exc:
+        if "does not match any albums" not in str(exc) and "NOT_FOUND" not in str(exc):
+            raise
+        cache = load_album_cache(settings)
+        cache.pop(album_title, None)
+        save_album_cache(settings, cache)
+        album_id = create_album(settings, creds, album_title)
+        result = create_media_item(creds, upload_token, album_id, description)
+
+    status = media_item_error_status(result)
+    if "does not match any albums" in status or "NOT_FOUND" in status:
+        cache = load_album_cache(settings)
+        cache.pop(album_title, None)
+        save_album_cache(settings, cache)
+        album_id = create_album(settings, creds, album_title)
+        result = create_media_item(creds, upload_token, album_id, description)
+    return album_id, result
+
+
 def classify_by_filename(settings: Settings, image_path: Path, forced_product: str | None) -> str:
     if forced_product:
         return forced_product
@@ -551,9 +587,8 @@ def capture_video_from_pixel(settings: Settings, duration_seconds: int = 10) -> 
 
 def upload_photo(settings: Settings, image_path: Path, product: str) -> dict[str, Any]:
     creds = get_credentials(settings)
-    album_id = get_or_create_album(settings, creds, product)
     upload_token = upload_bytes(creds, image_path)
-    result = create_media_item(creds, upload_token, album_id, f"Product: {product}")
+    album_id, result = create_media_item_with_album_retry(settings, creds, upload_token, product, f"Product: {product}")
 
     product_dir = settings.processed_dir / safe_name(product)
     product_dir.mkdir(parents=True, exist_ok=True)
@@ -565,9 +600,14 @@ def upload_photo(settings: Settings, image_path: Path, product: str) -> dict[str
 
 def upload_media(settings: Settings, media_path: Path, product: str, description_prefix: str = "Product") -> dict[str, Any]:
     creds = get_credentials(settings)
-    album_id = get_or_create_album(settings, creds, product)
     upload_token = upload_bytes(creds, media_path)
-    result = create_media_item(creds, upload_token, album_id, f"{description_prefix}: {product}")
+    album_id, result = create_media_item_with_album_retry(
+        settings,
+        creds,
+        upload_token,
+        product,
+        f"{description_prefix}: {product}",
+    )
 
     product_dir = settings.processed_dir / safe_name(product)
     product_dir.mkdir(parents=True, exist_ok=True)

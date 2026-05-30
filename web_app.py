@@ -336,9 +336,10 @@ HTML = r"""
                 </div>
                 <button id="ingestBtn" onclick="ingest()">Qu&#233;t d&#7919; li&#7879;u</button>
               </div>
-              <div class="button-row">
-                <button class="secondary" onclick="resetCatalog()">X&#243;a catalog v&#224; qu&#233;t l&#7841;i</button>
-              </div>
+            <div class="button-row">
+              <button class="secondary" onclick="resetCatalog()">X&#243;a catalog v&#224; qu&#233;t l&#7841;i</button>
+              <button class="ghost" onclick="resetAlbumCache()">X&#243;a cache album Google Photos</button>
+            </div>
             </div>
           </div>
 
@@ -714,6 +715,19 @@ HTML = r"""
       }
     }
 
+    async function resetAlbumCache() {
+      if (!confirm("Xóa cache album Google Photos? App sẽ tạo album mới khi upload tiếp theo nếu cần.")) return;
+      setBusy(true);
+      try {
+        log(await api("/api/reset-album-cache", {}));
+        await refresh();
+      } catch (err) {
+        log(err);
+      } finally {
+        setBusy(false);
+      }
+    }
+
     const browserKey = localStorage.getItem("pixel_agent_openai_api_key");
     if (browserKey) {
       document.getElementById("openaiApiKey").value = browserKey;
@@ -1005,6 +1019,16 @@ def api_reset_catalog():
         cfg = settings()
         pipeline.save_catalog(cfg, {"products": []})
         return jsonify({"status": "reset", "catalog": str(cfg.catalog_file)})
+    except Exception as exc:
+        return error_response(exc)
+
+
+@app.post("/api/reset-album-cache")
+def api_reset_album_cache():
+    try:
+        cfg = settings()
+        pipeline.save_album_cache(cfg, {})
+        return jsonify({"status": "reset", "album_cache": str(cfg.album_cache_file)})
     except Exception as exc:
         return error_response(exc)
 
