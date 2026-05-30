@@ -111,7 +111,8 @@ The UI can:
 
 - scan a local product folder for docs and sample images;
 - classify the latest captured image;
-- trigger Pixel capture and Google Photos upload with one button.
+- trigger Pixel photo capture and Google Photos upload with one button;
+- trigger Pixel video recording and Google Photos upload with one button.
 
 Start automatically when Windows logs in:
 
@@ -173,6 +174,12 @@ Capture from Pixel, auto-classify from product samples, and upload:
 
 ```powershell
 python .\photo_pipeline.py run-once-auto
+```
+
+Record a video from Pixel, auto-classify using a quick reference photo, and upload:
+
+```powershell
+python .\photo_pipeline.py record-once --duration 10
 ```
 
 Run automatically every 30 seconds:

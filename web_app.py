@@ -271,7 +271,8 @@ HTML = r"""
         </div>
         <div class="top-actions">
           <button class="ghost" onclick="refresh()">L&#224;m m&#7899;i</button>
-          <button id="topCaptureBtn" onclick="captureUpload()">Ch&#7909;p v&#224; upload</button>
+          <button id="topCaptureBtn" onclick="captureUpload()">Ch&#7909;p &#7843;nh</button>
+          <button id="topRecordBtn" onclick="recordUpload()">Quay video</button>
         </div>
       </header>
 
@@ -333,7 +334,7 @@ HTML = r"""
               </div>
               <div class="step">
                 <div class="step-num">2</div>
-                <div><div class="step-title">Ch&#7909;p t&#7915; Pixel</div><div class="step-text">ADB m&#7903; camera, ch&#7909;p &#7843;nh v&#224; k&#233;o file v&#7873; m&#225;y.</div></div>
+                <div><div class="step-title">Ch&#7909;p ho&#7863;c quay t&#7915; Pixel</div><div class="step-text">ADB m&#7903; camera, t&#7841;o media v&#224; k&#233;o file v&#7873; m&#225;y.</div></div>
               </div>
               <div class="step">
                 <div class="step-num">3</div>
@@ -346,8 +347,8 @@ HTML = r"""
         <section class="panel">
           <div class="panel-header">
             <div>
-              <h2 class="panel-title">Ch&#7909;p v&#224; upload</h2>
-              <p class="panel-subtitle">&#272;&#7875; tr&#7889;ng t&#234;n s&#7843;n ph&#7849;m n&#7871;u mu&#7889;n AI t&#7921; nh&#7853;n di&#7879;n.</p>
+              <h2 class="panel-title">Ch&#7909;p / quay v&#224; upload</h2>
+              <p class="panel-subtitle">&#272;&#7875; tr&#7889;ng t&#234;n s&#7843;n ph&#7849;m n&#7871;u mu&#7889;n AI t&#7921; nh&#7853;n di&#7879;n. Khi quay video, h&#7879; th&#7889;ng ch&#7909;p &#7843;nh tham chi&#7871;u tr&#432;&#7899;c &#273;&#7875; ph&#226;n lo&#7841;i album.</p>
             </div>
           </div>
           <div class="panel-body">
@@ -365,8 +366,14 @@ HTML = r"""
                 <input id="forcedProduct" placeholder="&#272;&#7875; tr&#7889;ng &#273;&#7875; AI t&#7921; nh&#7853;n di&#7879;n">
               </div>
             </div>
+            <div>
+              <label for="videoDuration">Th&#7901;i l&#432;&#7907;ng video (gi&#226;y)</label>
+              <input id="videoDuration" type="number" min="1" max="300" value="10">
+              <div class="hint">Gi&#7899;i h&#7841;n t&#7915; 1 &#273;&#7871;n 300 gi&#226;y cho m&#7895;i l&#7847;n quay.</div>
+            </div>
             <div class="button-row">
-              <button id="captureBtn" onclick="captureUpload()">Ch&#7909;p t&#7915; Pixel v&#224; upload</button>
+              <button id="captureBtn" onclick="captureUpload()">Ch&#7909;p &#7843;nh t&#7915; Pixel v&#224; upload</button>
+              <button id="recordBtn" onclick="recordUpload()">Quay video t&#7915; Pixel v&#224; upload</button>
               <button class="secondary" onclick="classifyLatest()">Nh&#7853;n di&#7879;n &#7843;nh m&#7899;i nh&#7845;t</button>
             </div>
           </div>
@@ -435,7 +442,9 @@ HTML = r"""
     function setBusy(isBusy) {
       document.getElementById("ingestBtn").disabled = isBusy;
       document.getElementById("captureBtn").disabled = isBusy;
+      document.getElementById("recordBtn").disabled = isBusy;
       document.getElementById("topCaptureBtn").disabled = isBusy;
+      document.getElementById("topRecordBtn").disabled = isBusy;
     }
 
     function renderStatus(data) {
@@ -487,6 +496,23 @@ HTML = r"""
         const data = await api("/api/capture-upload", {
           provider: document.getElementById("provider").value,
           product: document.getElementById("forcedProduct").value
+        });
+        log(data);
+        await refresh();
+      } catch (err) {
+        log(err);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function recordUpload() {
+      setBusy(true);
+      try {
+        const data = await api("/api/record-upload", {
+          provider: document.getElementById("provider").value,
+          product: document.getElementById("forcedProduct").value,
+          duration: Number(document.getElementById("videoDuration").value || 10)
         });
         log(data);
         await refresh();
@@ -697,6 +723,38 @@ def api_capture_upload():
                 "product": product,
                 "score": score,
                 "reason": reason,
+                **pipeline.upload_result_summary(result),
+            }
+        )
+    except Exception as exc:
+        return error_response(exc)
+
+
+@app.post("/api/record-upload")
+def api_record_upload():
+    try:
+        cfg = settings()
+        set_provider(cfg, request.json.get("provider", cfg.ai_provider))
+        forced_product = (request.json.get("product") or "").strip() or None
+        duration = int(request.json.get("duration") or 10)
+
+        reference_image = None
+        if forced_product:
+            product, score, reason = forced_product, None, "forced by user"
+        else:
+            reference_image = pipeline.capture_from_pixel(cfg)
+            product, score, reason = pipeline.classify_product(cfg, reference_image)
+
+        video = pipeline.capture_video_from_pixel(cfg, duration)
+        result = pipeline.upload_media(cfg, video, product, "Product video")
+        return jsonify(
+            {
+                "captured": str(video),
+                "reference_image": str(reference_image) if reference_image else None,
+                "product": product,
+                "score": score,
+                "reason": reason,
+                "duration": max(1, min(duration, 300)),
                 **pipeline.upload_result_summary(result),
             }
         )

@@ -486,6 +486,44 @@ def capture_from_pixel(settings: Settings) -> Path:
     return local_path
 
 
+def capture_video_from_pixel(settings: Settings, duration_seconds: int = 10) -> Path:
+    ensure_dirs(settings)
+    duration_seconds = max(1, min(duration_seconds, 300))
+    before_latest = adb_command(
+        settings,
+        "shell",
+        f"ls -t {settings.camera_dir}/*.mp4 {settings.camera_dir}/*.3gp 2>/dev/null | head -n 1",
+        check=False,
+    ).stdout.strip()
+
+    adb_command(settings, "shell", "am", "start", "-a", "android.media.action.VIDEO_CAMERA")
+    time.sleep(2)
+    adb_command(settings, "shell", "input", "keyevent", "27")
+    time.sleep(duration_seconds)
+    adb_command(settings, "shell", "input", "keyevent", "27")
+
+    latest = ""
+    for _ in range(20):
+        time.sleep(1)
+        latest = adb_command(
+            settings,
+            "shell",
+            f"ls -t {settings.camera_dir}/*.mp4 {settings.camera_dir}/*.3gp 2>/dev/null | head -n 1",
+            check=False,
+        ).stdout.strip()
+        if latest and latest != before_latest:
+            break
+
+    if not latest:
+        raise RuntimeError("Could not find a captured MP4/3GP in the Pixel camera folder.")
+    if latest == before_latest:
+        raise RuntimeError("Pixel did not create a new video. Check Camera app focus/permissions and try again.")
+
+    local_path = settings.inbox_dir / Path(latest).name
+    adb_command(settings, "pull", latest, str(local_path))
+    return local_path
+
+
 def upload_photo(settings: Settings, image_path: Path, product: str) -> dict[str, Any]:
     creds = get_credentials(settings)
     album_id = get_or_create_album(settings, creds, product)
@@ -497,6 +535,20 @@ def upload_photo(settings: Settings, image_path: Path, product: str) -> dict[str
     target = product_dir / image_path.name
     if image_path.resolve() != target.resolve():
         shutil.copy2(image_path, target)
+    return {"album_id": album_id, "api_result": result}
+
+
+def upload_media(settings: Settings, media_path: Path, product: str, description_prefix: str = "Product") -> dict[str, Any]:
+    creds = get_credentials(settings)
+    album_id = get_or_create_album(settings, creds, product)
+    upload_token = upload_bytes(creds, media_path)
+    result = create_media_item(creds, upload_token, album_id, f"{description_prefix}: {product}")
+
+    product_dir = settings.processed_dir / safe_name(product)
+    product_dir.mkdir(parents=True, exist_ok=True)
+    target = product_dir / media_path.name
+    if media_path.resolve() != target.resolve():
+        shutil.copy2(media_path, target)
     return {"album_id": album_id, "api_result": result}
 
 
@@ -565,6 +617,27 @@ def cmd_run_once(settings: Settings, args: argparse.Namespace) -> None:
     )
 
 
+def cmd_record_once(settings: Settings, args: argparse.Namespace) -> None:
+    reference_path: Path | None = None
+    if args.product:
+        product, score, reason = args.product, None, "forced by user"
+    else:
+        reference_path = capture_from_pixel(settings)
+        product, score, reason = classify_product(settings, reference_path)
+    video_path = capture_video_from_pixel(settings, args.duration)
+    result = upload_media(settings, video_path, product, "Product video")
+    print_upload_summary(
+        {
+            "captured": str(video_path),
+            "reference_image": str(reference_path) if reference_path else None,
+            "product": product,
+            "match_score": score,
+            "classification_reason": reason,
+            **result,
+        }
+    )
+
+
 def cmd_classify(settings: Settings, args: argparse.Namespace) -> None:
     image_path = Path(args.image).resolve()
     if not image_path.exists():
@@ -616,6 +689,10 @@ def build_parser() -> argparse.ArgumentParser:
     run_once_auto = subparsers.add_parser("run-once-auto", help="Capture, auto-classify from samples, and upload one photo")
     run_once_auto.set_defaults(command="run-once")
 
+    record_once = subparsers.add_parser("record-once", help="Record, classify, and upload one video")
+    record_once.add_argument("--product", help="Force product/album name")
+    record_once.add_argument("--duration", type=int, default=10, help="Video duration in seconds")
+
     classify = subparsers.add_parser("classify", help="Classify an existing image without uploading")
     classify.add_argument("image")
     classify.add_argument("--product", help="Force product name")
@@ -644,6 +721,7 @@ def main() -> int:
         "upload": cmd_upload,
         "run-once": cmd_run_once,
         "run-once-auto": cmd_run_once,
+        "record-once": cmd_record_once,
         "classify": cmd_classify,
         "add-sample": cmd_add_sample,
         "watch": cmd_watch,
