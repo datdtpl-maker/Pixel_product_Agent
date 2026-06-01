@@ -126,6 +126,7 @@ HTML = r"""
     .status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
     .status-grid.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     .status-grid.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .status-grid.seven { grid-template-columns: repeat(7, minmax(0, 1fr)); }
     .metric {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -250,7 +251,7 @@ HTML = r"""
     @media (max-width: 980px) {
       .app-shell { grid-template-columns: 1fr; }
       .sidebar { position: static; height: auto; }
-      .status-grid, .status-grid.five, .status-grid.six, .layout, .two-col, .field-row { grid-template-columns: 1fr; }
+      .status-grid, .status-grid.five, .status-grid.six, .status-grid.seven, .layout, .two-col, .field-row { grid-template-columns: 1fr; }
       .field-row button { margin-top: 0; width: 100%; }
       .topbar { align-items: flex-start; flex-direction: column; }
       .top-actions { width: 100%; }
@@ -292,7 +293,7 @@ HTML = r"""
       </header>
 
       <main class="content">
-        <section class="status-grid six" aria-label="System status">
+        <section class="status-grid seven" aria-label="System status">
           <div class="metric">
             <div class="metric-label">Pixel ADB</div>
             <div id="adbMetric" class="metric-value"><span class="badge warn">Dang kiem tra</span></div>
@@ -312,6 +313,10 @@ HTML = r"""
           <div class="metric">
             <div class="metric-label">Gemini API</div>
             <div id="geminiMetric" class="metric-value"><span class="badge warn">Chưa kiểm tra</span></div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Web Search</div>
+            <div id="searchMetric" class="metric-value"><span class="badge warn">Chưa kiểm tra</span></div>
           </div>
           <div class="metric">
             <div class="metric-label">S&#7843;n ph&#7849;m &#273;&#227; n&#7841;p</div>
@@ -448,6 +453,46 @@ HTML = r"""
         <section class="panel">
           <div class="panel-header">
             <div>
+              <h2 class="panel-title">T&#236;m s&#7843;n ph&#7849;m tr&#234;n internet</h2>
+              <p class="panel-subtitle">Khi catalog kh&#244;ng nh&#7853;n ra s&#7843;n ph&#7849;m, agent s&#7869; d&#249;ng OpenAI/Gemini &#273;&#7885;c &#7843;nh, t&#7841;o truy v&#7845;n, t&#236;m h&#236;nh &#7843;nh web, &#273;&#7889;i chi&#7871;u v&#224; ch&#7881; t&#7921; t&#7841;o album khi &#273;&#7911; tin c&#7853;y.</p>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="two-col">
+              <div>
+                <label for="searchProvider">Search provider</label>
+                <select id="searchProvider">
+                  <option value="serpapi">SerpAPI Google Images</option>
+                  <option value="google_cse">Google Custom Search</option>
+                  <option value="bing">Bing Image Search</option>
+                </select>
+              </div>
+              <div>
+                <label for="searchApiKey">Search API key</label>
+                <input id="searchApiKey" type="password" autocomplete="off" placeholder="SerpAPI / Google CSE / Bing key">
+              </div>
+            </div>
+            <div class="two-col">
+              <div>
+                <label for="googleCseCx">Google CSE CX</label>
+                <input id="googleCseCx" autocomplete="off" placeholder="Ch&#7881; c&#7847;n khi d&#249;ng Google Custom Search">
+              </div>
+              <div>
+                <label for="webConfidenceThreshold">Ng&#432;&#7905;ng t&#7921; t&#7841;o album</label>
+                <input id="webConfidenceThreshold" type="number" min="0" max="1" step="0.01" value="0.78">
+              </div>
+            </div>
+            <div class="button-row">
+              <button id="saveSearchSettingsBtn" onclick="saveSearchSettings()">L&#432;u c&#7845;u h&#236;nh t&#236;m web</button>
+              <button class="secondary" onclick="checkSearchApi()">Ki&#7875;m tra Search API</button>
+            </div>
+            <div id="searchKeyStatus" class="hint">N&#7871;u ch&#432;a nh&#7853;p Search API key, enrichment s&#7869; t&#7921; b&#7887; qua v&#224; h&#7879; th&#7889;ng v&#7851;n ho&#7841;t &#273;&#7897;ng theo catalog hi&#7879;n c&#243;.</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
               <h2 class="panel-title">S&#7843;n ph&#7849;m &#273;&#227; n&#7841;p</h2>
               <p class="panel-subtitle">Danh s&#225;ch n&#224;y l&#224; t&#7853;p t&#234;n m&#224; AI &#273;&#432;&#7907;c ph&#233;p ch&#7885;n khi upload.</p>
             </div>
@@ -531,12 +576,20 @@ HTML = r"""
       document.getElementById("geminiMetric").innerHTML = data.gemini_key
         ? `<span class="badge ok">Đã có key</span>`
         : `<span class="badge warn">Thiếu key</span>`;
+      document.getElementById("searchMetric").innerHTML = data.search_key
+        ? `<span class="badge ok">${data.search_provider}</span>`
+        : `<span class="badge warn">Thiếu key</span>`;
       document.getElementById("apiKeyStatus").textContent = data.openai_key
         ? `Trạng thái key: đã lưu (${data.openai_key_masked})`
         : "Trạng thái key: chưa có OpenAI API key";
       document.getElementById("geminiKeyStatus").textContent = data.gemini_key
         ? "Trạng thái key Gemini: đã lưu"
         : "Trạng thái key Gemini: chưa có Gemini API key";
+      document.getElementById("searchProvider").value = data.search_provider || "serpapi";
+      document.getElementById("webConfidenceThreshold").value = data.web_confidence_threshold || 0.78;
+      document.getElementById("searchKeyStatus").textContent = data.search_key
+        ? `Trạng thái search: đã lưu (${data.search_key_masked})`
+        : "Trạng thái search: chưa có Search API key";
       document.getElementById("productMetric").textContent = products.filter(p => p !== "Unsorted").length;
       document.getElementById("navProductCount").textContent = products.filter(p => p !== "Unsorted").length;
       document.getElementById("navGoogle").textContent = hasGoogle ? "OK" : "Thiếu";
@@ -691,6 +744,43 @@ HTML = r"""
       }
     }
 
+    async function saveSearchSettings() {
+      const provider = document.getElementById("searchProvider").value;
+      const apiKey = document.getElementById("searchApiKey").value.trim();
+      const cx = document.getElementById("googleCseCx").value.trim();
+      const threshold = Number(document.getElementById("webConfidenceThreshold").value || 0.78);
+      document.getElementById("saveSearchSettingsBtn").disabled = true;
+      try {
+        const data = await api("/api/settings/search", {
+          provider,
+          api_key: apiKey,
+          google_cse_cx: cx,
+          confidence_threshold: threshold
+        });
+        document.getElementById("searchApiKey").value = "";
+        log(data);
+        await refresh();
+      } catch (err) {
+        log(err);
+      } finally {
+        document.getElementById("saveSearchSettingsBtn").disabled = false;
+      }
+    }
+
+    async function checkSearchApi() {
+      const provider = document.getElementById("searchProvider").value;
+      try {
+        const data = await api("/api/settings/check-search", {provider});
+        document.getElementById("searchMetric").innerHTML = data.ok
+          ? `<span class="badge ok">Search OK</span>`
+          : `<span class="badge warn">${data.status}</span>`;
+        log(data);
+      } catch (err) {
+        document.getElementById("searchMetric").innerHTML = `<span class="badge warn">Lỗi</span>`;
+        log(err);
+      }
+    }
+
     async function classifyLatest() {
       setBusy(true);
       try {
@@ -769,7 +859,14 @@ def load_env_values() -> dict[str, str]:
 
 
 def save_env_values(values: dict[str, str]) -> None:
-    ordered_keys = ["OPENAI_API_KEY", "GEMINI_API_KEY"]
+    ordered_keys = [
+        "OPENAI_API_KEY",
+        "GEMINI_API_KEY",
+        "SERPAPI_API_KEY",
+        "GOOGLE_CSE_API_KEY",
+        "GOOGLE_CSE_CX",
+        "BING_SEARCH_API_KEY",
+    ]
     lines: list[str] = []
     for key in ordered_keys:
         if values.get(key):
@@ -780,6 +877,23 @@ def save_env_values(values: dict[str, str]) -> None:
     for key, value in values.items():
         if value:
             os.environ[key] = value
+
+
+def update_classification_config(updates: dict[str, Any]) -> None:
+    config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    config.setdefault("classification", {}).update(updates)
+    CONFIG_PATH.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def active_search_key(values: dict[str, str], provider: str) -> str:
+    provider = provider.lower().strip()
+    if provider == "serpapi":
+        return os.environ.get("SERPAPI_API_KEY") or values.get("SERPAPI_API_KEY", "")
+    if provider == "google_cse":
+        return os.environ.get("GOOGLE_CSE_API_KEY") or values.get("GOOGLE_CSE_API_KEY", "")
+    if provider == "bing":
+        return os.environ.get("BING_SEARCH_API_KEY") or values.get("BING_SEARCH_API_KEY", "")
+    return ""
 
 
 def masked_key(value: str | None) -> str:
@@ -825,6 +939,50 @@ def check_gemini_key(api_key: str) -> dict[str, Any]:
         return {"ok": False, "status": "auth_error", "message": "Key khong hop le hoac khong co quyen truy cap."}
     if response.status_code == 429:
         return {"ok": False, "status": "rate_or_quota", "message": "Key bi gioi han toc do hoac het quota."}
+    return {"ok": False, "status": f"http_{response.status_code}", "message": response.text[:500]}
+
+
+def check_search_key(provider: str, values: dict[str, str]) -> dict[str, Any]:
+    import requests
+
+    provider = provider.lower().strip()
+    if provider == "serpapi":
+        api_key = values.get("SERPAPI_API_KEY") or os.environ.get("SERPAPI_API_KEY", "")
+        if not api_key:
+            raise ValueError("Chua co SERPAPI_API_KEY.")
+        response = requests.get(
+            "https://serpapi.com/search.json",
+            params={"engine": "google_images", "q": "test product", "api_key": api_key},
+            timeout=30,
+        )
+    elif provider == "google_cse":
+        api_key = values.get("GOOGLE_CSE_API_KEY") or os.environ.get("GOOGLE_CSE_API_KEY", "")
+        cx = values.get("GOOGLE_CSE_CX") or os.environ.get("GOOGLE_CSE_CX", "")
+        if not api_key or not cx:
+            raise ValueError("Chua co GOOGLE_CSE_API_KEY hoac GOOGLE_CSE_CX.")
+        response = requests.get(
+            "https://www.googleapis.com/customsearch/v1",
+            params={"key": api_key, "cx": cx, "q": "test product", "searchType": "image", "num": 1},
+            timeout=30,
+        )
+    elif provider == "bing":
+        api_key = values.get("BING_SEARCH_API_KEY") or os.environ.get("BING_SEARCH_API_KEY", "")
+        if not api_key:
+            raise ValueError("Chua co BING_SEARCH_API_KEY.")
+        response = requests.get(
+            "https://api.bing.microsoft.com/v7.0/images/search",
+            headers={"Ocp-Apim-Subscription-Key": api_key},
+            params={"q": "test product", "count": 1},
+            timeout=30,
+        )
+    else:
+        raise ValueError(f"Search provider khong hop le: {provider}")
+    if response.status_code == 200:
+        return {"ok": True, "status": "connected", "message": f"{provider} search API dang hoat dong."}
+    if response.status_code in {400, 401, 403}:
+        return {"ok": False, "status": "auth_error", "message": "Search API key/cau hinh khong hop le."}
+    if response.status_code == 429:
+        return {"ok": False, "status": "rate_or_quota", "message": "Search API bi gioi han toc do hoac het quota."}
     return {"ok": False, "status": f"http_{response.status_code}", "message": response.text[:500]}
 
 
@@ -937,14 +1095,21 @@ def api_status():
     cfg = settings()
     adb = pipeline.adb_command(cfg, "devices", check=False).stdout.splitlines()
     devices = [line.split()[0] for line in adb if "\tdevice" in line]
+    values = load_env_values()
+    search_key = active_search_key(values, cfg.web_enrichment_provider)
     return jsonify(
         {
             "adb_device": devices[0] if devices else "",
-      "google_token": cfg.token_file.exists(),
-            "openai_key": bool(os.environ.get("OPENAI_API_KEY") or load_env_values().get("OPENAI_API_KEY")),
-            "openai_key_masked": masked_key(os.environ.get("OPENAI_API_KEY") or load_env_values().get("OPENAI_API_KEY")),
-            "gemini_key": bool(os.environ.get("GEMINI_API_KEY") or load_env_values().get("GEMINI_API_KEY")),
-            "gemini_key_masked": masked_key(os.environ.get("GEMINI_API_KEY") or load_env_values().get("GEMINI_API_KEY")),
+            "google_token": cfg.token_file.exists(),
+            "openai_key": bool(os.environ.get("OPENAI_API_KEY") or values.get("OPENAI_API_KEY")),
+            "openai_key_masked": masked_key(os.environ.get("OPENAI_API_KEY") or values.get("OPENAI_API_KEY")),
+            "gemini_key": bool(os.environ.get("GEMINI_API_KEY") or values.get("GEMINI_API_KEY")),
+            "gemini_key_masked": masked_key(os.environ.get("GEMINI_API_KEY") or values.get("GEMINI_API_KEY")),
+            "search_key": bool(search_key),
+            "search_key_masked": masked_key(search_key),
+            "search_provider": cfg.web_enrichment_provider,
+            "web_enrichment_enabled": cfg.web_enrichment_enabled,
+            "web_confidence_threshold": cfg.web_enrichment_confidence_threshold,
             "ai_provider": cfg.ai_provider if cfg.classification_mode == "ai" else "offline",
             "products": pipeline.product_names(cfg),
         }
@@ -999,6 +1164,57 @@ def api_check_gemini():
         result = check_gemini_key(api_key)
         result["gemini_key_masked"] = masked_key(api_key)
         return jsonify(result)
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/settings/search")
+def api_save_search_settings():
+    try:
+        payload = request.json or {}
+        provider = (payload.get("provider") or "serpapi").lower().strip()
+        api_key = (payload.get("api_key") or "").strip()
+        cx = (payload.get("google_cse_cx") or "").strip()
+        threshold = float(payload.get("confidence_threshold") or 0.78)
+        if provider not in {"serpapi", "google_cse", "bing"}:
+            raise ValueError("Search provider khong hop le.")
+        values = load_env_values()
+        if api_key:
+            if provider == "serpapi":
+                values["SERPAPI_API_KEY"] = api_key
+            elif provider == "google_cse":
+                values["GOOGLE_CSE_API_KEY"] = api_key
+            elif provider == "bing":
+                values["BING_SEARCH_API_KEY"] = api_key
+        if cx:
+            values["GOOGLE_CSE_CX"] = cx
+        save_env_values(values)
+        update_classification_config(
+            {
+                "web_enrichment_enabled": True,
+                "web_enrichment_provider": provider,
+                "web_enrichment_confidence_threshold": max(0.0, min(threshold, 1.0)),
+            }
+        )
+        return jsonify(
+            {
+                "status": "saved",
+                "provider": provider,
+                "has_key": bool(active_search_key(values, provider)),
+                "confidence_threshold": max(0.0, min(threshold, 1.0)),
+            }
+        )
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/settings/check-search")
+def api_check_search():
+    try:
+        payload = request.json or {}
+        provider = (payload.get("provider") or "serpapi").lower().strip()
+        values = load_env_values()
+        return jsonify(check_search_key(provider, values))
     except Exception as exc:
         return error_response(exc, 400)
 

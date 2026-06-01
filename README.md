@@ -80,6 +80,18 @@ To use only Gemini instead, set:
 
 Supported values are `both`, `openai`, `gemini`, and `offline` from the web UI. In `both` mode, OpenAI and Gemini classify the same reference image; matching results are treated as agreement, and if one provider fails the other can still be used.
 
+## Web Product Enrichment
+
+When the local catalog returns `Unsorted`, the agent can optionally search the web for product candidates, then ask AI to resolve the product name before creating the Google Photos album.
+
+Supported search providers:
+
+- `serpapi`: set `SERPAPI_API_KEY`.
+- `google_cse`: set `GOOGLE_CSE_API_KEY` and `GOOGLE_CSE_CX`.
+- `bing`: set `BING_SEARCH_API_KEY`.
+
+The web UI includes a **Tìm sản phẩm trên internet** panel for saving the search API key, choosing the provider, and setting the confidence threshold. If no search API key is configured, enrichment is skipped and the existing catalog/AI flow still works.
+
 ## Test Modes
 
 ## Web UI

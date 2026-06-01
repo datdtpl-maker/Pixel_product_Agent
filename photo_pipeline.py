@@ -41,6 +41,9 @@ class Settings:
     ai_provider: str
     openai_model: str
     gemini_model: str
+    web_enrichment_enabled: bool
+    web_enrichment_provider: str
+    web_enrichment_confidence_threshold: float
     adb_serial: str
     camera_dir: str
 
@@ -71,6 +74,11 @@ def load_settings(config_path: Path) -> Settings:
         ai_provider=config["classification"].get("ai_provider", "openai"),
         openai_model=config["classification"].get("openai_model", "gpt-4.1-mini"),
         gemini_model=config["classification"].get("gemini_model", "gemini-2.5-flash"),
+        web_enrichment_enabled=bool(config["classification"].get("web_enrichment_enabled", False)),
+        web_enrichment_provider=config["classification"].get("web_enrichment_provider", "serpapi"),
+        web_enrichment_confidence_threshold=float(
+            config["classification"].get("web_enrichment_confidence_threshold", 0.78)
+        ),
         adb_serial=config["pixel"].get("adb_serial", ""),
         camera_dir=config["pixel"].get("camera_dir", "/sdcard/DCIM/Camera"),
     )
@@ -361,6 +369,28 @@ def ai_prompt(names: list[str]) -> str:
     )
 
 
+def discovery_prompt() -> str:
+    return (
+        "You are identifying a retail product from a photo.\n"
+        "Read visible text, brand names, SKU, barcode numbers, package size, color, and product type.\n"
+        "Return strict JSON only with keys: product_name, brand, barcode, search_query, confidence, reason.\n"
+        "If the product cannot be identified, set product_name to Unsorted and confidence below 0.5.\n"
+    )
+
+
+def enrichment_prompt(discoveries: list[dict[str, Any]], candidates: list[dict[str, Any]]) -> str:
+    return (
+        "You are resolving a product name for automatic Google Photos album creation.\n"
+        "Use the AI image observations and web/image-search candidates below.\n"
+        "Choose one concise album title in Vietnamese or the product's package language.\n"
+        "Prefer exact barcode/SKU matches, then exact package text, then brand+product+size matches.\n"
+        "Return strict JSON only with keys: product, confidence, reason.\n"
+        "If not confident, return product as Unsorted and confidence below 0.6.\n\n"
+        f"AI observations:\n{json.dumps(discoveries, ensure_ascii=False, indent=2)}\n\n"
+        f"Web candidates:\n{json.dumps(candidates[:10], ensure_ascii=False, indent=2)}\n"
+    )
+
+
 def parse_ai_json(text: str) -> dict[str, Any]:
     cleaned = text.strip()
     if cleaned.startswith("```"):
@@ -414,6 +444,43 @@ def classify_with_openai(settings: Settings, image_path: Path, names: list[str])
     return product, parsed.get("confidence"), parsed.get("reason", "")
 
 
+def discover_with_openai(settings: Settings, image_path: Path) -> dict[str, Any]:
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set.")
+    response = requests.post(
+        "https://api.openai.com/v1/responses",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={
+            "model": settings.openai_model,
+            "input": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": discovery_prompt()},
+                        {"type": "input_image", "image_url": image_data_url(image_path), "detail": "low"},
+                    ],
+                }
+            ],
+        },
+        timeout=120,
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"OpenAI discovery failed: {response.status_code} {response.text}")
+    payload = response.json()
+    text = payload.get("output_text")
+    if not text:
+        parts: list[str] = []
+        for item in payload.get("output", []):
+            for content in item.get("content", []):
+                if content.get("type") == "output_text":
+                    parts.append(content.get("text", ""))
+        text = "\n".join(parts)
+    result = parse_ai_json(text)
+    result["provider"] = "openai"
+    return result
+
+
 def classify_with_gemini(settings: Settings, image_path: Path, names: list[str]) -> tuple[str, float | None, str]:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -448,6 +515,185 @@ def classify_with_gemini(settings: Settings, image_path: Path, names: list[str])
     if product not in names:
         product = settings.default_product
     return product, parsed.get("confidence"), parsed.get("reason", "")
+
+
+def discover_with_gemini(settings: Settings, image_path: Path) -> dict[str, Any]:
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set.")
+    mime_type = mimetypes.guess_type(str(image_path))[0] or "image/jpeg"
+    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent"
+    response = requests.post(
+        url,
+        params={"key": api_key},
+        headers={"Content-Type": "application/json"},
+        json={
+            "contents": [
+                {
+                    "parts": [
+                        {"text": discovery_prompt()},
+                        {"inline_data": {"mime_type": mime_type, "data": encoded}},
+                    ]
+                }
+            ],
+            "generationConfig": {"response_mime_type": "application/json"},
+        },
+        timeout=120,
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"Gemini discovery failed: {response.status_code} {response.text}")
+    payload = response.json()
+    result = parse_ai_json(payload["candidates"][0]["content"]["parts"][0]["text"])
+    result["provider"] = "gemini"
+    return result
+
+
+def search_queries_from_discoveries(discoveries: list[dict[str, Any]]) -> list[str]:
+    queries: list[str] = []
+    for item in discoveries:
+        for key in ("barcode", "search_query", "product_name"):
+            value = str(item.get(key) or "").strip()
+            if value and value.lower() != "unsorted" and value not in queries:
+                queries.append(value)
+    return queries[:3]
+
+
+def web_search_candidates(settings: Settings, queries: list[str]) -> list[dict[str, Any]]:
+    provider = settings.web_enrichment_provider.lower()
+    candidates: list[dict[str, Any]] = []
+    for query in queries:
+        if provider == "serpapi":
+            api_key = os.environ.get("SERPAPI_API_KEY")
+            if not api_key:
+                continue
+            response = requests.get(
+                "https://serpapi.com/search.json",
+                params={"engine": "google_images", "q": query, "api_key": api_key},
+                timeout=45,
+            )
+            if response.status_code >= 400:
+                continue
+            for item in response.json().get("images_results", [])[:6]:
+                candidates.append(
+                    {
+                        "query": query,
+                        "title": item.get("title", ""),
+                        "source": item.get("source", ""),
+                        "link": item.get("link", ""),
+                        "thumbnail": item.get("thumbnail", ""),
+                    }
+                )
+        elif provider == "google_cse":
+            api_key = os.environ.get("GOOGLE_CSE_API_KEY")
+            cx = os.environ.get("GOOGLE_CSE_CX")
+            if not api_key or not cx:
+                continue
+            response = requests.get(
+                "https://www.googleapis.com/customsearch/v1",
+                params={"key": api_key, "cx": cx, "q": query, "searchType": "image", "num": 6},
+                timeout=45,
+            )
+            if response.status_code >= 400:
+                continue
+            for item in response.json().get("items", [])[:6]:
+                candidates.append(
+                    {
+                        "query": query,
+                        "title": item.get("title", ""),
+                        "source": item.get("displayLink", ""),
+                        "link": item.get("link", ""),
+                        "thumbnail": item.get("image", {}).get("thumbnailLink", ""),
+                    }
+                )
+        elif provider == "bing":
+            api_key = os.environ.get("BING_SEARCH_API_KEY")
+            if not api_key:
+                continue
+            response = requests.get(
+                "https://api.bing.microsoft.com/v7.0/images/search",
+                headers={"Ocp-Apim-Subscription-Key": api_key},
+                params={"q": query, "count": 6},
+                timeout=45,
+            )
+            if response.status_code >= 400:
+                continue
+            for item in response.json().get("value", [])[:6]:
+                candidates.append(
+                    {
+                        "query": query,
+                        "title": item.get("name", ""),
+                        "source": item.get("hostPageDisplayUrl", ""),
+                        "link": item.get("contentUrl", ""),
+                        "thumbnail": item.get("thumbnailUrl", ""),
+                    }
+                )
+    return candidates[:12]
+
+
+def resolve_enriched_product_with_openai(
+    settings: Settings,
+    image_path: Path,
+    discoveries: list[dict[str, Any]],
+    candidates: list[dict[str, Any]],
+) -> tuple[str, float | None, str]:
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set.")
+    response = requests.post(
+        "https://api.openai.com/v1/responses",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={
+            "model": settings.openai_model,
+            "input": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": enrichment_prompt(discoveries, candidates)},
+                        {"type": "input_image", "image_url": image_data_url(image_path), "detail": "low"},
+                    ],
+                }
+            ],
+        },
+        timeout=120,
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"OpenAI enrichment failed: {response.status_code} {response.text}")
+    payload = response.json()
+    text = payload.get("output_text")
+    if not text:
+        parts: list[str] = []
+        for item in payload.get("output", []):
+            for content in item.get("content", []):
+                if content.get("type") == "output_text":
+                    parts.append(content.get("text", ""))
+        text = "\n".join(parts)
+    parsed = parse_ai_json(text)
+    return parsed.get("product", settings.default_product), parsed.get("confidence"), parsed.get("reason", "")
+
+
+def classify_by_web_enrichment(settings: Settings, image_path: Path) -> tuple[str, float | None, str]:
+    if not settings.web_enrichment_enabled:
+        return settings.default_product, 0.0, "web enrichment disabled"
+    discoveries: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for name, discoverer in (("openai", discover_with_openai), ("gemini", discover_with_gemini)):
+        try:
+            discoveries.append(discoverer(settings, image_path))
+        except Exception as exc:
+            errors.append(f"{name}: {exc}")
+    queries = search_queries_from_discoveries(discoveries)
+    candidates = web_search_candidates(settings, queries)
+    if not candidates:
+        reason = f"web enrichment found no candidates; discoveries={discoveries}; errors={errors}"
+        return settings.default_product, 0.0, reason
+    try:
+        product, confidence, reason = resolve_enriched_product_with_openai(settings, image_path, discoveries, candidates)
+    except Exception as exc:
+        return settings.default_product, 0.0, f"web enrichment resolution failed: {exc}; candidates={candidates[:3]}"
+    if product != settings.default_product and float(confidence or 0) >= settings.web_enrichment_confidence_threshold:
+        return product, confidence, f"web enrichment accepted: {reason}"
+    return settings.default_product, confidence, f"web enrichment below threshold: {reason}"
 
 
 def classify_by_ai(settings: Settings, image_path: Path) -> tuple[str, float | None, str]:
@@ -490,7 +736,13 @@ def classify_product(settings: Settings, image_path: Path, forced_product: str |
         return forced_product, None, "forced by user"
     if settings.classification_mode == "ai":
         try:
-            return classify_by_ai(settings, image_path)
+            product, score, reason = classify_by_ai(settings, image_path)
+            if product != settings.default_product:
+                return product, score, reason
+            enriched_product, enriched_score, enriched_reason = classify_by_web_enrichment(settings, image_path)
+            if enriched_product != settings.default_product:
+                return enriched_product, enriched_score, enriched_reason
+            return product, score, f"{reason}; {enriched_reason}"
         except Exception as exc:
             product, score = classify_by_samples(settings, image_path)
             if product != settings.default_product:

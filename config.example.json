@@ -16,7 +16,10 @@
     "similarity_threshold": 0.82,
     "ai_provider": "both",
     "openai_model": "gpt-4.1-mini",
-    "gemini_model": "gemini-2.5-flash"
+    "gemini_model": "gemini-2.5-flash",
+    "web_enrichment_enabled": true,
+    "web_enrichment_provider": "serpapi",
+    "web_enrichment_confidence_threshold": 0.78
   },
   "pixel": {
     "adb_serial": "",
