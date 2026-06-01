@@ -896,6 +896,23 @@ def active_search_key(values: dict[str, str], provider: str) -> str:
     return ""
 
 
+def normalize_google_cse_cx(value: str) -> str:
+    value = (value or "").strip()
+    if "cx=" not in value:
+        return value.strip().strip('"').strip("'")
+    tail = value.split("cx=", 1)[1]
+    for separator in ['"', "'", "&", ">", " ", "\n", "\r"]:
+        if separator in tail:
+            tail = tail.split(separator, 1)[0]
+    return tail.strip().strip('"').strip("'")
+
+
+def parse_float_input(value: Any, default: float) -> float:
+    if value is None or value == "":
+        return default
+    return float(str(value).replace(",", "."))
+
+
 def masked_key(value: str | None) -> str:
     if not value:
         return ""
@@ -1174,8 +1191,8 @@ def api_save_search_settings():
         payload = request.json or {}
         provider = (payload.get("provider") or "serpapi").lower().strip()
         api_key = (payload.get("api_key") or "").strip()
-        cx = (payload.get("google_cse_cx") or "").strip()
-        threshold = float(payload.get("confidence_threshold") or 0.78)
+        cx = normalize_google_cse_cx(payload.get("google_cse_cx") or "")
+        threshold = parse_float_input(payload.get("confidence_threshold"), 0.78)
         if provider not in {"serpapi", "google_cse", "bing"}:
             raise ValueError("Search provider khong hop le.")
         values = load_env_values()
