@@ -454,7 +454,7 @@ HTML = r"""
           <div class="panel-header">
             <div>
               <h2 class="panel-title">T&#236;m s&#7843;n ph&#7849;m tr&#234;n internet</h2>
-              <p class="panel-subtitle">Khi catalog kh&#244;ng nh&#7853;n ra s&#7843;n ph&#7849;m, agent s&#7869; d&#249;ng OpenAI/Gemini &#273;&#7885;c &#7843;nh, t&#7841;o truy v&#7845;n, t&#236;m h&#236;nh &#7843;nh web, &#273;&#7889;i chi&#7871;u v&#224; ch&#7881; t&#7921; t&#7841;o album khi &#273;&#7911; tin c&#7853;y.</p>
+              <p class="panel-subtitle">Khi catalog kh&#244;ng nh&#7853;n ra s&#7843;n ph&#7849;m, agent s&#7869; d&#249;ng OpenAI/Gemini &#273;&#7885;c &#7843;nh, t&#7841;o truy v&#7845;n, t&#236;m h&#236;nh &#7843;nh web, &#273;&#7889;i chi&#7871;u v&#224; ch&#7881; t&#7921; t&#7841;o album khi &#273;&#7911; tin c&#7853;y. Google Custom Search JSON API c&#243; th&#7875; b&#7883; ch&#7863;n v&#7899;i project m&#7899;i; n&#234;n d&#249;ng SerpAPI ho&#7863;c Bing cho t&#224;i kho&#7843;n m&#7899;i.</p>
             </div>
           </div>
           <div class="panel-body">
@@ -979,6 +979,8 @@ def readable_http_error(response) -> str:
                 if isinstance(detail, dict) and detail.get("reason"):
                     parts.append(str(detail["reason"]).strip())
         message = " | ".join(part for part in parts if part)
+        if "does not have the access to Custom Search JSON API" in message:
+            message += " | Google Custom Search JSON API is closed to many new projects; use SerpAPI or Bing Image Search instead."
         return message[:700] if message else json.dumps(data, ensure_ascii=False)[:700]
 
     if isinstance(error, str):
