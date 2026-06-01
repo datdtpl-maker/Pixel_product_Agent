@@ -50,20 +50,21 @@ HTML = r"""
     button.ghost{background:#edf2f7;color:#243041} button.ghost:hover{background:#e2e8f0}
     input,select{width:100%;min-height:42px;border:1px solid #b9c5d5;border-radius:7px;background:#fff;padding:10px 12px;color:var(--text);outline:none}
     input:focus,select:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(21,94,239,.12)}
-    label{display:block;margin-bottom:7px;font-weight:700}.shell{min-height:100vh;display:grid;grid-template-columns:244px minmax(0,1fr)}
-    .sidebar{background:var(--side);color:#e5e7eb;padding:20px 16px;position:sticky;top:0;height:100vh}
+    label{display:block;margin-bottom:7px;font-weight:700}.shell{min-height:100vh}
+    .sidebar{display:none}
     .brand{padding-bottom:21px;border-bottom:1px solid rgba(255,255,255,.14)} .brand h1{font-size:18px;margin:0 0 6px}.brand p{font-size:13px;color:#a9b4c7;line-height:1.45;margin:0}
     .nav{display:grid;gap:7px;margin-top:20px}.nav div{display:flex;justify-content:space-between;gap:8px;padding:10px;border-radius:7px;color:#cbd5e1;font-size:14px}.nav .active{background:rgba(255,255,255,.1);color:#fff}
     .main{min-width:0}.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:17px 26px;background:rgba(255,255,255,.9);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:3;backdrop-filter:blur(10px)}
     .topbar h2{margin:0;font-size:22px}.topbar p{margin:4px 0 0;color:var(--muted);font-size:14px}.actions,.buttons{display:flex;gap:10px;flex-wrap:wrap}
-    .content{max-width:1180px;margin:0 auto;padding:24px 26px 40px;display:grid;gap:18px}.metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+    .content{padding:20px 26px 40px}.workspace{display:grid;grid-template-columns:minmax(0,1fr) 430px;gap:18px;align-items:start}.work-main{display:grid;gap:18px;min-width:0}.work-log{position:sticky;top:94px;min-width:0}.metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
     .metric,.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}.metric{padding:15px;min-height:91px}.metric small{display:block;color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase}.metric strong{display:block;margin-top:8px;font-size:16px;overflow-wrap:anywhere}
     .badge{display:inline-flex;min-height:25px;align-items:center;border-radius:999px;padding:4px 9px;font-size:13px;font-weight:700}.ok{background:var(--okbg);color:var(--ok)}.warn{background:var(--warnbg);color:var(--warn)}
     .layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr);gap:18px;align-items:start}.panel{overflow:hidden}.panel-head{padding:16px 18px;border-bottom:1px solid var(--line)}.panel-head h3{margin:0;font-size:17px}.panel-head p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.45}.panel-body{padding:18px;display:grid;gap:15px}
     .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.field-action{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}.hint{margin-top:6px;color:var(--muted);font-size:13px;line-height:1.4}
     .steps{display:grid;gap:10px}.step{display:grid;grid-template-columns:31px 1fr;gap:10px;padding:12px;background:var(--soft);border:1px solid #e5eaf1;border-radius:7px}.step span{display:grid;place-items:center;width:31px;height:31px;border-radius:50%;background:#dbeafe;color:#1d4ed8;font-weight:800}.step b{display:block;margin-bottom:3px}.step small{display:block;color:var(--muted);font-size:13px;line-height:1.4}
-    .logbox{background:#101828;border-radius:7px;border:1px solid #1f2937;overflow:hidden}.loghead{display:flex;justify-content:space-between;padding:10px 12px;color:#d0d5dd;border-bottom:1px solid rgba(255,255,255,.09);font-size:13px;font-weight:700}.log{min-height:230px;max-height:420px;overflow:auto;white-space:pre-wrap;padding:14px;color:#e5e7eb;font:13px/1.55 Consolas,"Cascadia Mono",monospace}
-    @media(max-width:900px){.shell{grid-template-columns:1fr}.sidebar{position:static;height:auto}.metrics,.layout,.two,.field-action{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-direction:column}.actions{width:100%}.actions button{flex:1}}
+    .logbox{background:#101828;border-radius:7px;border:1px solid #1f2937;overflow:hidden}.loghead{display:flex;justify-content:space-between;padding:10px 12px;color:#d0d5dd;border-bottom:1px solid rgba(255,255,255,.09);font-size:13px;font-weight:700}.log{min-height:520px;max-height:calc(100vh - 250px);overflow:auto;white-space:pre-wrap;padding:14px;color:#e5e7eb;font:13px/1.55 Consolas,"Cascadia Mono",monospace}
+    @media(max-width:1180px){.workspace{grid-template-columns:1fr}.work-log{position:static}.log{min-height:260px;max-height:420px}}
+    @media(max-width:900px){.metrics,.layout,.two,.field-action{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-direction:column}.actions{width:100%}.actions button{flex:1}}
     @media(max-width:540px){.content,.topbar{padding-left:15px;padding-right:15px}.buttons,.actions{display:grid;grid-template-columns:1fr;width:100%}button{width:100%}}
   </style>
 </head>
@@ -89,6 +90,8 @@ HTML = r"""
       </div>
     </header>
     <div class="content">
+      <div class="workspace">
+      <div class="work-main">
       <section class="metrics">
         <div class="metric"><small>Pixel ADB</small><strong id="adbMetric"><span class="badge warn">Đang kiểm tra</span></strong></div>
         <div class="metric"><small>Thư mục Drive</small><strong id="driveMetric"><span class="badge warn">Đang kiểm tra</span></strong></div>
@@ -138,14 +141,16 @@ HTML = r"""
           </div>
         </div>
       </section>
+      </div>
 
-      <section class="panel">
+      <aside class="panel work-log">
         <div class="panel-head"><h3>Nhật ký xử lý</h3><p>Theo dõi từng bước: chụp/quay, kéo file, chép vào Drive và xóa khỏi Pixel.</p></div>
         <div class="panel-body">
           <div class="buttons"><button class="ghost" onclick="clearLog()">Xóa log</button></div>
           <div class="logbox"><div class="loghead"><span>Event stream</span><span id="logCount">0 events</span></div><div id="log" class="log"></div></div>
         </div>
-      </section>
+      </aside>
+      </div>
     </div>
   </main>
 </div>
