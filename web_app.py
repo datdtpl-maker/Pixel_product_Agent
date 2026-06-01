@@ -86,7 +86,7 @@ HTML = r"""
       <div class="actions">
         <button class="ghost" onclick="refresh()">Làm mới</button>
         <button class="secondary" onclick="openPreview()">Xem màn hình Pixel</button>
-        <button class="secondary" onclick="sleepPixel()">Tắt màn hình Pixel</button>
+        <button class="secondary" onclick="togglePixelScreen()">Bật / tắt màn hình Pixel</button>
         <button onclick="capture()">Chụp ảnh</button>
         <button onclick="record()">Quay video</button>
       </div>
@@ -138,7 +138,7 @@ HTML = r"""
           </div>
           <div class="buttons">
             <button class="secondary" onclick="openPreview()">Xem màn hình Pixel</button>
-            <button class="secondary" onclick="sleepPixel()">Tắt màn hình Pixel</button>
+            <button class="secondary" onclick="togglePixelScreen()">Bật / tắt màn hình Pixel</button>
             <button onclick="capture()">Chụp ảnh vào thư mục đang chọn</button>
             <button onclick="record()">Quay video vào thư mục đang chọn</button>
           </div>
@@ -177,7 +177,7 @@ HTML = r"""
   async function deleteFolder(){const name=selected();if(!name){log({error:"Hãy chọn thư mục cần xóa."});return}if(!confirm(`Xóa thư mục rỗng "${name}"?`))return;try{log(await api("/api/folders/delete",{name}));await refresh()}catch(e){log(e)}}
   async function selectFolder(){try{const d=await api("/api/select-folder",{name:selected()});log(d);await refresh()}catch(e){log(e)}}
   async function openPreview(){try{log(await api("/api/open-preview",{}))}catch(e){log(e)}}
-  async function sleepPixel(){try{log(await api("/api/sleep-pixel",{}));await refresh()}catch(e){log(e)}}
+  async function togglePixelScreen(){try{log(await api("/api/toggle-screen",{}));await refresh()}catch(e){log(e)}}
   async function run(path,body){if(!requireFolder()||busy)return;setBusy(true);await api("/api/events/clear",{}).catch(()=>{});lastId=0;startPoll();try{log(await api(path,body));await refresh()}catch(e){log(e)}finally{await stopPoll();setBusy(false)}}
   function capture(){run("/api/capture",{folder:selected()})}
   function record(){run("/api/record",{folder:selected(),duration:Number(document.getElementById("duration").value||10)})}
@@ -344,6 +344,31 @@ def sleep_pixel(cfg: pipeline.Settings) -> None:
     pipeline.adb_command(cfg, "shell", "input", "keyevent", "223", check=False)
 
 
+def wake_pixel(cfg: pipeline.Settings) -> None:
+    pipeline.adb_command(cfg, "shell", "input", "keyevent", "224", check=False)
+
+
+def pixel_screen_is_on(cfg: pipeline.Settings) -> bool:
+    result = pipeline.adb_command(cfg, "shell", "dumpsys", "power", check=False)
+    output = f"{result.stdout}\n{result.stderr}"
+    lowered = output.lower()
+    compact = lowered.replace(" ", "")
+    if "display power: state=on" in lowered or "mholdingdisplaywakelockssuspendblocker=true" in lowered:
+        return True
+    if "display power: state=off" in lowered or "mholdingdisplaywakelockssuspendblocker=false" in lowered:
+        return False
+    if "mwakefulness=awake" in compact or "misinteractive:true" in compact or "misinteractive=true" in compact:
+        return True
+    if "mwakefulness=asleep" in compact or "misinteractive:false" in compact or "misinteractive=false" in compact:
+        return False
+    wakefulness_lines = [line.lower() for line in output.splitlines() if "wakefulness=" in line.lower()]
+    if any("awake" in line or "dreaming" in line for line in wakefulness_lines):
+        return True
+    if any("asleep" in line for line in wakefulness_lines):
+        return False
+    raise RuntimeError("Không đọc được trạng thái màn hình Pixel từ dumpsys power.")
+
+
 def stop_existing_scrcpy() -> None:
     if os.name == "nt":
         subprocess.run(["taskkill", "/IM", "scrcpy.exe", "/F"], text=True, capture_output=True, check=False)
@@ -484,6 +509,31 @@ def api_sleep_pixel():
         sleep_pixel(cfg)
         add_event({"step": "pixel_sleep", "message": "Đã tắt màn hình Pixel và đóng scrcpy.", "adb_serial": serial})
         return jsonify({"status": "Đã tắt màn hình Pixel.", "adb_serial": serial})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/toggle-screen")
+def api_toggle_screen():
+    try:
+        if OPERATION_LOCK.locked():
+            raise RuntimeError("Pixel đang chụp hoặc quay. Hãy đợi tác vụ hiện tại hoàn tất.")
+        cfg = settings()
+        serial = adb_device_serial(cfg)
+        was_on = pixel_screen_is_on(cfg)
+        if was_on:
+            stop_existing_scrcpy()
+            sleep_pixel(cfg)
+            action = "off"
+            message = "Đã tắt màn hình Pixel và đóng scrcpy."
+            status = "Đã tắt màn hình Pixel."
+        else:
+            wake_pixel(cfg)
+            action = "on"
+            message = "Đã bật màn hình Pixel."
+            status = "Đã bật màn hình Pixel."
+        add_event({"step": "pixel_screen_toggle", "action": action, "message": message, "adb_serial": serial})
+        return jsonify({"status": status, "screen": action, "adb_serial": serial})
     except Exception as exc:
         return error_response(exc, 400)
 

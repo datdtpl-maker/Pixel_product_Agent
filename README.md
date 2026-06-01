@@ -13,7 +13,7 @@ Luồng web hiện tại không dùng AI phân loại, không tạo album Google
 4. Bấm **Xem màn hình Pixel** để chỉnh góc máy bằng scrcpy.
 5. Bấm **Chụp ảnh** hoặc **Quay video**.
 6. Theo dõi log: kéo file từ Pixel, chép file vào Drive, xác minh dung lượng và xóa file khỏi Pixel.
-7. Bấm **Tắt màn hình Pixel** khi không cần xem trước để tiết kiệm pin và tránh màn hình sáng liên tục.
+7. Bấm **Bật / tắt màn hình Pixel** khi cần khóa hoặc đánh thức màn hình, giúp tránh màn hình sáng liên tục.
 
 Thư mục Drive mặc định:
 

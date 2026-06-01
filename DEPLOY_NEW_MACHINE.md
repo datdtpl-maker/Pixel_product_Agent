@@ -127,7 +127,7 @@ Kiem tra tren giao dien:
 - Tao hoac chon thu muc san pham.
 - Bam `Xem man hinh Pixel` de mo scrcpy.
 - Bam `Chup anh` hoac `Quay video`.
-- Bam `Tat man hinh Pixel` khi khong can xem truoc nua. Nut nay dong scrcpy va dua Pixel ve che do sleep.
+- Bam `Bat / tat man hinh Pixel` khi can khoa hoac danh thuc man hinh. Khi tat, nut nay dong scrcpy va dua Pixel ve che do sleep.
 
 ## 6. Tao ten mien noi bo
 
