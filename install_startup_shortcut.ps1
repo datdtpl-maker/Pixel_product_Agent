@@ -23,4 +23,4 @@ $shortcut.Save()
 & $Launcher
 
 Write-Host "Created startup shortcut: $ShortcutPath"
-Write-Host "Open: http://pixel-agent.test:8765 or http://127.0.0.1:8765"
+Write-Host "Open: http://pixel-drive-capture:8765 or http://127.0.0.1:8765"

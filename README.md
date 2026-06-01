@@ -9,6 +9,7 @@ Luồng web hiện tại không dùng AI phân loại, không tạo album Google
 1. Mở giao diện web.
 2. Kiểm tra trạng thái Pixel ADB và thư mục Drive.
 3. Tạo thư mục sản phẩm mới hoặc chọn thư mục đã có.
+   Có thể xóa thư mục rỗng được chọn trực tiếp trên giao diện web.
 4. Bấm **Xem màn hình Pixel** để chỉnh góc máy bằng scrcpy.
 5. Bấm **Chụp ảnh** hoặc **Quay video**.
 6. Theo dõi log: kéo file từ Pixel, chép file vào Drive, xác minh dung lượng và xóa file khỏi Pixel.
@@ -91,8 +92,16 @@ python .\web_app.py
 Mở trình duyệt:
 
 ```text
-http://127.0.0.1:8765
+http://pixel-drive-capture:8765
 ```
+
+Để dùng tên miền nội bộ, mở PowerShell bằng quyền Administrator và chạy:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\add_internal_domain.ps1
+```
+
+URL dự phòng: `http://127.0.0.1:8765`.
 
 ## Khởi động cùng Windows
 

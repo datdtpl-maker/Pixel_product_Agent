@@ -48,6 +48,7 @@ HTML = r"""
     button:hover{background:var(--brand2)} button:disabled{opacity:.58;cursor:wait}
     button.secondary{background:#455468} button.secondary:hover{background:#344054}
     button.ghost{background:#edf2f7;color:#243041} button.ghost:hover{background:#e2e8f0}
+    button.danger{background:#b42318} button.danger:hover{background:#912018}
     input,select{width:100%;min-height:42px;border:1px solid #b9c5d5;border-radius:7px;background:#fff;padding:10px 12px;color:var(--text);outline:none}
     input:focus,select:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(21,94,239,.12)}
     label{display:block;margin-bottom:7px;font-weight:700}.shell{min-height:100vh}
@@ -112,7 +113,7 @@ HTML = r"""
               <div><label for="folderSelect">Chọn thư mục sản phẩm</label><select id="folderSelect" onchange="selectFolder()"><option value="">-- Chưa chọn thư mục --</option></select></div>
               <div><label for="newFolder">Tạo thư mục sản phẩm mới</label><div class="field-action"><input id="newFolder" placeholder="Ví dụ: Eskar Tears 15ml"><button onclick="createFolder()">Tạo</button></div></div>
             </div>
-            <div class="buttons"><button class="secondary" onclick="scanFolders()">Quét lại thư mục</button></div>
+            <div class="buttons"><button class="secondary" onclick="scanFolders()">Quét lại thư mục</button><button class="danger" onclick="deleteFolder()">Xóa thư mục đang chọn</button></div>
             <div class="hint">Bắt buộc chọn đúng thư mục sản phẩm trước khi chụp hoặc quay. App không tự phân loại và không tự tạo album Google Photos.</div>
           </div>
         </div>
@@ -171,6 +172,7 @@ HTML = r"""
   async function scanFolders(){try{render(await api("/api/status"));log({status:"Đã quét lại danh sách thư mục."})}catch(e){log(e)}}
   async function saveDriveRoot(){try{log(await api("/api/drive-root",{drive_root:document.getElementById("driveRoot").value}));await refresh()}catch(e){log(e)}}
   async function createFolder(){try{const d=await api("/api/folders",{name:document.getElementById("newFolder").value});document.getElementById("newFolder").value="";log(d);await refresh()}catch(e){log(e)}}
+  async function deleteFolder(){const name=selected();if(!name){log({error:"Hãy chọn thư mục cần xóa."});return}if(!confirm(`Xóa thư mục rỗng "${name}"?`))return;try{log(await api("/api/folders/delete",{name}));await refresh()}catch(e){log(e)}}
   async function selectFolder(){try{const d=await api("/api/select-folder",{name:selected()});log(d);await refresh()}catch(e){log(e)}}
   async function openPreview(){try{log(await api("/api/open-preview",{}))}catch(e){log(e)}}
   async function run(path,body){if(!requireFolder()||busy)return;setBusy(true);await api("/api/events/clear",{}).catch(()=>{});lastId=0;startPoll();try{log(await api(path,body));await refresh()}catch(e){log(e)}finally{await stopPoll();setBusy(false)}}
@@ -416,6 +418,24 @@ def api_select_folder():
         target = selected_drive_folder(name)
         save_path_setting("selected_drive_folder", target.name)
         return jsonify({"status": "Đã chọn thư mục sản phẩm.", "folder": target.name, "path": str(target)})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/folders/delete")
+def api_delete_folder():
+    try:
+        if OPERATION_LOCK.locked():
+            raise RuntimeError("Pixel đang chụp hoặc quay. Hãy đợi tác vụ hiện tại hoàn tất.")
+        name = str((request.json or {}).get("name", "")).strip()
+        target = selected_drive_folder(name)
+        if any(target.iterdir()):
+            raise ValueError("Thư mục không rỗng. Hãy kiểm tra và di chuyển hoặc xóa file bên trong trước.")
+        target.rmdir()
+        if selected_folder_name() == target.name:
+            save_path_setting("selected_drive_folder", "")
+        add_event({"step": "folder_deleted", "message": "Đã xóa thư mục rỗng.", "folder": target.name})
+        return jsonify({"status": "Đã xóa thư mục rỗng.", "folder": target.name})
     except Exception as exc:
         return error_response(exc, 400)
 
