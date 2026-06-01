@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$ProjectDir = "C:\Users\datdt\Documents\Codex\2026-05-27\project-n-y-nousresearch-hermes-agent"
+$ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Port = 8765
 $LogDir = Join-Path $ProjectDir "logs"
 $LogFile = Join-Path $LogDir "pixel-agent.log"

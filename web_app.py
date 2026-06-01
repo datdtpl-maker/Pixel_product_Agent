@@ -21,6 +21,8 @@ DEFAULT_DRIVE_ROOT = r"G:\My Drive\Test hình ảnh shopee"
 EVENT_LOCK = threading.Lock()
 EVENTS: list[dict[str, Any]] = []
 EVENT_COUNTER = 0
+OPERATION_LOCK = threading.Lock()
+CONFIG_LOCK = threading.RLock()
 
 app = Flask(__name__)
 
@@ -54,7 +56,7 @@ HTML = r"""
     .nav{display:grid;gap:7px;margin-top:20px}.nav div{display:flex;justify-content:space-between;gap:8px;padding:10px;border-radius:7px;color:#cbd5e1;font-size:14px}.nav .active{background:rgba(255,255,255,.1);color:#fff}
     .main{min-width:0}.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:17px 26px;background:rgba(255,255,255,.9);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:3;backdrop-filter:blur(10px)}
     .topbar h2{margin:0;font-size:22px}.topbar p{margin:4px 0 0;color:var(--muted);font-size:14px}.actions,.buttons{display:flex;gap:10px;flex-wrap:wrap}
-    .content{max-width:1180px;margin:0 auto;padding:24px 26px 40px;display:grid;gap:18px}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+    .content{max-width:1180px;margin:0 auto;padding:24px 26px 40px;display:grid;gap:18px}.metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
     .metric,.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}.metric{padding:15px;min-height:91px}.metric small{display:block;color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase}.metric strong{display:block;margin-top:8px;font-size:16px;overflow-wrap:anywhere}
     .badge{display:inline-flex;min-height:25px;align-items:center;border-radius:999px;padding:4px 9px;font-size:13px;font-weight:700}.ok{background:var(--okbg);color:var(--ok)}.warn{background:var(--warnbg);color:var(--warn)}
     .layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr);gap:18px;align-items:start}.panel{overflow:hidden}.panel-head{padding:16px 18px;border-bottom:1px solid var(--line)}.panel-head h3{margin:0;font-size:17px}.panel-head p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.45}.panel-body{padding:18px;display:grid;gap:15px}
@@ -92,6 +94,7 @@ HTML = r"""
         <div class="metric"><small>Thư mục Drive</small><strong id="driveMetric"><span class="badge warn">Đang kiểm tra</span></strong></div>
         <div class="metric"><small>Thư mục đang chọn</small><strong id="selectedMetric">Chưa chọn</strong></div>
         <div class="metric"><small>Số thư mục sản phẩm</small><strong id="folderMetric">0</strong></div>
+        <div class="metric"><small>Trạng thái tác vụ</small><strong id="busyMetric"><span class="badge ok">Sẵn sàng</span></strong></div>
       </section>
 
       <section class="layout">
@@ -157,7 +160,7 @@ HTML = r"""
   function selected(){return document.getElementById("folderSelect").value}
   function requireFolder(){if(!selected()){log({error:"Hãy chọn hoặc tạo thư mục sản phẩm trước khi chụp/quay."});return false}return true}
   function setBusy(v){busy=v;document.querySelectorAll("button").forEach(b=>b.disabled=v)}
-  function render(d){document.getElementById("adbMetric").innerHTML=d.adb_device?`<span class="badge ok">${d.adb_device}</span>`:`<span class="badge warn">Chưa thấy Pixel</span>`;document.getElementById("driveMetric").innerHTML=d.drive_ready?`<span class="badge ok">Đã kết nối</span>`:`<span class="badge warn">Không tìm thấy</span>`;document.getElementById("selectedMetric").textContent=d.selected_folder||"Chưa chọn";document.getElementById("folderMetric").textContent=(d.folders||[]).length;document.getElementById("navFolders").textContent=(d.folders||[]).length;document.getElementById("navDrive").textContent=d.drive_ready?"OK":"Lỗi";document.getElementById("navAdb").textContent=d.adb_device?"OK":"Offline";document.getElementById("driveRoot").value=d.drive_root;const s=document.getElementById("folderSelect"),current=d.selected_folder||s.value;s.innerHTML='<option value="">-- Chưa chọn thư mục --</option>'+d.folders.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("");s.value=current}
+  function render(d){document.getElementById("adbMetric").innerHTML=d.adb_device?`<span class="badge ok">${d.adb_device}</span>`:`<span class="badge warn">Chưa thấy Pixel</span>`;document.getElementById("driveMetric").innerHTML=d.drive_ready?`<span class="badge ok">Đã kết nối</span>`:`<span class="badge warn">Không tìm thấy</span>`;document.getElementById("selectedMetric").textContent=d.selected_folder||"Chưa chọn";document.getElementById("folderMetric").textContent=(d.folders||[]).length;document.getElementById("busyMetric").innerHTML=d.operation_busy?'<span class="badge warn">Đang xử lý</span>':'<span class="badge ok">Sẵn sàng</span>';document.getElementById("navFolders").textContent=(d.folders||[]).length;document.getElementById("navDrive").textContent=d.drive_ready?"OK":"Lỗi";document.getElementById("navAdb").textContent=d.adb_device?"OK":"Offline";document.getElementById("driveRoot").value=d.drive_root;const s=document.getElementById("folderSelect"),current=d.selected_folder||s.value;s.innerHTML='<option value="">-- Chưa chọn thư mục --</option>'+d.folders.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("");s.value=current}
   function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
   async function refresh(){try{render(await api("/api/status"))}catch(e){log(e)}}
   async function scanFolders(){try{render(await api("/api/status"));log({status:"Đã quét lại danh sách thư mục."})}catch(e){log(e)}}
@@ -181,11 +184,15 @@ def settings() -> pipeline.Settings:
 
 
 def load_config() -> dict[str, Any]:
-    return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    with CONFIG_LOCK:
+        return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
 
 def save_config(config: dict[str, Any]) -> None:
-    CONFIG_PATH.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
+    with CONFIG_LOCK:
+        temp_path = CONFIG_PATH.with_suffix(".json.tmp")
+        temp_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
+        os.replace(temp_path, CONFIG_PATH)
 
 
 def drive_root() -> Path:
@@ -199,9 +206,10 @@ def selected_folder_name() -> str:
 
 
 def save_path_setting(key: str, value: str) -> None:
-    config = load_config()
-    config.setdefault("paths", {})[key] = value
-    save_config(config)
+    with CONFIG_LOCK:
+        config = load_config()
+        config.setdefault("paths", {})[key] = value
+        save_config(config)
 
 
 def validate_drive_root(path: Path) -> Path:
@@ -253,13 +261,20 @@ def copy_media_to_drive(source: Path, folder: Path) -> Path:
         raise FileNotFoundError(f"Không tìm thấy file vừa kéo từ Pixel: {source}")
     target = unique_target(folder, source.name)
     temp = target.with_name(f".{target.name}.part")
-    shutil.copy2(source, temp)
-    if temp.stat().st_size != source.stat().st_size:
+    target_created = False
+    try:
+        shutil.copy2(source, temp)
+        if temp.stat().st_size != source.stat().st_size:
+            raise RuntimeError("File chép vào Drive không đủ dung lượng. App giữ nguyên file trên Pixel.")
+        os.replace(temp, target)
+        target_created = True
+        if target.stat().st_size != source.stat().st_size:
+            raise RuntimeError("Không xác minh được file đích trong Drive. App giữ nguyên file trên Pixel.")
+    except Exception:
         temp.unlink(missing_ok=True)
-        raise RuntimeError("File chép vào Drive không đủ dung lượng. App giữ nguyên file trên Pixel.")
-    os.replace(temp, target)
-    if target.stat().st_size != source.stat().st_size:
-        raise RuntimeError("Không xác minh được file đích trong Drive. App giữ nguyên file trên Pixel.")
+        if target_created:
+            target.unlink(missing_ok=True)
+        raise
     return target
 
 
@@ -358,7 +373,7 @@ def api_status():
         folders, ready = list_drive_folders(), True
     except Exception:
         folders, ready = [], False
-    return jsonify({"adb_device": devices[0] if devices else "", "drive_root": str(drive_root()), "drive_ready": ready, "selected_folder": selected_folder_name(), "folders": folders})
+    return jsonify({"adb_device": devices[0] if devices else "", "drive_root": str(drive_root()), "drive_ready": ready, "selected_folder": selected_folder_name(), "folders": folders, "operation_busy": OPERATION_LOCK.locked()})
 
 
 @app.post("/api/drive-root")
@@ -403,6 +418,8 @@ def api_select_folder():
 @app.post("/api/open-preview")
 def api_open_preview():
     try:
+        if OPERATION_LOCK.locked():
+            raise RuntimeError("Pixel đang chụp hoặc quay. Hãy đợi tác vụ hiện tại hoàn tất.")
         cfg, scrcpy = settings(), find_scrcpy_exe()
         serial = adb_device_serial(cfg)
         stop_existing_scrcpy()
@@ -426,6 +443,8 @@ def api_open_preview():
 
 @app.post("/api/capture")
 def api_capture():
+    if not OPERATION_LOCK.acquire(blocking=False):
+        return error_response(RuntimeError("Pixel đang xử lý một tác vụ khác. Hãy đợi hoàn tất rồi thử lại."), 409)
     try:
         cfg = settings()
         folder = selected_drive_folder(str((request.json or {}).get("folder", "")).strip())
@@ -442,10 +461,14 @@ def api_capture():
     except Exception as exc:
         add_event({"step": "error", "message": str(exc)})
         return error_response(exc)
+    finally:
+        OPERATION_LOCK.release()
 
 
 @app.post("/api/record")
 def api_record():
+    if not OPERATION_LOCK.acquire(blocking=False):
+        return error_response(RuntimeError("Pixel đang xử lý một tác vụ khác. Hãy đợi hoàn tất rồi thử lại."), 409)
     try:
         cfg = settings()
         payload = request.json or {}
@@ -464,6 +487,8 @@ def api_record():
     except Exception as exc:
         add_event({"step": "error", "message": str(exc)})
         return error_response(exc)
+    finally:
+        OPERATION_LOCK.release()
 
 
 if __name__ == "__main__":

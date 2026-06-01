@@ -2,7 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $TaskName = "Pixel Product Agent"
-$ProjectDir = "C:\Users\datdt\Documents\Codex\2026-05-27\project-n-y-nousresearch-hermes-agent"
+$ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Launcher = Join-Path $ProjectDir "start_pixel_agent.ps1"
 
 if (-not (Test-Path $Launcher)) {

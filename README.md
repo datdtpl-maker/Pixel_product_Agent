@@ -108,6 +108,8 @@ Hoặc cài Scheduled Task:
 powershell -ExecutionPolicy Bypass -File .\install_startup_task.ps1
 ```
 
+Các script tự nhận diện thư mục cài đặt hiện tại, nên có thể clone repo vào vị trí khác mà không cần sửa đường dẫn thủ công.
+
 Gỡ cài đặt:
 
 ```powershell
@@ -145,6 +147,8 @@ Khi chụp hoặc quay, app thực hiện theo thứ tự:
 7. Chỉ sau khi xác minh thành công mới xóa file khỏi Pixel và xóa file tạm local.
 
 Nếu Drive lỗi hoặc bị ngắt kết nối, app giữ nguyên file trên Pixel.
+
+App chỉ cho phép một tác vụ chụp hoặc quay chạy tại một thời điểm. Nếu nhiều tab trình duyệt cùng thao tác, yêu cầu đến sau sẽ bị từ chối để tránh trộn file giữa hai lượt.
 
 ## File riêng tư
 
