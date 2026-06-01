@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import difflib
 import json
 import mimetypes
 import os
@@ -9,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import time
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -141,6 +143,44 @@ def save_album_cache(settings: Settings, cache: dict[str, str]) -> None:
     settings.album_cache_file.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+def normalized_title_tokens(title: str) -> set[str]:
+    normalized = unicodedata.normalize("NFKD", title.lower())
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    for char in "/\\_-.,:;()[]{}|+&":
+        ascii_text = ascii_text.replace(char, " ")
+    stop_words = {
+        "san",
+        "pham",
+        "product",
+        "the",
+        "and",
+        "of",
+        "for",
+        "nuoc",
+        "nhan",
+        "tao",
+        "artificial",
+    }
+    return {token for token in ascii_text.split() if len(token) >= 2 and token not in stop_words}
+
+
+def album_title_similarity(left: str, right: str) -> float:
+    left_tokens = normalized_title_tokens(left)
+    right_tokens = normalized_title_tokens(right)
+    if not left_tokens or not right_tokens:
+        return 0.0
+    overlap = len(left_tokens & right_tokens) / min(len(left_tokens), len(right_tokens))
+    sequence = difflib.SequenceMatcher(None, " ".join(sorted(left_tokens)), " ".join(sorted(right_tokens))).ratio()
+    return max(overlap, sequence)
+
+
+def find_similar_cached_album(cache: dict[str, str], title: str) -> tuple[str, str] | None:
+    for cached_title, album_id in cache.items():
+        if album_title_similarity(cached_title, title) >= 0.72:
+            return cached_title, album_id
+    return None
+
+
 def create_album(settings: Settings, creds: Credentials, title: str) -> str:
     response = requests.post(
         f"{API_BASE}/albums",
@@ -159,6 +199,13 @@ def create_album(settings: Settings, creds: Credentials, title: str) -> str:
 
 def get_or_create_album(settings: Settings, creds: Credentials, title: str) -> str:
     cache = load_album_cache(settings)
+    similar = find_similar_cached_album(cache, title)
+    if similar:
+        _canonical_title, album_id = similar
+        if title not in cache or cache[title] != album_id:
+            cache[title] = album_id
+            save_album_cache(settings, cache)
+        return album_id
     if title in cache:
         return cache[title]
     return create_album(settings, creds, title)
