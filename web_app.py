@@ -1204,6 +1204,53 @@ def open_camera_for_preview(cfg: pipeline.Settings) -> None:
     )
 
 
+def adb_device_serial(cfg: pipeline.Settings) -> str:
+    if cfg.adb_serial:
+        return cfg.adb_serial
+    output = pipeline.adb_command(cfg, "devices", check=False).stdout.splitlines()
+    devices = [line.split()[0] for line in output if "\tdevice" in line]
+    if not devices:
+        raise RuntimeError("Chua thay Pixel qua ADB. Kiem tra cap USB va USB debugging.")
+    if len(devices) > 1:
+        raise RuntimeError("Co nhieu thiet bi ADB. Dien adb_serial trong config.json.")
+    return devices[0]
+
+
+def stop_existing_scrcpy() -> None:
+    if os.name != "nt":
+        return
+    subprocess.run(
+        ["taskkill", "/IM", "scrcpy.exe", "/F"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def running_scrcpy_processes() -> list[str]:
+    if os.name != "nt":
+        return []
+    output = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-Command",
+            "Get-Process scrcpy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    ).stdout
+    return [line.strip() for line in output.splitlines() if line.strip()]
+
+
+def adb_exe_path() -> str | None:
+    configured = os.environ.get("ADB", "").strip()
+    if configured and Path(configured).exists():
+        return configured
+    return shutil.which("adb")
+
+
 @app.get("/")
 def index():
     return render_template_string(HTML)
@@ -1410,28 +1457,46 @@ def api_open_preview():
     try:
         cfg = settings()
         scrcpy = find_scrcpy_exe()
+        serial = adb_device_serial(cfg)
+        stop_existing_scrcpy()
         open_camera_for_preview(cfg)
+        time.sleep(0.8)
         args = [
             str(scrcpy),
+            "--serial",
+            serial,
             "--stay-awake",
+            "--no-audio",
             "--window-title",
             "Pixel Product Agent - Camera Preview",
         ]
-        creationflags = 0
+        env = os.environ.copy()
+        adb_path = adb_exe_path()
+        if adb_path:
+            env["ADB"] = adb_path
         if os.name == "nt":
-            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
-        subprocess.Popen(
-            args,
-            cwd=str(scrcpy.parent),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=creationflags,
-        )
+            subprocess.Popen(
+                args,
+                cwd=str(scrcpy.parent),
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            )
+        else:
+            subprocess.Popen(args, cwd=str(scrcpy.parent), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(2)
+        pids = running_scrcpy_processes()
+        if os.name == "nt" and not pids:
+            raise RuntimeError("scrcpy da duoc goi nhung thoat ngay. Thu mo truc tiep scrcpy de xem loi ADB/driver.")
         return jsonify(
             {
                 "status": "started",
                 "message": "Da mo man hinh Pixel bang scrcpy. Chinh goc san pham roi bam chup tren app.",
                 "scrcpy": str(scrcpy),
+                "adb_serial": serial,
+                "adb": adb_path,
+                "scrcpy_pids": pids,
             }
         )
     except Exception as exc:
