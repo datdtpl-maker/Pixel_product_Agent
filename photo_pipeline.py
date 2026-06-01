@@ -793,14 +793,29 @@ def adb_command(settings: Settings, *args: str, check: bool = True) -> subproces
     return subprocess.run(command, text=True, capture_output=True, check=check)
 
 
+def device_epoch_seconds(settings: Settings) -> int:
+    output = adb_command(settings, "shell", "date", "+%s", check=False).stdout.strip()
+    try:
+        return int(output.splitlines()[-1])
+    except (TypeError, ValueError, IndexError):
+        return int(time.time())
+
+
+def latest_media_after(settings: Settings, patterns: list[str], min_epoch: int) -> str:
+    pattern_text = " ".join(f"{settings.camera_dir}/{pattern}" for pattern in patterns)
+    command = (
+        f"for f in {pattern_text}; do "
+        "[ -e \"$f\" ] || continue; "
+        "mtime=$(stat -c %Y \"$f\" 2>/dev/null || stat -f %m \"$f\" 2>/dev/null); "
+        f"[ \"$mtime\" -ge {min_epoch} ] && printf '%s %s\\n' \"$mtime\" \"$f\"; "
+        "done | sort -nr | head -n 1 | cut -d' ' -f2-"
+    )
+    return adb_command(settings, "shell", command, check=False).stdout.strip()
+
+
 def capture_from_pixel(settings: Settings) -> Path:
     ensure_dirs(settings)
-    before_latest = adb_command(
-        settings,
-        "shell",
-        f"ls -t {settings.camera_dir}/*.jpg {settings.camera_dir}/*.jpeg 2>/dev/null | head -n 1",
-        check=False,
-    ).stdout.strip()
+    capture_started_at = max(0, device_epoch_seconds(settings) - 1)
 
     adb_command(settings, "shell", "am", "start", "-a", "android.media.action.STILL_IMAGE_CAMERA")
     time.sleep(2)
@@ -809,19 +824,12 @@ def capture_from_pixel(settings: Settings) -> Path:
     latest = ""
     for _ in range(12):
         time.sleep(1)
-        latest = adb_command(
-            settings,
-            "shell",
-            f"ls -t {settings.camera_dir}/*.jpg {settings.camera_dir}/*.jpeg 2>/dev/null | head -n 1",
-            check=False,
-        ).stdout.strip()
-        if latest and latest != before_latest:
+        latest = latest_media_after(settings, ["*.jpg", "*.jpeg"], capture_started_at)
+        if latest:
             break
 
     if not latest:
-        raise RuntimeError("Could not find a captured JPG/JPEG in the Pixel camera folder.")
-    if latest == before_latest:
-        raise RuntimeError("Pixel did not create a new photo. Check Camera app focus/permissions and try again.")
+        raise RuntimeError("Pixel did not create a new photo after capture started. Check Camera focus/permissions and try again.")
 
     local_path = settings.inbox_dir / Path(latest).name
     adb_command(settings, "pull", latest, str(local_path))
@@ -831,12 +839,7 @@ def capture_from_pixel(settings: Settings) -> Path:
 def capture_video_from_pixel(settings: Settings, duration_seconds: int = 10) -> Path:
     ensure_dirs(settings)
     duration_seconds = max(1, min(duration_seconds, 300))
-    before_latest = adb_command(
-        settings,
-        "shell",
-        f"ls -t {settings.camera_dir}/*.mp4 {settings.camera_dir}/*.3gp 2>/dev/null | head -n 1",
-        check=False,
-    ).stdout.strip()
+    recording_started_at = max(0, device_epoch_seconds(settings) - 1)
 
     adb_command(settings, "shell", "am", "start", "-a", "android.media.action.VIDEO_CAMERA")
     time.sleep(2)
@@ -847,19 +850,12 @@ def capture_video_from_pixel(settings: Settings, duration_seconds: int = 10) -> 
     latest = ""
     for _ in range(20):
         time.sleep(1)
-        latest = adb_command(
-            settings,
-            "shell",
-            f"ls -t {settings.camera_dir}/*.mp4 {settings.camera_dir}/*.3gp 2>/dev/null | head -n 1",
-            check=False,
-        ).stdout.strip()
-        if latest and latest != before_latest:
+        latest = latest_media_after(settings, ["*.mp4", "*.3gp"], recording_started_at)
+        if latest:
             break
 
     if not latest:
-        raise RuntimeError("Could not find a captured MP4/3GP in the Pixel camera folder.")
-    if latest == before_latest:
-        raise RuntimeError("Pixel did not create a new video. Check Camera app focus/permissions and try again.")
+        raise RuntimeError("Pixel did not create a new video after recording started. Check Camera focus/permissions and try again.")
 
     local_path = settings.inbox_dir / Path(latest).name
     adb_command(settings, "pull", latest, str(local_path))
