@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +20,9 @@ app = Flask(__name__)
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 DOC_EXTS = {".txt", ".csv", ".json", ".docx", ".pdf"}
 SUPPORTED_SEARCH_PROVIDERS = {"serpapi", "bing"}
+EVENT_LOCK = threading.Lock()
+EVENTS: list[dict[str, Any]] = []
+EVENT_COUNTER = 0
 
 
 HTML = r"""
@@ -520,6 +525,8 @@ HTML = r"""
   <script>
     const logBox = document.getElementById("log");
     let eventCount = 0;
+    let lastServerEventId = 0;
+    let eventPoller = null;
 
     function log(value) {
       const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
@@ -531,8 +538,31 @@ HTML = r"""
 
     function clearLog() {
       eventCount = 0;
+      lastServerEventId = 0;
       document.getElementById("logCount").textContent = "0 events";
       logBox.textContent = "";
+    }
+
+    async function pullServerEvents() {
+      const data = await api(`/api/events?after=${lastServerEventId}`);
+      for (const event of data.events || []) {
+        lastServerEventId = Math.max(lastServerEventId, event.id || 0);
+        log(event.payload);
+      }
+    }
+
+    function startEventPolling() {
+      if (eventPoller) return;
+      pullServerEvents().catch(() => {});
+      eventPoller = setInterval(() => pullServerEvents().catch(() => {}), 1000);
+    }
+
+    async function stopEventPolling() {
+      if (eventPoller) {
+        clearInterval(eventPoller);
+        eventPoller = null;
+      }
+      await pullServerEvents().catch(() => {});
     }
 
     async function api(path, body) {
@@ -619,6 +649,10 @@ HTML = r"""
 
     async function captureUpload() {
       setBusy(true);
+      await api("/api/events/clear", {}).catch(() => {});
+      lastServerEventId = 0;
+      log({step: "bat_dau", message: "Bat dau chup anh va upload."});
+      startEventPolling();
       try {
         const data = await api("/api/capture-upload", {
           provider: document.getElementById("provider").value,
@@ -629,12 +663,17 @@ HTML = r"""
       } catch (err) {
         log(err);
       } finally {
+        await stopEventPolling();
         setBusy(false);
       }
     }
 
     async function recordUpload() {
       setBusy(true);
+      await api("/api/events/clear", {}).catch(() => {});
+      lastServerEventId = 0;
+      log({step: "bat_dau", message: "Bat dau quay video va upload."});
+      startEventPolling();
       try {
         const data = await api("/api/record-upload", {
           provider: document.getElementById("provider").value,
@@ -646,6 +685,7 @@ HTML = r"""
       } catch (err) {
         log(err);
       } finally {
+        await stopEventPolling();
         setBusy(false);
       }
     }
@@ -901,6 +941,20 @@ def masked_key(value: str | None) -> str:
     return f"{value[:7]}...{value[-4:]}"
 
 
+def add_event(payload: dict[str, Any]) -> None:
+    global EVENT_COUNTER
+    with EVENT_LOCK:
+        EVENT_COUNTER += 1
+        EVENTS.append(
+            {
+                "id": EVENT_COUNTER,
+                "time": time.strftime("%H:%M:%S"),
+                "payload": payload,
+            }
+        )
+        del EVENTS[:-200]
+
+
 def check_openai_key(api_key: str) -> dict[str, Any]:
     import requests
 
@@ -1106,6 +1160,23 @@ def index():
     return render_template_string(HTML)
 
 
+@app.get("/api/events")
+def api_events():
+    after = int(request.args.get("after") or 0)
+    with EVENT_LOCK:
+        events = [event for event in EVENTS if int(event["id"]) > after]
+    return jsonify({"events": events})
+
+
+@app.post("/api/events/clear")
+def api_clear_events():
+    global EVENT_COUNTER
+    with EVENT_LOCK:
+        EVENTS.clear()
+        EVENT_COUNTER = 0
+    return jsonify({"status": "cleared"})
+
+
 @app.get("/api/status")
 def api_status():
     cfg = settings()
@@ -1289,21 +1360,28 @@ def api_classify_latest():
 def api_capture_upload():
     try:
         cfg = settings()
+        add_event({"step": "setup", "message": "Dang doc cau hinh va chuan bi Pixel."})
         set_provider(cfg, request.json.get("provider", cfg.ai_provider))
         forced_product = (request.json.get("product") or "").strip() or None
+        add_event({"step": "capture", "message": "Dang mo camera Pixel va chup anh."})
         image = pipeline.capture_from_pixel(cfg)
+        add_event({"step": "capture_done", "message": "Da chup anh va keo file ve may.", "file": str(image)})
+        add_event({"step": "classify", "message": "Dang phan loai san pham bang AI/catalog."})
         product, score, reason = pipeline.classify_product(cfg, image, forced_product)
+        add_event({"step": "classified", "message": "Da nhan dien san pham.", "product": product, "score": score})
+        add_event({"step": "upload", "message": "Dang tao album va upload len Google Photos.", "product": product})
         result = pipeline.upload_photo(cfg, image, product)
-        return jsonify(
-            {
-                "captured": str(image),
-                "product": product,
-                "score": score,
-                "reason": reason,
-                **pipeline.upload_result_summary(result),
-            }
-        )
+        payload = {
+            "captured": str(image),
+            "product": product,
+            "score": score,
+            "reason": reason,
+            **pipeline.upload_result_summary(result),
+        }
+        add_event({"step": "done", "message": "Hoan tat chup anh va upload.", "result": payload})
+        return jsonify(payload)
     except Exception as exc:
+        add_event({"step": "error", "message": str(exc)})
         return error_response(exc)
 
 
@@ -1311,6 +1389,7 @@ def api_capture_upload():
 def api_record_upload():
     try:
         cfg = settings()
+        add_event({"step": "setup", "message": "Dang doc cau hinh va chuan bi quay video."})
         set_provider(cfg, request.json.get("provider", cfg.ai_provider))
         forced_product = (request.json.get("product") or "").strip() or None
         duration = int(request.json.get("duration") or 10)
@@ -1318,26 +1397,34 @@ def api_record_upload():
         reference_image = None
         if forced_product:
             product, score, reason = forced_product, None, "forced by user"
+            add_event({"step": "classify_skipped", "message": "Dung ten san pham ep san.", "product": product})
         else:
+            add_event({"step": "reference_capture", "message": "Dang chup anh tham chieu de phan loai video."})
             reference_image = pipeline.capture_from_pixel(cfg)
+            add_event({"step": "classify", "message": "Dang phan loai anh tham chieu bang AI/catalog.", "file": str(reference_image)})
             product, score, reason = pipeline.classify_product(cfg, reference_image)
+            add_event({"step": "classified", "message": "Da nhan dien san pham cho video.", "product": product, "score": score})
 
+        add_event({"step": "record", "message": "Dang quay video tren Pixel.", "duration": max(1, min(duration, 300))})
         video = pipeline.capture_video_from_pixel(cfg, duration)
+        add_event({"step": "record_done", "message": "Da quay video va keo file ve may.", "file": str(video)})
+        add_event({"step": "upload", "message": "Dang tao album va upload video len Google Photos.", "product": product})
         result = pipeline.upload_media(cfg, video, product, "Product video")
-        return jsonify(
-            {
-                "captured": str(video),
-                "reference_image": str(reference_image) if reference_image else None,
-                "product": product,
-                "score": score,
-                "reason": reason,
-                "duration": max(1, min(duration, 300)),
-                **pipeline.upload_result_summary(result),
-            }
-        )
+        payload = {
+            "captured": str(video),
+            "reference_image": str(reference_image) if reference_image else None,
+            "product": product,
+            "score": score,
+            "reason": reason,
+            "duration": max(1, min(duration, 300)),
+            **pipeline.upload_result_summary(result),
+        }
+        add_event({"step": "done", "message": "Hoan tat quay video va upload.", "result": payload})
+        return jsonify(payload)
     except Exception as exc:
+        add_event({"step": "error", "message": str(exc)})
         return error_response(exc)
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "8765")), debug=False)
+    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "8765")), debug=False, threaded=True)
