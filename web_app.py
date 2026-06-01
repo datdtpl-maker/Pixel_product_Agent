@@ -86,6 +86,7 @@ HTML = r"""
       <div class="actions">
         <button class="ghost" onclick="refresh()">Làm mới</button>
         <button class="secondary" onclick="openPreview()">Xem màn hình Pixel</button>
+        <button class="secondary" onclick="sleepPixel()">Tắt màn hình Pixel</button>
         <button onclick="capture()">Chụp ảnh</button>
         <button onclick="record()">Quay video</button>
       </div>
@@ -137,6 +138,7 @@ HTML = r"""
           </div>
           <div class="buttons">
             <button class="secondary" onclick="openPreview()">Xem màn hình Pixel</button>
+            <button class="secondary" onclick="sleepPixel()">Tắt màn hình Pixel</button>
             <button onclick="capture()">Chụp ảnh vào thư mục đang chọn</button>
             <button onclick="record()">Quay video vào thư mục đang chọn</button>
           </div>
@@ -175,6 +177,7 @@ HTML = r"""
   async function deleteFolder(){const name=selected();if(!name){log({error:"Hãy chọn thư mục cần xóa."});return}if(!confirm(`Xóa thư mục rỗng "${name}"?`))return;try{log(await api("/api/folders/delete",{name}));await refresh()}catch(e){log(e)}}
   async function selectFolder(){try{const d=await api("/api/select-folder",{name:selected()});log(d);await refresh()}catch(e){log(e)}}
   async function openPreview(){try{log(await api("/api/open-preview",{}))}catch(e){log(e)}}
+  async function sleepPixel(){try{log(await api("/api/sleep-pixel",{}));await refresh()}catch(e){log(e)}}
   async function run(path,body){if(!requireFolder()||busy)return;setBusy(true);await api("/api/events/clear",{}).catch(()=>{});lastId=0;startPoll();try{log(await api(path,body));await refresh()}catch(e){log(e)}finally{await stopPoll();setBusy(false)}}
   function capture(){run("/api/capture",{folder:selected()})}
   function record(){run("/api/record",{folder:selected(),duration:Number(document.getElementById("duration").value||10)})}
@@ -337,6 +340,10 @@ def open_camera(cfg: pipeline.Settings) -> None:
     pipeline.adb_command(cfg, "shell", "am", "start", "-a", "android.media.action.STILL_IMAGE_CAMERA", check=False)
 
 
+def sleep_pixel(cfg: pipeline.Settings) -> None:
+    pipeline.adb_command(cfg, "shell", "input", "keyevent", "223", check=False)
+
+
 def stop_existing_scrcpy() -> None:
     if os.name == "nt":
         subprocess.run(["taskkill", "/IM", "scrcpy.exe", "/F"], text=True, capture_output=True, check=False)
@@ -462,6 +469,21 @@ def api_open_preview():
         if os.name == "nt" and not pids:
             raise RuntimeError("scrcpy đã thoát ngay. Hãy kiểm tra ADB/driver.")
         return jsonify({"status": "Đã mở màn hình Pixel.", "adb_serial": serial, "scrcpy_pids": pids})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/sleep-pixel")
+def api_sleep_pixel():
+    try:
+        if OPERATION_LOCK.locked():
+            raise RuntimeError("Pixel đang chụp hoặc quay. Hãy đợi tác vụ hiện tại hoàn tất.")
+        cfg = settings()
+        serial = adb_device_serial(cfg)
+        stop_existing_scrcpy()
+        sleep_pixel(cfg)
+        add_event({"step": "pixel_sleep", "message": "Đã tắt màn hình Pixel và đóng scrcpy.", "adb_serial": serial})
+        return jsonify({"status": "Đã tắt màn hình Pixel.", "adb_serial": serial})
     except Exception as exc:
         return error_response(exc, 400)
 

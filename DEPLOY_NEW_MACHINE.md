@@ -127,6 +127,7 @@ Kiem tra tren giao dien:
 - Tao hoac chon thu muc san pham.
 - Bam `Xem man hinh Pixel` de mo scrcpy.
 - Bam `Chup anh` hoac `Quay video`.
+- Bam `Tat man hinh Pixel` khi khong can xem truoc nua. Nut nay dong scrcpy va dua Pixel ve che do sleep.
 
 ## 6. Tao ten mien noi bo
 
@@ -187,4 +188,3 @@ Neu app khong mo duoc cong 8765:
 $env:PORT="8766"
 python .\web_app.py
 ```
-
