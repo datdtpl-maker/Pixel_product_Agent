@@ -8,6 +8,7 @@ import io
 import json
 import mimetypes
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -159,11 +160,49 @@ def normalized_title_tokens(title: str) -> set[str]:
         "of",
         "for",
         "nuoc",
+        "mat",
         "nhan",
         "tao",
         "artificial",
+        "eye",
+        "eyes",
+        "drops",
+        "drop",
+        "thuoc",
     }
-    return {token for token in ascii_text.split() if len(token) >= 2 and token not in stop_words}
+    tokens = set()
+    for token in ascii_text.split():
+        if len(token) < 2 or token in stop_words:
+            continue
+        if re.fullmatch(r"\d+(\.\d+)?(ml|g|mg|kg|l|pcs|vien|chai|hop)?", token):
+            continue
+        tokens.add(token)
+    return tokens
+
+
+def canonical_album_key(title: str) -> str:
+    tokens = sorted(normalized_title_tokens(title))
+    if len(tokens) < 2:
+        return ""
+    return " ".join(tokens)
+
+
+def normalize_album_cache_aliases(cache: dict[str, str]) -> tuple[dict[str, str], bool]:
+    canonical_album_ids: dict[str, str] = {}
+    normalized = dict(cache)
+    changed = False
+    for title, album_id in cache.items():
+        key = canonical_album_key(title)
+        if not key:
+            continue
+        if key not in canonical_album_ids:
+            canonical_album_ids[key] = album_id
+            continue
+        canonical_album_id = canonical_album_ids[key]
+        if normalized[title] != canonical_album_id:
+            normalized[title] = canonical_album_id
+            changed = True
+    return normalized, changed
 
 
 def album_title_similarity(left: str, right: str) -> float:
@@ -177,8 +216,13 @@ def album_title_similarity(left: str, right: str) -> float:
 
 
 def find_similar_cached_album(cache: dict[str, str], title: str) -> tuple[str, str] | None:
+    title_key = canonical_album_key(title)
+    if title_key:
+        for cached_title, album_id in cache.items():
+            if canonical_album_key(cached_title) == title_key:
+                return cached_title, album_id
     for cached_title, album_id in cache.items():
-        if album_title_similarity(cached_title, title) >= 0.72:
+        if album_title_similarity(cached_title, title) >= 0.68:
             return cached_title, album_id
     return None
 
@@ -201,6 +245,9 @@ def create_album(settings: Settings, creds: Credentials, title: str) -> str:
 
 def get_or_create_album(settings: Settings, creds: Credentials, title: str) -> str:
     cache = load_album_cache(settings)
+    cache, cache_changed = normalize_album_cache_aliases(cache)
+    if cache_changed:
+        save_album_cache(settings, cache)
     similar = find_similar_cached_album(cache, title)
     if similar:
         _canonical_title, album_id = similar
