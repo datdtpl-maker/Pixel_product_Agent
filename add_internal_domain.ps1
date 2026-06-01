@@ -12,7 +12,7 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     Write-Error "Run this PowerShell script as Administrator."
 }
 
-$content = Get-Content -Path $HostsPath -ErrorAction Stop
+$content = @(Get-Content -Path $HostsPath -ErrorAction Stop)
 $updated = @($content | Where-Object { $_ -notmatch "(^|\s)$([regex]::Escape($OldDomain))(\s|$)" })
 if ($updated.Count -ne $content.Count) {
     Set-Content -Path $HostsPath -Value $updated
