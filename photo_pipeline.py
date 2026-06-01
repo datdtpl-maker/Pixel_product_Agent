@@ -260,6 +260,23 @@ def get_or_create_album(settings: Settings, creds: Credentials, title: str) -> s
     return create_album(settings, creds, title)
 
 
+def replace_cached_album_aliases(
+    settings: Settings,
+    album_title: str,
+    album_id: str,
+    stale_album_id: str | None = None,
+) -> None:
+    cache = load_album_cache(settings)
+    album_key = canonical_album_key(album_title)
+    for cached_title, cached_album_id in list(cache.items()):
+        same_product = bool(album_key) and canonical_album_key(cached_title) == album_key
+        stale_alias = bool(stale_album_id) and cached_album_id == stale_album_id
+        if same_product or stale_alias:
+            cache[cached_title] = album_id
+    cache[album_title] = album_id
+    save_album_cache(settings, cache)
+
+
 def upload_bytes(creds: Credentials, image_path: Path) -> str:
     mime_type = mimetypes.guess_type(str(image_path))[0] or "application/octet-stream"
     response = requests.post(
@@ -318,18 +335,16 @@ def create_media_item_with_album_retry(
     except RuntimeError as exc:
         if "does not match any albums" not in str(exc) and "NOT_FOUND" not in str(exc):
             raise
-        cache = load_album_cache(settings)
-        cache.pop(album_title, None)
-        save_album_cache(settings, cache)
+        stale_album_id = album_id
         album_id = create_album(settings, creds, album_title)
+        replace_cached_album_aliases(settings, album_title, album_id, stale_album_id)
         result = create_media_item(creds, upload_token, album_id, description)
 
     status = media_item_error_status(result)
     if "does not match any albums" in status or "NOT_FOUND" in status:
-        cache = load_album_cache(settings)
-        cache.pop(album_title, None)
-        save_album_cache(settings, cache)
+        stale_album_id = album_id
         album_id = create_album(settings, creds, album_title)
+        replace_cached_album_aliases(settings, album_title, album_id, stale_album_id)
         result = create_media_item(creds, upload_token, album_id, description)
     return album_id, result
 

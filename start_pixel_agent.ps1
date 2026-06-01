@@ -28,6 +28,14 @@ try {
 } catch {
     Write-Host "Starting Pixel Agent on port $Port"
 }
+
+# PowerShell Start-Process fails when the parent environment contains both
+# Path and PATH entries. Normalize them before launching the hidden server.
+$processPath = $env:Path
+[Environment]::SetEnvironmentVariable("Path", $null, "Process")
+[Environment]::SetEnvironmentVariable("PATH", $null, "Process")
+[Environment]::SetEnvironmentVariable("Path", $processPath, "Process")
+
 Start-Process -FilePath $python `
     -ArgumentList $arguments `
     -WorkingDirectory $ProjectDir `
