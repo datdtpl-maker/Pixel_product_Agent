@@ -1,243 +1,369 @@
-# Pixel to Google Photos MVP
+# Pixel Product Agent
 
-This MVP captures or imports product photos, classifies them into a product name, creates a Google Photos album with that product name, and uploads the photo.
+Pixel Product Agent là ứng dụng local dùng để điều khiển điện thoại Google Pixel chụp ảnh/quay video sản phẩm, nhận diện sản phẩm bằng AI, tự tạo album Google Photos theo tên sản phẩm và upload media vào đúng album.
 
-Google Photos API note: new uploads can be added to albums created by this script/app. Keep `album_cache.json`; if it is deleted, the script may create duplicate albums with the same title.
+Ứng dụng chạy trên Windows, điều khiển Pixel qua ADB, xem trước màn hình bằng scrcpy và cung cấp giao diện web local để thao tác thay vì gõ lệnh thủ công.
 
-## Setup
+## Tính năng chính
 
-1. Install dependencies:
+- Chụp ảnh từ Google Pixel và upload Google Photos bằng một nút bấm.
+- Quay video từ Google Pixel và upload vào album sản phẩm.
+- Xem trước màn hình/camera Pixel bằng scrcpy để chỉnh góc chụp trước khi bấm chụp.
+- Nhận diện sản phẩm bằng OpenAI, Gemini hoặc cả hai cùng lúc.
+- Nạp catalog sản phẩm từ thư mục dữ liệu gồm ảnh mẫu, barcode và tài liệu `.txt`, `.csv`, `.json`, `.docx`, `.pdf`.
+- Tự tìm thêm dữ liệu sản phẩm trên internet bằng SerpAPI hoặc Bing Image Search khi catalog chưa đủ.
+- Tự tạo album Google Photos theo tên sản phẩm.
+- Tái sử dụng album đã có nếu tên sản phẩm gần giống nhau, ví dụ tiếng Việt và tiếng Anh của cùng một sản phẩm.
+- Log tiến trình realtime trên giao diện: chụp, kéo file, AI phân loại, tạo album, upload.
+- Có script khởi động cùng Windows.
 
-   ```powershell
-   python -m pip install -r requirements.txt
-   ```
+## Yêu cầu hệ thống
 
-2. Copy config:
+- Windows 10/11.
+- Python 3.11 trở lên.
+- Google Pixel hoặc điện thoại Android có bật USB debugging.
+- ADB đã cài và gọi được bằng lệnh `adb`.
+- scrcpy để xem màn hình Pixel.
+- Tài khoản Google Cloud có OAuth Desktop app cho Google Photos Library API.
+- Ít nhất một AI key: OpenAI hoặc Gemini.
+- Tùy chọn: SerpAPI hoặc Bing Image Search nếu muốn agent tìm hình sản phẩm trên internet.
 
-   ```powershell
-   Copy-Item config.example.json config.json
-   ```
+## Cài đặt nhanh
 
-3. Create Google OAuth credentials:
-
-   - Open Google Cloud Console.
-   - Create or choose a project.
-   - Enable **Google Photos Library API**.
-   - Create OAuth client credentials for a **Desktop app**.
-   - Download the OAuth JSON as `client_secret.json` into this folder.
-
-4. First auth/login:
-
-   ```powershell
-   python .\photo_pipeline.py auth
-   ```
-
-   A browser opens on your machine. Log in with the Google account you want to use.
-
-5. Pixel ADB setup:
-
-   - Enable Developer options on the Pixel.
-   - Enable USB debugging.
-   - Connect the Pixel by USB.
-   - Approve the RSA prompt on the phone.
-   - Check:
-
-   ```powershell
-   adb devices
-   ```
-
-## AI Product Recognition
-
-API keys are read from `.env` or environment variables. Do not put API keys into `photo_pipeline.py`.
-
-Create `.env` interactively:
+Clone source:
 
 ```powershell
-.\set_api_keys.ps1
+git clone https://github.com/datdtpl-maker/hermes-agent-photo-google.git
+cd hermes-agent-photo-google
 ```
 
-Or create it manually:
+Cài thư viện Python:
+
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Tạo file cấu hình local:
+
+```powershell
+Copy-Item config.example.json config.json
+```
+
+Các file sau là file riêng tư, không commit lên Git:
 
 ```text
-OPENAI_API_KEY=your_openai_key
-GEMINI_API_KEY=your_gemini_key
+.env
+client_secret.json
+token.json
+config.json
+album_cache.json
 ```
 
-Default AI settings live in `config.json`:
+## Cài ADB và kết nối Pixel
+
+1. Trên Pixel, bật **Developer options**.
+2. Bật **USB debugging**.
+3. Cắm Pixel vào máy tính bằng USB.
+4. Chấp nhận RSA debugging prompt trên điện thoại.
+5. Kiểm tra:
+
+```powershell
+adb devices
+```
+
+Kết quả hợp lệ có dạng:
+
+```text
+List of devices attached
+23241JEGR00378    device
+```
+
+Nếu có nhiều thiết bị, điền serial vào `config.json`:
 
 ```json
-"mode": "ai",
-"ai_provider": "both",
-"openai_model": "gpt-4.1-mini",
-"gemini_model": "gemini-2.5-flash"
+"pixel": {
+  "adb_serial": "23241JEGR00378",
+  "camera_dir": "/sdcard/DCIM/Camera"
+}
 ```
 
-To use only Gemini instead, set:
+## Cài scrcpy để xem trước màn hình
 
-```json
-"ai_provider": "gemini"
+Ứng dụng sẽ tự tìm `scrcpy` theo thứ tự:
+
+1. Biến môi trường `SCRCPY_PATH`.
+2. Đường dẫn mặc định:
+
+```text
+C:\FastbootFirmwareFlasher\ExtraTools\scrcpy\scrcpy.exe
 ```
 
-Supported values are `both`, `openai`, `gemini`, and `offline` from the web UI. In `both` mode, OpenAI and Gemini classify the same reference image; matching results are treated as agreement, and if one provider fails the other can still be used.
+3. Lệnh `scrcpy` trong `PATH`.
 
-## Web Product Enrichment
+Nếu scrcpy ở chỗ khác, thêm vào `.env`:
 
-When the local catalog returns `Unsorted`, the agent can optionally search the web for product candidates, then ask AI to resolve the product name before creating the Google Photos album.
+```text
+SCRCPY_PATH=C:\path\to\scrcpy.exe
+```
 
-Supported search providers:
+Trên giao diện web, bấm **Xem màn hình Pixel** để mở camera trên Pixel và xem live preview trước khi chụp.
 
-- `serpapi`: set `SERPAPI_API_KEY`.
-- `google_cse`: set `GOOGLE_CSE_API_KEY` and `GOOGLE_CSE_CX`.
-- `bing`: set `BING_SEARCH_API_KEY`.
+## Cấu hình Google Photos OAuth
 
-The web UI includes a **Tìm sản phẩm trên internet** panel for saving the search API key, choosing the provider, and setting the confidence threshold. If no search API key is configured, enrichment is skipped and the existing catalog/AI flow still works.
+1. Vào Google Cloud Console.
+2. Tạo hoặc chọn project.
+3. Enable **Google Photos Library API**.
+4. Vào OAuth consent screen:
+   - User type: `External` cho app cá nhân/test.
+   - Thêm Gmail dùng Google Photos vào test users nếu app còn ở testing mode.
+5. Tạo OAuth client:
+   - Type: `OAuth client ID`.
+   - Application type: `Desktop app`.
+6. Download JSON và lưu vào thư mục project với tên:
 
-## Test Modes
+```text
+client_secret.json
+```
 
-## Web UI
+Đăng nhập lần đầu:
 
-Start the local web interface:
+```powershell
+python .\photo_pipeline.py auth
+```
+
+Trình duyệt sẽ mở ra để đăng nhập Google. Sau khi xác thực xong, app tạo `token.json` để dùng cho các lần upload sau.
+
+Ghi chú quan trọng: Google Photos API với scope `photoslibrary.appendonly` chỉ upload media và thêm vào album do app tạo/quản lý. Giữ `album_cache.json` để app nhớ album ID và tránh tạo trùng album.
+
+## Cấu hình AI key
+
+Cách dễ nhất là nhập key trên giao diện web tại mục **Cấu hình API AI** rồi bấm **Lưu server**.
+
+Hoặc tạo `.env` thủ công:
+
+```text
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=AIza...
+```
+
+Provider hỗ trợ:
+
+- `OpenAI`
+- `Gemini`
+- `OpenAI + Gemini`
+- `Offline mẫu ảnh`
+
+Chế độ khuyến nghị là `OpenAI + Gemini`. Nếu một provider lỗi, provider còn lại vẫn có thể trả kết quả.
+
+## Cấu hình tìm sản phẩm trên internet
+
+Khi catalog không nhận ra sản phẩm, agent có thể dùng AI đọc ảnh, tạo truy vấn tìm kiếm, lấy kết quả hình ảnh web và quyết định tên sản phẩm nếu đủ tin cậy.
+
+Provider hỗ trợ:
+
+- `SerpAPI Google Images`
+- `Bing Image Search`
+
+Google Custom Search đã bị loại khỏi app vì Google Custom Search JSON API không còn phù hợp cho nhiều project/key mới.
+
+Biến `.env` tương ứng:
+
+```text
+SERPAPI_API_KEY=...
+BING_SEARCH_API_KEY=...
+```
+
+Trên giao diện web:
+
+1. Chọn Search provider.
+2. Nhập Search API key.
+3. Chọn ngưỡng tự tạo album, ví dụ `0.78`.
+4. Bấm **Lưu cấu hình tìm web**.
+5. Bấm **Kiểm tra Search API**.
+
+## Chuẩn bị dữ liệu sản phẩm
+
+Khuyến nghị mỗi sản phẩm là một thư mục riêng:
+
+```text
+D:\product-data
+|-- Eskar Tears Artificial Tears 15ml
+|   |-- front.jpg
+|   |-- back.jpg
+|   |-- barcode.jpg
+|-- Thuoc Paracetamol PV Pharma
+|   |-- front.jpg
+|   |-- label.jpg
+|-- danh-sach-san-pham.txt
+```
+
+File tài liệu có thể chứa tên sản phẩm, SKU, barcode hoặc mô tả. Định dạng được hỗ trợ:
+
+```text
+.txt
+.csv
+.json
+.docx
+.pdf
+```
+
+Ảnh mẫu nên gồm:
+
+- mặt trước sản phẩm;
+- mặt sau/nhãn phụ nếu có;
+- barcode/SKU nếu rõ;
+- 2-5 ảnh mỗi sản phẩm nếu các sản phẩm nhìn giống nhau.
+
+## Chạy giao diện web
+
+Chạy server:
 
 ```powershell
 python .\web_app.py
 ```
 
-Open:
+Mở trình duyệt:
 
 ```text
 http://127.0.0.1:8765
 ```
 
-Optional internal domain:
+Nếu muốn dùng tên miền nội bộ:
 
 ```powershell
-# Run PowerShell as Administrator first
+# Mở PowerShell bằng Run as Administrator
 .\add_internal_domain.ps1
 ```
 
-Then open:
+Sau đó mở:
 
 ```text
 http://pixel-agent.test:8765
 ```
 
-The UI can:
+## Quy trình sử dụng hằng ngày
 
-- scan a local product folder for docs and sample images;
-- classify the latest captured image;
-- trigger Pixel photo capture and Google Photos upload with one button;
-- trigger Pixel video recording and Google Photos upload with one button.
+1. Cắm Pixel vào máy tính.
+2. Mở app web.
+3. Kiểm tra trạng thái Pixel ADB, Google token, AI key.
+4. Bấm **Xem màn hình Pixel** để mở live preview.
+5. Chỉnh góc sản phẩm trên camera.
+6. Bấm **Chụp ảnh từ Pixel và upload** hoặc **Quay video từ Pixel và upload**.
+7. Theo dõi tiến trình trong **Nhật ký xử lý**.
+8. Kiểm tra Google Photos album.
 
-Start automatically when Windows logs in:
+Nếu muốn ép tên sản phẩm khi test, nhập tên vào ô **Ép tên sản phẩm khi test**. Khi dùng thật, để trống để AI tự nhận diện.
+
+## Chạy cùng Windows
+
+Tạo shortcut khởi động cùng Windows:
 
 ```powershell
 .\install_startup_shortcut.ps1
 ```
 
-Stop auto-start:
+Gỡ shortcut:
 
 ```powershell
 .\uninstall_startup_shortcut.ps1
 ```
 
-The Pixel Agent uses port `8765`, so it will not conflict with VietDub AI on port `3210`.
-
-## Production Readiness
-
-This repo is currently a local operator app / edge-agent prototype. For thousands of users, keep the Pixel/ADB capture worker local, but move shared product data and user management to a proper backend.
-
-Recommended additions before multi-user production:
-
-- authentication and role-based access control;
-- per-user/per-device OAuth token storage with encryption;
-- database-backed catalog instead of local `product_catalog.json`;
-- background job queue for capture/classification/upload work;
-- audit logs for every upload and classification decision;
-- production WSGI server instead of Flask's development server;
-- centralized error monitoring and retry policy;
-- per-customer Google Photos/Drive quota handling;
-- device registration so one user's browser cannot control another user's Pixel.
-
-Recommended product folder layout:
-
-```text
-products/
-|-- Product A/
-|   |-- front.jpg
-|   `-- barcode.jpg
-|-- Product B/
-|   `-- sample.jpg
-`-- product-list.txt
-```
-
-Docs supported for product-name extraction: `.txt`, `.csv`, `.json`, `.docx`, `.pdf`. Images under a product folder are added as samples for that folder name.
-
-Upload an existing photo and force a product name:
+Chạy thủ công bằng launcher:
 
 ```powershell
-python .\photo_pipeline.py upload .\inbox\test.jpg --product "My Product"
+.\start_pixel_agent.ps1
 ```
 
-Capture from Pixel, classify, and upload:
+Ứng dụng dùng port `8765`, không trùng với app khác đang chạy port `3210`.
 
-```powershell
-python .\photo_pipeline.py run-once --product "My Product"
-```
+Lưu ý: các script startup hiện chứa đường dẫn project local. Nếu clone repo sang máy/thư mục khác, chỉnh lại biến `$ProjectDir` trong các file `.ps1`.
 
-Capture from Pixel, auto-classify from product samples, and upload:
+## Lệnh CLI hữu ích
 
-```powershell
-python .\photo_pipeline.py run-once-auto
-```
-
-Record a video from Pixel, auto-classify using a quick reference photo, and upload:
-
-```powershell
-python .\photo_pipeline.py record-once --duration 10
-```
-
-Run automatically every 30 seconds:
-
-```powershell
-python .\photo_pipeline.py watch --interval 30
-```
-
-Run automatically 5 times:
-
-```powershell
-python .\photo_pipeline.py watch --interval 30 --count 5
-```
-
-Capture only:
-
-```powershell
-python .\photo_pipeline.py capture
-```
-
-Classify by filename keywords from `product_labels.example.json`:
+Chụp ảnh từ Pixel, phân loại và upload:
 
 ```powershell
 python .\photo_pipeline.py run-once
 ```
 
-For a real product test, edit `product_labels.example.json` with your SKU/product names and keywords, or pass `--product` while validating the upload flow.
-
-## Offline Product Recognition
-
-The current recognition module works offline by comparing a newly captured image against saved sample images. It is enough for initial testing when the product is framed consistently.
-
-Add a sample image:
+Chụp ảnh và ép tên album:
 
 ```powershell
-python .\photo_pipeline.py add-sample --product "My Product" .\inbox\sample.jpg
+python .\photo_pipeline.py run-once --product "Tên sản phẩm"
 ```
 
-Add 2-5 samples per product from slightly different angles. Samples are copied under `samples/`, and metadata is stored in `product_catalog.json`.
+Quay video 10 giây, phân loại bằng ảnh tham chiếu và upload:
 
-Test classification without upload:
+```powershell
+python .\photo_pipeline.py record-once --duration 10
+```
+
+Upload ảnh có sẵn:
+
+```powershell
+python .\photo_pipeline.py upload .\inbox\test.jpg --product "Tên sản phẩm"
+```
+
+Chỉ test nhận diện, không upload:
 
 ```powershell
 python .\photo_pipeline.py classify .\inbox\test.jpg
 ```
 
-If the match score is below `similarity_threshold` in `config.json`, the product becomes `Unsorted`.
+Chạy lặp lại:
+
+```powershell
+python .\photo_pipeline.py watch --interval 30 --count 5
+```
+
+## Xử lý lỗi thường gặp
+
+`adb devices` không thấy Pixel:
+
+- kiểm tra cáp USB;
+- bật USB debugging;
+- approve RSA prompt trên điện thoại;
+- chạy lại `adb kill-server` rồi `adb start-server`.
+
+Không mở được scrcpy:
+
+- kiểm tra `SCRCPY_PATH`;
+- chạy thử trực tiếp `scrcpy.exe`;
+- đảm bảo ADB thấy Pixel.
+
+App upload nhầm ảnh cũ:
+
+- bản mới đã chặn bằng timestamp, chỉ nhận file tạo sau thời điểm bấm chụp/quay;
+- nếu camera không tạo ảnh mới, app sẽ báo lỗi thay vì upload ảnh cũ.
+
+Tạo trùng album:
+
+- app dùng `album_cache.json` để nhớ album;
+- bản mới có so tên gần giống để gom tên tiếng Việt/tiếng Anh về cùng album;
+- album đã lỡ tạo trùng trên Google Photos cần xóa thủ công.
+
+Google token hết hạn hoặc revoke:
+
+```powershell
+Remove-Item .\token.json
+python .\photo_pipeline.py auth
+```
+
+## Bảo mật
+
+- Không commit `.env`, `client_secret.json`, `token.json`, `config.json`, `album_cache.json`.
+- Không gửi API key trong chat hoặc ticket.
+- Nếu key đã lộ, rotate hoặc tạo key mới.
+- Với triển khai nhiều người dùng, cần backend riêng, đăng nhập người dùng, phân quyền thiết bị, mã hóa token và audit log.
+
+## Ghi chú production
+
+Repo này là local edge-agent prototype. Để phục vụ hàng ngàn người dùng, nên tách kiến trúc:
+
+- worker local điều khiển Pixel/ADB/scrcpy;
+- backend quản lý user, thiết bị, catalog và job queue;
+- database thay cho JSON local;
+- storage và audit log tập trung;
+- cơ chế retry, quota tracking và monitoring;
+- OAuth token lưu mã hóa theo từng user.
