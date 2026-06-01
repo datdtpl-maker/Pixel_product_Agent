@@ -83,6 +83,17 @@ Ket qua hop le phai co trang thai `device`, vi du:
 23241JEGR00378    device
 ```
 
+### Ket noi Pixel qua Wifi (Khong day)
+
+Neu muon ket noi khong day qua Wifi:
+1. Cam cap USB vao may tinh 1 lan duy nhat de kich hoat.
+2. Chạy file script ket noi tu dong trong PowerShell:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\connect_pixel_wifi.ps1
+   ```
+3. Script se tu dong lay IP cua Pixel, kich hoat che do TCP/IP 5555 va ket noi khong day.
+4. Khi script thong bao thanh cong, ban co the **RUT CAP USB** ra va su dung tool hoan toan khong day!
+
 ## 4. Cai tool tren may moi
 
 Mo PowerShell trong thu muc tool da copy:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -34,40 +35,623 @@ HTML = r"""
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pixel Drive Capture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      color-scheme: light;
-      --bg:#eef4f8; --panel:#fff; --soft:#f8fafc; --line:#d3deeb;
-      --text:#111827; --muted:#5f6f86; --brand:#155eef; --brand2:#0f47c5;
-      --side:#0f172a; --ok:#137333; --okbg:#eaf7ef; --warn:#a15c00; --warnbg:#fff6e5;
-      --shadow:0 18px 44px rgba(16,24,40,.08);
-      font-family:Inter,"Segoe UI",Arial,sans-serif;
+      color-scheme: dark;
+      --bg: #07090e;
+      --panel: rgba(17, 22, 37, 0.65);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --soft: rgba(255, 255, 255, 0.03);
+      --line: rgba(255, 255, 255, 0.06);
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --brand: #3b82f6;
+      --brand-hover: #2563eb;
+      --brand-gradient: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      --brand-glow: rgba(59, 130, 246, 0.3);
+      --ok: #10b981;
+      --okbg: rgba(16, 185, 129, 0.1);
+      --warn: #f59e0b;
+      --warnbg: rgba(245, 158, 11, 0.1);
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --danger-gradient: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+      --shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
-    *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#f7fbff 0,#eef4f8 340px,#eef4f8 100%);color:var(--text)}
-    button,input,select{font:inherit} button{min-height:40px;border:0;border-radius:8px;padding:10px 14px;background:var(--brand);color:#fff;font-weight:800;cursor:pointer;white-space:nowrap}
-    button:hover{background:var(--brand2)} button:disabled{opacity:.58;cursor:wait}
-    button.secondary{background:#455468} button.secondary:hover{background:#344054}
-    button.ghost{background:#edf2f7;color:#243041} button.ghost:hover{background:#e2e8f0}
-    button.danger{background:#b42318} button.danger:hover{background:#912018}
-    input,select{width:100%;min-height:44px;border:1px solid #b9c5d5;border-radius:8px;background:#fff;padding:10px 12px;color:var(--text);outline:none}
-    input:focus,select:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(21,94,239,.12)}
-    label{display:block;margin-bottom:7px;font-weight:800}.shell{min-height:100vh}
-    .sidebar{display:none}
-    .brand{padding-bottom:21px;border-bottom:1px solid rgba(255,255,255,.14)} .brand h1{font-size:18px;margin:0 0 6px}.brand p{font-size:13px;color:#a9b4c7;line-height:1.45;margin:0}
-    .nav{display:grid;gap:7px;margin-top:20px}.nav div{display:flex;justify-content:space-between;gap:8px;padding:10px;border-radius:7px;color:#cbd5e1;font-size:14px}.nav .active{background:rgba(255,255,255,.1);color:#fff}
-    .main{min-width:0}.topbar{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:20px 28px;background:rgba(255,255,255,.92);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:3;backdrop-filter:blur(10px)}
-    .topbar h2{margin:0;font-size:23px;letter-spacing:0}.topbar p{margin:5px 0 0;color:var(--muted);font-size:14px}.actions,.buttons{display:flex;gap:10px;flex-wrap:wrap}
-    .content{padding:22px 28px 42px}.workspace{display:grid;grid-template-columns:minmax(0,1fr) 430px;gap:20px;align-items:start}.work-main{display:grid;gap:18px;min-width:0}.work-log{position:sticky;top:98px;min-width:0}.metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
-    .metric,.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}.metric{padding:16px;min-height:94px}.metric small{display:block;color:var(--muted);font-size:12px;font-weight:800;text-transform:uppercase}.metric strong{display:block;margin-top:8px;font-size:16px;overflow-wrap:anywhere}
-    .badge{display:inline-flex;min-height:25px;align-items:center;border-radius:999px;padding:4px 9px;font-size:13px;font-weight:700}.ok{background:var(--okbg);color:var(--ok)}.warn{background:var(--warnbg);color:var(--warn)}
-    .layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr);gap:18px;align-items:start}.panel{overflow:hidden}.panel-head{padding:17px 18px;border-bottom:1px solid var(--line)}.panel-head h3{margin:0;font-size:18px}.panel-head p{margin:5px 0 0;color:var(--muted);font-size:13px;line-height:1.45}.panel-body{padding:18px;display:grid;gap:15px}
-    .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.field-action{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}.hint{margin-top:6px;color:var(--muted);font-size:13px;line-height:1.4}
-    .steps{display:grid;gap:10px}.step{display:grid;grid-template-columns:31px 1fr;gap:10px;padding:12px;background:var(--soft);border:1px solid #e5eaf1;border-radius:8px}.step span{display:grid;place-items:center;width:31px;height:31px;border-radius:50%;background:#dbeafe;color:#1d4ed8;font-weight:800}.step b{display:block;margin-bottom:3px}.step small{display:block;color:var(--muted);font-size:13px;line-height:1.4}
-    .control-grid{display:grid;grid-template-columns:minmax(220px,320px) minmax(0,1fr);gap:16px;align-items:end}.control-note{padding:13px 14px;border:1px solid #e5eaf1;background:var(--soft);border-radius:8px;color:var(--muted);font-size:13px;line-height:1.45}
-    .logbox{background:#101828;border-radius:7px;border:1px solid #1f2937;overflow:hidden}.loghead{display:flex;justify-content:space-between;padding:10px 12px;color:#d0d5dd;border-bottom:1px solid rgba(255,255,255,.09);font-size:13px;font-weight:700}.log{min-height:520px;max-height:calc(100vh - 250px);overflow:auto;white-space:pre-wrap;padding:14px;color:#e5e7eb;font:13px/1.55 Consolas,"Cascadia Mono",monospace}
-    @media(max-width:1180px){.workspace{grid-template-columns:1fr}.work-log{position:static}.log{min-height:260px;max-height:420px}}
-    @media(max-width:900px){.metrics,.layout,.two,.field-action,.control-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-direction:column}.actions{width:100%}.actions button{flex:1}}
-    @media(max-width:540px){.content,.topbar{padding-left:15px;padding-right:15px}.buttons,.actions{display:grid;grid-template-columns:1fr;width:100%}button{width:100%}}
+    
+    body.theme-light {
+      color-scheme: light;
+      --bg: #f4f7fa;
+      --panel: rgba(255, 255, 255, 0.85);
+      --panel-border: rgba(0, 0, 0, 0.07);
+      --soft: rgba(0, 0, 0, 0.02);
+      --line: rgba(0, 0, 0, 0.05);
+      --text: #1e293b;
+      --muted: #64748b;
+      --brand: #2563eb;
+      --brand-hover: #1d4ed8;
+      --brand-glow: rgba(37, 99, 235, 0.15);
+      --ok: #059669;
+      --okbg: rgba(5, 150, 105, 0.08);
+      --warn: #d97706;
+      --warnbg: rgba(217, 119, 6, 0.08);
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+    }
+    
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.07), transparent 45%),
+                  radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.07), transparent 45%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
+    }
+    button, input, select { font: inherit; }
+    button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 16px;
+      background: var(--brand-gradient);
+      color: #fff;
+      font-weight: 700;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      cursor: pointer;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px var(--brand-glow);
+    }
+    button:hover {
+      background: var(--brand-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px var(--brand-glow);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+    button.secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: none;
+      transition: background 0.3s, color 0.3s, border-color 0.3s;
+    }
+    body.theme-light button.secondary {
+      background: rgba(0, 0, 0, 0.03);
+      color: var(--text);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+    }
+    button.secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    body.theme-light button.secondary:hover {
+      background: rgba(0, 0, 0, 0.06);
+      border-color: rgba(0, 0, 0, 0.12);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    button.ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: none;
+    }
+    body.theme-light button.ghost {
+      border-color: rgba(0, 0, 0, 0.05);
+    }
+    button.ghost:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    body.theme-light button.ghost:hover {
+      background: rgba(0, 0, 0, 0.03);
+      color: var(--text);
+      border-color: rgba(0, 0, 0, 0.1);
+    }
+    button.danger {
+      background: var(--danger-gradient);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    }
+    button.danger:hover {
+      background: var(--danger-hover);
+      box-shadow: 0 6px 18px rgba(239, 68, 68, 0.3);
+    }
+    button.btn-capture {
+      background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
+    }
+    button.btn-capture:hover {
+      background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+    }
+    button.btn-record {
+      background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+      box-shadow: 0 4px 14px rgba(225, 29, 72, 0.3);
+    }
+    button.btn-record:hover {
+      background: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
+      box-shadow: 0 6px 20px rgba(225, 29, 72, 0.4);
+    }
+    input, select {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      background: rgba(13, 17, 28, 0.6);
+      padding: 10px 14px;
+      color: var(--text);
+      outline: none;
+      transition: all 0.2s;
+    }
+    body.theme-light input, body.theme-light select {
+      background: #fff;
+      border-color: #cbd5e1;
+      color: var(--text);
+    }
+    input:focus, select:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px var(--brand-glow);
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar { display: none; }
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      padding: 20px 32px;
+      background: rgba(10, 14, 23, 0.7);
+      border-bottom: 1px solid var(--panel-border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: background 0.3s, border-color 0.3s;
+    }
+    body.theme-light .topbar {
+      background: rgba(240, 244, 248, 0.85);
+    }
+    .topbar h2 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 800;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: linear-gradient(135deg, #fff 40%, #a5b4fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      transition: all 0.3s;
+    }
+    body.theme-light .topbar h2 {
+      background: linear-gradient(135deg, #0f172a 40%, #1e3a8a 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .topbar p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .content {
+      padding: 32px;
+      flex: 1;
+      max-width: 1600px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 440px;
+      gap: 24px;
+      align-items: start;
+    }
+    .work-main {
+      display: grid;
+      gap: 24px;
+      min-width: 0;
+    }
+    .work-log {
+      position: sticky;
+      top: 112px;
+      min-width: 0;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+      min-height: 96px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .metric:hover {
+      transform: translateY(-2px);
+      border-color: rgba(59, 130, 246, 0.25);
+      box-shadow: 0 12px 30px rgba(59, 130, 246, 0.08);
+    }
+    body.theme-light .metric strong {
+      color: #0f172a;
+    }
+    .metric small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+    .metric strong {
+      display: block;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      overflow-wrap: anywhere;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      gap: 6px;
+      line-height: 1.2;
+    }
+    .badge.ok {
+      background: var(--okbg);
+      color: var(--ok);
+      border: 1px solid rgba(16, 185, 129, 0.15);
+    }
+    .badge.ok::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--ok);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--ok);
+      animation: pulse 1.8s infinite;
+    }
+    .badge.warn {
+      background: var(--warnbg);
+      color: var(--warn);
+      border: 1px solid rgba(245, 158, 11, 0.15);
+    }
+    .badge.warn::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--warn);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--warn);
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.6; }
+      50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 10px currentColor; }
+      100% { transform: scale(0.95); opacity: 0.6; }
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+    }
+    .panel-head {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.01);
+      transition: border-color 0.3s;
+    }
+    .panel-head h3 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: #fff;
+      transition: color 0.3s;
+    }
+    body.theme-light .panel-head h3 {
+      color: #0f172a;
+    }
+    .panel-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .panel-body {
+      padding: 24px;
+      display: grid;
+      gap: 20px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+      gap: 24px;
+      align-items: start;
+    }
+    .two {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .field-action {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: end;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .hint::before {
+      content: 'ℹ';
+      color: var(--brand);
+      font-weight: bold;
+    }
+    .steps {
+      display: grid;
+      gap: 12px;
+    }
+    .step {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 12px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 12px;
+      transition: all 0.25s;
+    }
+    body.theme-light .step {
+      background: rgba(0, 0, 0, 0.01);
+      border-color: rgba(0, 0, 0, 0.04);
+    }
+    .step:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.08);
+      transform: translateX(4px);
+    }
+    body.theme-light .step:hover {
+      background: rgba(0, 0, 0, 0.03);
+      border-color: rgba(0, 0, 0, 0.08);
+    }
+    .step span {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      font-weight: 800;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      transition: all 0.3s;
+    }
+    body.theme-light .step span {
+      background: rgba(37, 99, 235, 0.08);
+      color: #2563eb;
+    }
+    .step b {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+      color: #fff;
+      transition: color 0.3s;
+    }
+    body.theme-light .step b {
+      color: #0f172a;
+    }
+    .step small {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .control-grid {
+      display: grid;
+      grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+      gap: 20px;
+      align-items: end;
+    }
+    .control-note {
+      padding: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    body.theme-light .control-note {
+      background: rgba(0, 0, 0, 0.015);
+      border-color: rgba(0, 0, 0, 0.05);
+    }
+    .logbox {
+      background: #090c13;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+      box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.5);
+      transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+    }
+    body.theme-light .logbox {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+    }
+    .loghead {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 16px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 13px;
+      font-weight: 700;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      transition: background 0.3s, border-color 0.3s, color 0.3s;
+    }
+    body.theme-light .loghead {
+      background: #f1f5f9;
+      border-bottom-color: #e2e8f0;
+      color: #334155;
+    }
+    .log {
+      min-height: 520px;
+      max-height: calc(100vh - 250px);
+      overflow: auto;
+      padding: 16px;
+      font: 13px/1.5 Consolas, "Cascadia Mono", monospace;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .log-item {
+      border-left: 3px solid var(--brand);
+      padding: 8px 12px;
+      border-radius: 0 6px 6px 0;
+      background: rgba(255, 255, 255, 0.015);
+      animation: fadeIn 0.3s ease-out;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    body.theme-light .log-item {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-left-width: 3px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    }
+    .log-item.log-error {
+      border-left-color: var(--danger);
+      background: rgba(239, 68, 68, 0.05);
+    }
+    body.theme-light .log-item.log-error {
+      border-left-color: var(--danger);
+      background: rgba(239, 68, 68, 0.02);
+    }
+    .log-item.log-success {
+      border-left-color: var(--ok);
+      background: rgba(16, 185, 129, 0.05);
+    }
+    body.theme-light .log-item.log-success {
+      border-left-color: var(--ok);
+      background: rgba(16, 185, 129, 0.02);
+    }
+    .log-item.log-warning {
+      border-left-color: var(--warn);
+      background: rgba(245, 158, 11, 0.05);
+    }
+    body.theme-light .log-item.log-warning {
+      border-left-color: var(--warn);
+      background: rgba(245, 158, 11, 0.02);
+    }
+    .log-time {
+      color: #6b7280;
+      font-size: 11px;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .log-text {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #e5e7eb;
+      transition: color 0.3s;
+    }
+    body.theme-light .log-text {
+      color: #1e293b;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .buttons {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    @media(max-width: 1280px) {
+      .workspace { grid-template-columns: 1fr; }
+      .work-log { position: static; }
+      .log { min-height: 280px; max-height: 420px; }
+    }
+    @media(max-width: 960px) {
+      .metrics { grid-template-columns: repeat(3, 1fr); }
+      .layout, .control-grid { grid-template-columns: 1fr; }
+      .topbar { flex-direction: column; align-items: stretch; padding: 18px 24px; }
+      .actions { margin-top: 12px; }
+    }
+    @media(max-width: 640px) {
+      .metrics { grid-template-columns: 1fr; }
+      .two, .field-action { grid-template-columns: 1fr; }
+      .content { padding: 16px; }
+      .buttons button, .actions button { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -83,13 +667,34 @@ HTML = r"""
   </aside>
   <main class="main">
     <header class="topbar">
-      <div><h2>Trung tâm chụp sản phẩm</h2><p>Chọn thư mục trước, sau đó chụp hoặc quay từ Pixel.</p></div>
+      <div>
+        <h2>Trung tâm chụp sản phẩm</h2>
+        <p>Chọn thư mục trước, sau đó chụp hoặc quay từ Pixel.</p>
+      </div>
       <div class="actions">
-        <button class="ghost" onclick="refresh()">Làm mới</button>
-        <button class="secondary" onclick="openPreview()">Xem màn hình Pixel</button>
-        <button class="secondary" onclick="togglePixelScreen()">Bật / tắt màn hình Pixel</button>
-        <button onclick="capture()">Chụp ảnh</button>
-        <button onclick="record()">Quay video</button>
+        <button id="themeToggleBtn" class="secondary" onclick="toggleTheme()">
+          <!-- Chèn icon SVG tự động bằng Javascript -->
+        </button>
+        <button class="ghost" onclick="refresh()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          Làm mới
+        </button>
+        <button class="secondary" onclick="openPreview()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+          Xem Pixel
+        </button>
+        <button class="secondary" onclick="togglePixelScreen()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+          Bật / tắt Pixel
+        </button>
+        <button class="btn-capture" onclick="capture()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          Chụp ảnh
+        </button>
+        <button class="btn-record" onclick="record()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+          Quay video
+        </button>
       </div>
     </header>
     <div class="content">
@@ -109,13 +714,25 @@ HTML = r"""
           <div class="panel-body">
             <div class="field-action">
               <div><label for="driveRoot">Đường dẫn thư mục chính</label><input id="driveRoot" value="G:\My Drive\Test hình ảnh shopee"></div>
-              <button onclick="saveDriveRoot()">Lưu và quét lại</button>
+              <button onclick="saveDriveRoot()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                Lưu & quét lại
+              </button>
             </div>
             <div class="two">
               <div><label for="folderSelect">Chọn thư mục sản phẩm</label><select id="folderSelect" onchange="selectFolder()"><option value="">-- Chưa chọn thư mục --</option></select></div>
-              <div><label for="newFolder">Tạo thư mục sản phẩm mới</label><div class="field-action"><input id="newFolder" placeholder="Ví dụ: Eskar Tears 15ml"><button onclick="createFolder()">Tạo</button></div></div>
+              <div><label for="newFolder">Tạo thư mục sản phẩm mới</label><div class="field-action"><input id="newFolder" placeholder="Ví dụ: Eskar Tears 15ml"><button onclick="createFolder()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Tạo</button></div></div>
             </div>
-            <div class="buttons"><button class="secondary" onclick="scanFolders()">Quét lại thư mục</button><button class="danger" onclick="deleteFolder()">Xóa thư mục đang chọn</button></div>
+            <div class="buttons">
+              <button class="secondary" onclick="scanFolders()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                Quét lại thư mục
+              </button>
+              <button class="danger" onclick="deleteFolder()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                Xóa thư mục đang chọn
+              </button>
+            </div>
             <div class="hint">Bắt buộc chọn đúng thư mục sản phẩm trước khi chụp hoặc quay. App không tự phân loại và không tự tạo album Google Photos.</div>
           </div>
         </div>
@@ -130,15 +747,34 @@ HTML = r"""
       </section>
 
       <section class="panel">
-        <div class="panel-head"><h3>Cấu hình quay</h3><p>Thiết lập thời lượng video. Các lệnh xem màn hình, bật/tắt, chụp và quay nằm ở thanh trên.</p></div>
+        <div class="panel-head"><h3>Cấu hình hệ thống & kết nối</h3><p>Thiết lập thời lượng quay video và phương thức kết nối điều khiển Pixel.</p></div>
         <div class="panel-body">
-          <div class="control-grid">
+          <div class="two">
             <div>
               <label for="duration">Thời lượng video (giây)</label>
               <input id="duration" type="number" min="1" max="300" value="10">
-              <div class="hint">Giới hạn từ 1 đến 300 giây cho mỗi lần quay.</div>
+              <div class="hint" style="margin-top: 6px;">Giới hạn từ 1 đến 300 giây cho mỗi lần quay.</div>
             </div>
-            <div class="control-note">Trước khi chụp hoặc quay, hãy chọn đúng thư mục sản phẩm. App sẽ lưu file vào Drive rồi mới xóa file khỏi Pixel.</div>
+            <div>
+              <label for="connMode">Kiểu kết nối Pixel</label>
+              <select id="connMode" onchange="changeConnMode()">
+                <option value="usb">🔌 Cắm cáp USB vật lý</option>
+                <option value="wifi">📶 Kết nối Wi-Fi không dây</option>
+              </select>
+              
+              <div id="wifiIpGroup" style="margin-top: 12px; display: none;">
+                <label for="wifiIp">Địa chỉ IP của Pixel (Wi-Fi)</label>
+                <div class="field-action">
+                  <input id="wifiIp" placeholder="Ví dụ: 192.168.1.18">
+                  <button class="secondary" onclick="detectPixelIp()" title="Dò tìm IP tự động khi đang cắm cáp USB">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    Quét IP (USB)
+                  </button>
+                  <button onclick="saveConnSettings()">Kết nối Wifi</button>
+                </div>
+                <div class="hint" style="margin-top: 6px;">Cắm cáp USB rồi bấm "Quét IP (USB)" để tự động dò IP, sau đó bấm "Kết nối Wifi" và rút cáp ra.</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -147,8 +783,11 @@ HTML = r"""
       <aside class="panel work-log">
         <div class="panel-head"><h3>Nhật ký xử lý</h3><p>Theo dõi từng bước: chụp/quay, kéo file, chép vào Drive và xóa khỏi Pixel.</p></div>
         <div class="panel-body">
-          <div class="buttons"><button class="ghost" onclick="clearLog()">Xóa log</button></div>
-          <div class="logbox"><div class="loghead"><span>Event stream</span><span id="logCount">0 events</span></div><div id="log" class="log"></div></div>
+          <div class="buttons"><button class="ghost" onclick="clearLog()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>Xóa log</button></div>
+          <div class="logbox">
+            <div class="loghead"><span>Event stream</span><span id="logCount">0 events</span></div>
+            <div id="log" class="log"></div>
+          </div>
         </div>
       </aside>
       </div>
@@ -157,16 +796,121 @@ HTML = r"""
 </div>
 <script>
   const logBox=document.getElementById("log"); let eventCount=0,lastId=0,poller=null,busy=false;
-  function log(v){const t=typeof v==="string"?v:JSON.stringify(v,null,2);eventCount++;document.getElementById("logCount").textContent=`${eventCount} events`;logBox.textContent=`[${new Date().toLocaleTimeString()}]\n${t}\n\n`+logBox.textContent}
-  function clearLog(){eventCount=0;lastId=0;logBox.textContent="";document.getElementById("logCount").textContent="0 events"}
+  
+  function initTheme() {
+    const theme = localStorage.getItem('theme') || 'dark';
+    if (theme === 'light') {
+      document.body.classList.add('theme-light');
+    }
+    updateThemeButton();
+  }
+  
+  function toggleTheme() {
+    const isLight = document.body.classList.toggle('theme-light');
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    updateThemeButton();
+  }
+  
+  function updateThemeButton() {
+    const isLight = document.body.classList.contains('theme-light');
+    const btn = document.getElementById('themeToggleBtn');
+    if (isLight) {
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg> Giao diện tối`;
+    } else {
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg> Giao diện sáng`;
+    }
+  }
+
+  function changeConnMode() {
+    const mode = document.getElementById("connMode").value;
+    const ipGroup = document.getElementById("wifiIpGroup");
+    if (mode === "wifi") {
+      ipGroup.style.display = "block";
+    } else {
+      ipGroup.style.display = "none";
+    }
+  }
+
+  async function detectPixelIp() {
+    try {
+      log({status: "Đang quét thiết bị Pixel cắm cáp USB để tự động lấy địa chỉ IP..."});
+      const d = await api("/api/pixel/detect-ip", {});
+      log(d);
+      if (d.ip) {
+        document.getElementById("wifiIp").value = d.ip;
+        log({status: `Đã tự động dò tìm IP wlan0: ${d.ip}. Tiến hành lưu cấu hình...`});
+        await saveConnSettings();
+      }
+    } catch(e) {
+      log(e);
+    }
+  }
+
+  async function saveConnSettings() {
+    try {
+      const mode = document.getElementById("connMode").value;
+      const ip = document.getElementById("wifiIp").value.trim();
+      
+      if (mode === "wifi" && !ip) {
+        log({error: "Vui lòng nhập địa chỉ IP của Pixel để kết nối Wi-Fi."});
+        return;
+      }
+      
+      log({status: `Đang lưu cấu hình kết nối qua ${mode.toUpperCase()}...`});
+      const d = await api("/api/pixel/connection", {
+        connection_mode: mode,
+        wifi_ip: ip
+      });
+      log(d);
+      await refresh();
+    } catch(e) {
+      log(e);
+    }
+  }
+
+  function log(v) {
+    eventCount++;
+    document.getElementById("logCount").textContent = `${eventCount} events`;
+    
+    let isError = false;
+    let isSuccess = false;
+    let isWarning = false;
+    let text = "";
+    
+    if (typeof v === "string") {
+      text = v;
+      if (v.toLowerCase().includes("lỗi") || v.toLowerCase().includes("error") || v.toLowerCase().includes("failed")) isError = true;
+    } else {
+      text = JSON.stringify(v, null, 2);
+      const step = v.step || "";
+      if (step === "error" || v.error) isError = true;
+      if (step === "done" || step === "drive_saved" || step === "pulled" || step === "capture" || step === "record" || step === "wifi_connected" || step === "usb_mode" || step === "ip_detected") isSuccess = true;
+      if (step === "cleanup" && v.cleanup_warning) isWarning = true;
+    }
+    
+    let colorClass = "log-info";
+    if (isError) colorClass = "log-error";
+    else if (isSuccess) colorClass = "log-success";
+    else if (isWarning) colorClass = "log-warning";
+    
+    const timeStr = new Date().toLocaleTimeString();
+    const escText = escapeHtml(text);
+    const logItem = `<div class="log-item ${colorClass}">
+      <span class="log-time">[${timeStr}]</span>
+      <pre class="log-text">${escText}</pre>
+    </div>`;
+    
+    logBox.innerHTML = logItem + logBox.innerHTML;
+  }
+  function clearLog(){eventCount=0;lastId=0;logBox.innerHTML="";document.getElementById("logCount").textContent="0 events"}
   async function api(path,body){const r=await fetch(path,{method:body?"POST":"GET",headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw d;return d}
   async function pull(){const d=await api(`/api/events?after=${lastId}`);for(const e of d.events||[]){lastId=Math.max(lastId,e.id||0);log(e.payload)}}
   function startPoll(){if(!poller){pull().catch(()=>{});poller=setInterval(()=>pull().catch(()=>{}),700)}}
   async function stopPoll(){if(poller){clearInterval(poller);poller=null}await pull().catch(()=>{})}
   function selected(){return document.getElementById("folderSelect").value}
   function requireFolder(){if(!selected()){log({error:"Hãy chọn hoặc tạo thư mục sản phẩm trước khi chụp/quay."});return false}return true}
-  function setBusy(v){busy=v;document.querySelectorAll("button").forEach(b=>b.disabled=v)}
-  function render(d){document.getElementById("adbMetric").innerHTML=d.adb_device?`<span class="badge ok">${d.adb_device}</span>`:`<span class="badge warn">Chưa thấy Pixel</span>`;document.getElementById("driveMetric").innerHTML=d.drive_ready?`<span class="badge ok">Đã kết nối</span>`:`<span class="badge warn">Không tìm thấy</span>`;document.getElementById("selectedMetric").textContent=d.selected_folder||"Chưa chọn";document.getElementById("folderMetric").textContent=(d.folders||[]).length;document.getElementById("busyMetric").innerHTML=d.operation_busy?'<span class="badge warn">Đang xử lý</span>':'<span class="badge ok">Sẵn sàng</span>';document.getElementById("navFolders").textContent=(d.folders||[]).length;document.getElementById("navDrive").textContent=d.drive_ready?"OK":"Lỗi";document.getElementById("navAdb").textContent=d.adb_device?"OK":"Offline";document.getElementById("driveRoot").value=d.drive_root;const s=document.getElementById("folderSelect"),current=d.selected_folder||s.value;s.innerHTML='<option value="">-- Chưa chọn thư mục --</option>'+d.folders.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("");s.value=current}
+  function setBusy(v){busy=v;document.querySelectorAll("button").forEach(b=>b.disabled=v);document.getElementById("themeToggleBtn").disabled=false;if(document.querySelector("#wifiIpGroup button")) document.querySelectorAll("#wifiIpGroup button").forEach(b=>b.disabled=v);}
+  function render(d){document.getElementById("adbMetric").innerHTML=d.adb_device?`<span class="badge ok">${d.adb_device}</span>`:`<span class="badge warn">Chưa thấy Pixel</span>`;document.getElementById("driveMetric").innerHTML=d.drive_ready?`<span class="badge ok">Đã kết nối</span>`:`<span class="badge warn">Không tìm thấy</span>`;document.getElementById("selectedMetric").textContent=d.selected_folder||"Chưa chọn";document.getElementById("folderMetric").textContent=(d.folders||[]).length;document.getElementById("busyMetric").innerHTML=d.operation_busy?'<span class="badge warn">Đang xử lý</span>':'<span class="badge ok">Sẵn sàng</span>';document.getElementById("navFolders").textContent=(d.folders||[]).length;document.getElementById("navDrive").textContent=d.drive_ready?"OK":"Lỗi";document.getElementById("navAdb").textContent=d.adb_device?"OK":"Offline";document.getElementById("driveRoot").value=d.drive_root;document.getElementById("connMode").value=d.connection_mode||"usb";document.getElementById("wifiIp").value=d.wifi_ip||"";changeConnMode();const s=document.getElementById("folderSelect"),current=d.selected_folder||s.value;s.innerHTML='<option value="">-- Chưa chọn thư mục --</option>'+d.folders.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("");s.value=current}
   function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
   async function refresh(){try{render(await api("/api/status"))}catch(e){log(e)}}
   async function scanFolders(){try{render(await api("/api/status"));log({status:"Đã quét lại danh sách thư mục."})}catch(e){log(e)}}
@@ -179,6 +923,7 @@ HTML = r"""
   async function run(path,body){if(!requireFolder()||busy)return;setBusy(true);await api("/api/events/clear",{}).catch(()=>{});lastId=0;startPoll();try{log(await api(path,body));await refresh()}catch(e){log(e)}finally{await stopPoll();setBusy(false)}}
   function capture(){run("/api/capture",{folder:selected()})}
   function record(){run("/api/record",{folder:selected(),duration:Number(document.getElementById("duration").value||10)})}
+  initTheme();
   refresh();
 </script>
 </body>
@@ -308,15 +1053,46 @@ def error_response(exc: Exception, status: int = 500):
 
 
 def adb_device_serial(cfg: pipeline.Settings) -> str:
-    if cfg.adb_serial:
-        return cfg.adb_serial
+    config = load_config()
+    pixel_cfg = config.get("pixel", {})
+    connection_mode = pixel_cfg.get("connection_mode", "usb")
+    wifi_ip = pixel_cfg.get("wifi_ip", "").strip()
+
+    # Quét danh sách thiết bị hiện có
     output = pipeline.adb_command(cfg, "devices", check=False).stdout.splitlines()
-    devices = [line.split()[0] for line in output if "\tdevice" in line]
-    if not devices:
-        raise RuntimeError("Chưa thấy Pixel qua ADB. Kiểm tra cáp USB và USB debugging.")
-    if len(devices) > 1:
-        raise RuntimeError("Có nhiều thiết bị ADB. Điền adb_serial trong config.json.")
-    return devices[0]
+    devices = []
+    for line in output:
+        if "\tdevice" in line:
+            devices.append(line.split()[0])
+
+    if connection_mode == "wifi":
+        if not wifi_ip:
+            raise ValueError("Chưa cấu hình địa chỉ IP của Pixel để kết nối không dây.")
+        target_serial = f"{wifi_ip}:5555"
+        
+        # Nếu chưa kết nối wifi, thử adb connect
+        if target_serial not in devices:
+            pipeline.adb_command(cfg, "connect", target_serial, check=False)
+            # Quét lại danh sách thiết bị
+            output = pipeline.adb_command(cfg, "devices", check=False).stdout.splitlines()
+            devices = [line.split()[0] for line in output if "\tdevice" in line]
+            
+        if target_serial not in devices:
+            raise RuntimeError(f"Không thể kết nối đến Pixel qua Wifi tại {target_serial}. Hãy kiểm tra IP điện thoại và đảm bảo bắt chung Wifi.")
+        return target_serial
+    else:
+        # Chế độ USB: Lọc các thiết bị không chứa dấu hai chấm ':' (tức là không phải IP mạng)
+        usb_devices = [d for d in devices if ":" not in d]
+        if not usb_devices:
+            # Nếu không tìm thấy qua USB nhưng có cấu hình adb_serial trong config.json
+            if cfg.adb_serial and cfg.adb_serial in devices:
+                return cfg.adb_serial
+            raise RuntimeError("Chưa thấy Pixel cắm cáp USB. Hãy kiểm tra cáp và USB debugging.")
+        if len(usb_devices) > 1:
+            if cfg.adb_serial and cfg.adb_serial in usb_devices:
+                return cfg.adb_serial
+            raise RuntimeError("Có nhiều thiết bị USB. Điền adb_serial trong config.json để chọn thiết bị.")
+        return usb_devices[0]
 
 
 def find_scrcpy_exe() -> Path:
@@ -404,13 +1180,28 @@ def api_clear_events():
 @app.get("/api/status")
 def api_status():
     cfg = settings()
+    config = load_config()
+    pixel_cfg = config.get("pixel", {})
+    connection_mode = pixel_cfg.get("connection_mode", "usb")
+    wifi_ip = pixel_cfg.get("wifi_ip", "")
+
     adb = pipeline.adb_command(cfg, "devices", check=False).stdout.splitlines()
     devices = [line.split()[0] for line in adb if "\tdevice" in line]
     try:
         folders, ready = list_drive_folders(), True
     except Exception:
         folders, ready = [], False
-    return jsonify({"adb_device": devices[0] if devices else "", "drive_root": str(drive_root()), "drive_ready": ready, "selected_folder": selected_folder_name(), "folders": folders, "operation_busy": OPERATION_LOCK.locked()})
+        
+    return jsonify({
+        "adb_device": devices[0] if devices else "", 
+        "drive_root": str(drive_root()), 
+        "drive_ready": ready, 
+        "selected_folder": selected_folder_name(), 
+        "folders": folders, 
+        "operation_busy": OPERATION_LOCK.locked(),
+        "connection_mode": connection_mode,
+        "wifi_ip": wifi_ip
+    })
 
 
 @app.post("/api/drive-root")
@@ -466,6 +1257,81 @@ def api_delete_folder():
             save_path_setting("selected_drive_folder", "")
         add_event({"step": "folder_deleted", "message": "Đã xóa thư mục rỗng.", "folder": target.name})
         return jsonify({"status": "Đã xóa thư mục rỗng.", "folder": target.name})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/pixel/connection")
+def api_pixel_connection():
+    try:
+        if OPERATION_LOCK.locked():
+            raise RuntimeError("Pixel đang chụp hoặc quay. Hãy đợi tác vụ hiện tại hoàn tất.")
+        
+        payload = request.json or {}
+        connection_mode = str(payload.get("connection_mode", "usb")).strip().lower()
+        wifi_ip = str(payload.get("wifi_ip", "")).strip()
+
+        if connection_mode not in {"usb", "wifi"}:
+            raise ValueError("Kiểu kết nối không hợp lệ.")
+
+        with CONFIG_LOCK:
+            config = load_config()
+            config.setdefault("pixel", {})["connection_mode"] = connection_mode
+            config.setdefault("pixel", {})["wifi_ip"] = wifi_ip
+            save_config(config)
+
+        cfg = settings()
+        status_msg = f"Đã chuyển cấu hình sang kết nối qua {connection_mode.upper()}."
+        
+        if connection_mode == "wifi":
+            if not wifi_ip:
+                raise ValueError("Vui lòng nhập địa chỉ IP của Pixel.")
+            target = f"{wifi_ip}:5555"
+            add_event({"step": "wifi_connect_attempt", "message": f"Đang thử kết nối Wi-Fi đến {target}...", "ip": wifi_ip})
+            res = pipeline.adb_command(cfg, "connect", target, check=False).stdout
+            if "connected" in res.lower() or "already connected" in res.lower():
+                status_msg = f"Kết nối Wi-Fi thành công đến {target}."
+                add_event({"step": "wifi_connected", "message": status_msg, "ip": wifi_ip})
+            else:
+                add_event({"step": "wifi_connect_warning", "message": f"Yêu cầu kết nối Wi-Fi đã gửi: {res.strip()}", "ip": wifi_ip})
+        else:
+            add_event({"step": "usb_mode", "message": "Đã chuyển sang chế độ cắm dây USB."})
+
+        return jsonify({"status": status_msg, "connection_mode": connection_mode, "wifi_ip": wifi_ip})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/pixel/detect-ip")
+def api_pixel_detect_ip():
+    try:
+        cfg = settings()
+        # Quét danh sách thiết bị hiện có
+        output = pipeline.adb_command(cfg, "devices", check=False).stdout.splitlines()
+        usb_devices = []
+        for line in output:
+            if "\tdevice" in line:
+                serial = line.split()[0]
+                if ":" not in serial: # Không phải thiết bị mạng
+                    usb_devices.append(serial)
+                    
+        if not usb_devices:
+            raise RuntimeError("Không tìm thấy thiết bị Pixel đang cắm cáp USB. Hãy cắm tạm cáp USB để tự động dò IP.")
+            
+        target_usb = usb_devices[0]
+        # Lấy IP từ thiết bị wlan0 của thiết bị usb này
+        ip_output = pipeline.adb_command(cfg, "-s", target_usb, "shell", "ip addr show wlan0", check=False).stdout
+        
+        match = re.search(r"inet\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", ip_output)
+        if not match:
+            raise RuntimeError("Thiết bị Pixel đã kết nối USB nhưng không tìm thấy địa chỉ IP Wifi. Hãy kiểm tra xem Pixel đã kết nối vào cùng mạng Wifi chưa.")
+            
+        ip = match.group(1)
+        # Kích hoạt tcpip 5555 trên thiết bị USB này luôn để người dùng đỡ phải làm thủ công!
+        pipeline.adb_command(cfg, "-s", target_usb, "tcpip", "5555", check=False)
+        
+        add_event({"step": "ip_detected", "message": f"Đã dò tìm thấy IP của Pixel wlan0: {ip} và tự động kích hoạt chế độ không dây TCP/IP 5555.", "ip": ip})
+        return jsonify({"ip": ip, "status": "Dò IP thành công."})
     except Exception as exc:
         return error_response(exc, 400)
 
@@ -587,4 +1453,4 @@ def api_record():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "8765")), debug=False, threaded=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8765")), debug=False, threaded=True)
