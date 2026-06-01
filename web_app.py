@@ -769,8 +769,10 @@ HTML = r"""
 
     async function checkSearchApi() {
       const provider = document.getElementById("searchProvider").value;
+      const apiKey = document.getElementById("searchApiKey").value.trim();
+      const cx = document.getElementById("googleCseCx").value.trim();
       try {
-        const data = await api("/api/settings/check-search", {provider});
+        const data = await api("/api/settings/check-search", {provider, api_key: apiKey, google_cse_cx: cx});
         document.getElementById("searchMetric").innerHTML = data.ok
           ? `<span class="badge ok">Search OK</span>`
           : `<span class="badge warn">${data.status}</span>`;
@@ -959,6 +961,35 @@ def check_gemini_key(api_key: str) -> dict[str, Any]:
     return {"ok": False, "status": f"http_{response.status_code}", "message": response.text[:500]}
 
 
+def readable_http_error(response) -> str:
+    try:
+        data = response.json()
+    except ValueError:
+        return response.text[:700]
+
+    error = data.get("error")
+    if isinstance(error, dict):
+        parts = [
+            str(error.get("message") or "").strip(),
+            str(error.get("status") or "").strip(),
+        ]
+        details = error.get("details")
+        if isinstance(details, list):
+            for detail in details:
+                if isinstance(detail, dict) and detail.get("reason"):
+                    parts.append(str(detail["reason"]).strip())
+        message = " | ".join(part for part in parts if part)
+        return message[:700] if message else json.dumps(data, ensure_ascii=False)[:700]
+
+    if isinstance(error, str):
+        return error[:700]
+
+    message = data.get("message") or data.get("error_message") or data.get("status")
+    if message:
+        return str(message)[:700]
+    return json.dumps(data, ensure_ascii=False)[:700]
+
+
 def check_search_key(provider: str, values: dict[str, str]) -> dict[str, Any]:
     import requests
 
@@ -974,7 +1005,7 @@ def check_search_key(provider: str, values: dict[str, str]) -> dict[str, Any]:
         )
     elif provider == "google_cse":
         api_key = values.get("GOOGLE_CSE_API_KEY") or os.environ.get("GOOGLE_CSE_API_KEY", "")
-        cx = values.get("GOOGLE_CSE_CX") or os.environ.get("GOOGLE_CSE_CX", "")
+        cx = normalize_google_cse_cx(values.get("GOOGLE_CSE_CX") or os.environ.get("GOOGLE_CSE_CX", ""))
         if not api_key or not cx:
             raise ValueError("Chua co GOOGLE_CSE_API_KEY hoac GOOGLE_CSE_CX.")
         response = requests.get(
@@ -997,10 +1028,10 @@ def check_search_key(provider: str, values: dict[str, str]) -> dict[str, Any]:
     if response.status_code == 200:
         return {"ok": True, "status": "connected", "message": f"{provider} search API dang hoat dong."}
     if response.status_code in {400, 401, 403}:
-        return {"ok": False, "status": "auth_error", "message": "Search API key/cau hinh khong hop le."}
+        return {"ok": False, "status": "auth_error", "message": readable_http_error(response)}
     if response.status_code == 429:
-        return {"ok": False, "status": "rate_or_quota", "message": "Search API bi gioi han toc do hoac het quota."}
-    return {"ok": False, "status": f"http_{response.status_code}", "message": response.text[:500]}
+        return {"ok": False, "status": "rate_or_quota", "message": readable_http_error(response)}
+    return {"ok": False, "status": f"http_{response.status_code}", "message": readable_http_error(response)}
 
 
 def error_response(exc: Exception, status: int = 500):
@@ -1231,6 +1262,17 @@ def api_check_search():
         payload = request.json or {}
         provider = (payload.get("provider") or "serpapi").lower().strip()
         values = load_env_values()
+        api_key = (payload.get("api_key") or "").strip()
+        cx = normalize_google_cse_cx(payload.get("google_cse_cx") or "")
+        if api_key:
+            if provider == "serpapi":
+                values["SERPAPI_API_KEY"] = api_key
+            elif provider == "google_cse":
+                values["GOOGLE_CSE_API_KEY"] = api_key
+            elif provider == "bing":
+                values["BING_SEARCH_API_KEY"] = api_key
+        if cx:
+            values["GOOGLE_CSE_CX"] = cx
         return jsonify(check_search_key(provider, values))
     except Exception as exc:
         return error_response(exc, 400)
