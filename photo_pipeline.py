@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import base64
+import concurrent.futures
 import difflib
+import io
 import json
 import mimetypes
 import os
@@ -404,9 +406,21 @@ def product_names(settings: Settings) -> list[str]:
     return names
 
 
+def ai_image_payload(image_path: Path, max_side: int = 1280) -> tuple[str, str]:
+    try:
+        with Image.open(image_path) as image:
+            image = ImageOps.exif_transpose(image).convert("RGB")
+            image.thumbnail((max_side, max_side))
+            buffer = io.BytesIO()
+            image.save(buffer, format="JPEG", quality=82, optimize=True)
+        return "image/jpeg", base64.b64encode(buffer.getvalue()).decode("ascii")
+    except Exception:
+        mime_type = mimetypes.guess_type(str(image_path))[0] or "image/jpeg"
+        return mime_type, base64.b64encode(image_path.read_bytes()).decode("ascii")
+
+
 def image_data_url(image_path: Path) -> str:
-    mime_type = mimetypes.guess_type(str(image_path))[0] or "image/jpeg"
-    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    mime_type, encoded = ai_image_payload(image_path)
     return f"data:{mime_type};base64,{encoded}"
 
 
@@ -537,8 +551,7 @@ def classify_with_gemini(settings: Settings, image_path: Path, names: list[str])
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not set. Put it in .env or set it in PowerShell.")
 
-    mime_type = mimetypes.guess_type(str(image_path))[0] or "image/jpeg"
-    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    mime_type, encoded = ai_image_payload(image_path)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent"
     response = requests.post(
         url,
@@ -572,8 +585,7 @@ def discover_with_gemini(settings: Settings, image_path: Path) -> dict[str, Any]
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not set.")
-    mime_type = mimetypes.guess_type(str(image_path))[0] or "image/jpeg"
-    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    mime_type, encoded = ai_image_payload(image_path)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent"
     response = requests.post(
         url,
@@ -613,20 +625,21 @@ def search_queries_from_discoveries(discoveries: list[dict[str, Any]]) -> list[s
 def web_search_candidates(settings: Settings, queries: list[str]) -> list[dict[str, Any]]:
     provider = settings.web_enrichment_provider.lower()
     candidates: list[dict[str, Any]] = []
-    for query in queries:
+    def search_one(query: str) -> list[dict[str, Any]]:
         if provider == "serpapi":
             api_key = os.environ.get("SERPAPI_API_KEY")
             if not api_key:
-                continue
+                return []
             response = requests.get(
                 "https://serpapi.com/search.json",
                 params={"engine": "google_images", "q": query, "api_key": api_key},
                 timeout=45,
             )
             if response.status_code >= 400:
-                continue
+                return []
+            results: list[dict[str, Any]] = []
             for item in response.json().get("images_results", [])[:6]:
-                candidates.append(
+                results.append(
                     {
                         "query": query,
                         "title": item.get("title", ""),
@@ -635,10 +648,11 @@ def web_search_candidates(settings: Settings, queries: list[str]) -> list[dict[s
                         "thumbnail": item.get("thumbnail", ""),
                     }
                 )
+            return results
         elif provider == "bing":
             api_key = os.environ.get("BING_SEARCH_API_KEY")
             if not api_key:
-                continue
+                return []
             response = requests.get(
                 "https://api.bing.microsoft.com/v7.0/images/search",
                 headers={"Ocp-Apim-Subscription-Key": api_key},
@@ -646,9 +660,10 @@ def web_search_candidates(settings: Settings, queries: list[str]) -> list[dict[s
                 timeout=45,
             )
             if response.status_code >= 400:
-                continue
+                return []
+            results = []
             for item in response.json().get("value", [])[:6]:
-                candidates.append(
+                results.append(
                     {
                         "query": query,
                         "title": item.get("name", ""),
@@ -657,6 +672,15 @@ def web_search_candidates(settings: Settings, queries: list[str]) -> list[dict[s
                         "thumbnail": item.get("thumbnailUrl", ""),
                     }
                 )
+            return results
+        return []
+
+    if not queries:
+        return []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(3, len(queries))) as executor:
+        futures = [executor.submit(search_one, query) for query in queries]
+        for future in concurrent.futures.as_completed(futures):
+            candidates.extend(future.result())
     return candidates[:12]
 
 
@@ -706,11 +730,18 @@ def classify_by_web_enrichment(settings: Settings, image_path: Path) -> tuple[st
         return settings.default_product, 0.0, "web enrichment disabled"
     discoveries: list[dict[str, Any]] = []
     errors: list[str] = []
-    for name, discoverer in (("openai", discover_with_openai), ("gemini", discover_with_gemini)):
-        try:
-            discoveries.append(discoverer(settings, image_path))
-        except Exception as exc:
-            errors.append(f"{name}: {exc}")
+    discoverers = (("openai", discover_with_openai), ("gemini", discover_with_gemini))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        future_map = {
+            executor.submit(discoverer, settings, image_path): name
+            for name, discoverer in discoverers
+        }
+        for future in concurrent.futures.as_completed(future_map):
+            name = future_map[future]
+            try:
+                discoveries.append(future.result())
+            except Exception as exc:
+                errors.append(f"{name}: {exc}")
     queries = search_queries_from_discoveries(discoveries)
     candidates = web_search_candidates(settings, queries)
     if not candidates:
@@ -731,12 +762,19 @@ def classify_by_ai(settings: Settings, image_path: Path) -> tuple[str, float | N
     if provider in {"both", "openai+gemini", "dual"}:
         results: list[tuple[str, float | None, str, str]] = []
         errors: list[str] = []
-        for name, classifier in (("openai", classify_with_openai), ("gemini", classify_with_gemini)):
-            try:
-                product, confidence, reason = classifier(settings, image_path, names)
-                results.append((name, product, confidence, reason))
-            except Exception as exc:
-                errors.append(f"{name}: {exc}")
+        classifiers = (("openai", classify_with_openai), ("gemini", classify_with_gemini))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            future_map = {
+                executor.submit(classifier, settings, image_path, names): name
+                for name, classifier in classifiers
+            }
+            for future in concurrent.futures.as_completed(future_map):
+                name = future_map[future]
+                try:
+                    product, confidence, reason = future.result()
+                    results.append((name, product, confidence, reason))
+                except Exception as exc:
+                    errors.append(f"{name}: {exc}")
         if not results:
             raise RuntimeError("; ".join(errors) or "No AI provider returned a result.")
 
