@@ -1,54 +1,19 @@
 from __future__ import annotations
 
 import argparse
-import base64
-import concurrent.futures
-import difflib
-import io
 import json
-import mimetypes
 import os
-import re
-import shutil
 import subprocess
-import sys
 import time
-import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-
-import requests
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from PIL import Image, ImageOps
-
-
-PHOTOS_SCOPE = "https://www.googleapis.com/auth/photoslibrary.appendonly"
-API_BASE = "https://photoslibrary.googleapis.com/v1"
-UPLOAD_URL = "https://photoslibrary.googleapis.com/v1/uploads"
 
 
 @dataclass
 class Settings:
     root: Path
-    client_secret_file: Path
-    token_file: Path
-    album_cache_file: Path
     inbox_dir: Path
     processed_dir: Path
-    labels_file: Path
-    catalog_file: Path
-    default_product: str
-    similarity_threshold: float
-    classification_mode: str
-    ai_provider: str
-    openai_model: str
-    gemini_model: str
-    web_enrichment_enabled: bool
-    web_enrichment_provider: str
-    web_enrichment_confidence_threshold: float
     adb_serial: str
     camera_dir: str
 
@@ -64,38 +29,13 @@ def load_settings(config_path: Path) -> Settings:
         path = Path(value)
         return path if path.is_absolute() else root / path
 
-    search_provider = config["classification"].get("web_enrichment_provider", "serpapi")
-    if search_provider not in {"serpapi", "bing"}:
-        search_provider = "serpapi"
-
     return Settings(
         root=root,
-        client_secret_file=resolve(config["google"]["client_secret_file"]),
-        token_file=resolve(config["google"]["token_file"]),
-        album_cache_file=resolve(config["google"]["album_cache_file"]),
-        inbox_dir=resolve(config["paths"]["inbox_dir"]),
-        processed_dir=resolve(config["paths"]["processed_dir"]),
-        labels_file=resolve(config["classification"]["labels_file"]),
-        catalog_file=resolve(config["classification"].get("catalog_file", "product_catalog.json")),
-        default_product=config["classification"].get("default_product", "Unsorted"),
-        similarity_threshold=float(config["classification"].get("similarity_threshold", 0.82)),
-        classification_mode=config["classification"].get("mode", "image_similarity"),
-        ai_provider=config["classification"].get("ai_provider", "openai"),
-        openai_model=config["classification"].get("openai_model", "gpt-4.1-mini"),
-        gemini_model=config["classification"].get("gemini_model", "gemini-2.5-flash"),
-        web_enrichment_enabled=bool(config["classification"].get("web_enrichment_enabled", False)),
-        web_enrichment_provider=search_provider,
-        web_enrichment_confidence_threshold=float(
-            config["classification"].get("web_enrichment_confidence_threshold", 0.78)
-        ),
+        inbox_dir=resolve(config["paths"].get("inbox_dir", "inbox")),
+        processed_dir=resolve(config["paths"].get("processed_dir", "processed")),
         adb_serial=config["pixel"].get("adb_serial", ""),
         camera_dir=config["pixel"].get("camera_dir", "/sdcard/DCIM/Camera"),
     )
-
-
-def ensure_dirs(settings: Settings) -> None:
-    settings.inbox_dir.mkdir(parents=True, exist_ok=True)
-    settings.processed_dir.mkdir(parents=True, exist_ok=True)
 
 
 def load_dotenv(root: Path) -> None:
@@ -107,782 +47,12 @@ def load_dotenv(root: Path) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        os.environ.setdefault(key, value)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
-def get_credentials(settings: Settings) -> Credentials:
-    creds: Credentials | None = None
-    if settings.token_file.exists():
-        creds = Credentials.from_authorized_user_file(str(settings.token_file), [PHOTOS_SCOPE])
-
-    if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-
-    if not creds or not creds.valid:
-        if not settings.client_secret_file.exists():
-            raise SystemExit(
-                f"Missing {settings.client_secret_file}. Download OAuth Desktop credentials as client_secret.json."
-            )
-        flow = InstalledAppFlow.from_client_secrets_file(str(settings.client_secret_file), [PHOTOS_SCOPE])
-        creds = flow.run_local_server(port=0)
-
-    settings.token_file.write_text(creds.to_json(), encoding="utf-8")
-    return creds
-
-
-def auth_headers(creds: Credentials) -> dict[str, str]:
-    return {"Authorization": f"Bearer {creds.token}"}
-
-
-def load_album_cache(settings: Settings) -> dict[str, str]:
-    if not settings.album_cache_file.exists():
-        return {}
-    return json.loads(settings.album_cache_file.read_text(encoding="utf-8"))
-
-
-def save_album_cache(settings: Settings, cache: dict[str, str]) -> None:
-    settings.album_cache_file.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-def normalized_title_tokens(title: str) -> set[str]:
-    normalized = unicodedata.normalize("NFKD", title.lower())
-    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
-    for char in "/\\_-.,:;()[]{}|+&":
-        ascii_text = ascii_text.replace(char, " ")
-    stop_words = {
-        "san",
-        "pham",
-        "product",
-        "the",
-        "and",
-        "of",
-        "for",
-        "nuoc",
-        "mat",
-        "nhan",
-        "tao",
-        "artificial",
-        "eye",
-        "eyes",
-        "drops",
-        "drop",
-        "thuoc",
-    }
-    tokens = set()
-    for token in ascii_text.split():
-        if len(token) < 2 or token in stop_words:
-            continue
-        if re.fullmatch(r"\d+(\.\d+)?(ml|g|mg|kg|l|pcs|vien|chai|hop)?", token):
-            continue
-        tokens.add(token)
-    return tokens
-
-
-def canonical_album_key(title: str) -> str:
-    tokens = sorted(normalized_title_tokens(title))
-    if len(tokens) < 2:
-        return ""
-    return " ".join(tokens)
-
-
-def normalize_album_cache_aliases(cache: dict[str, str]) -> tuple[dict[str, str], bool]:
-    canonical_album_ids: dict[str, str] = {}
-    normalized = dict(cache)
-    changed = False
-    for title, album_id in cache.items():
-        key = canonical_album_key(title)
-        if not key:
-            continue
-        if key not in canonical_album_ids:
-            canonical_album_ids[key] = album_id
-            continue
-        canonical_album_id = canonical_album_ids[key]
-        if normalized[title] != canonical_album_id:
-            normalized[title] = canonical_album_id
-            changed = True
-    return normalized, changed
-
-
-def album_title_similarity(left: str, right: str) -> float:
-    left_tokens = normalized_title_tokens(left)
-    right_tokens = normalized_title_tokens(right)
-    if not left_tokens or not right_tokens:
-        return 0.0
-    overlap = len(left_tokens & right_tokens) / min(len(left_tokens), len(right_tokens))
-    sequence = difflib.SequenceMatcher(None, " ".join(sorted(left_tokens)), " ".join(sorted(right_tokens))).ratio()
-    return max(overlap, sequence)
-
-
-def find_similar_cached_album(cache: dict[str, str], title: str) -> tuple[str, str] | None:
-    title_key = canonical_album_key(title)
-    if title_key:
-        for cached_title, album_id in cache.items():
-            if canonical_album_key(cached_title) == title_key:
-                return cached_title, album_id
-    for cached_title, album_id in cache.items():
-        if album_title_similarity(cached_title, title) >= 0.68:
-            return cached_title, album_id
-    return None
-
-
-def create_album(settings: Settings, creds: Credentials, title: str) -> str:
-    response = requests.post(
-        f"{API_BASE}/albums",
-        headers={**auth_headers(creds), "Content-Type": "application/json"},
-        json={"album": {"title": title}},
-        timeout=60,
-    )
-    if response.status_code >= 400:
-        raise RuntimeError(f"Create album failed: {response.status_code} {response.text}")
-    album_id = response.json()["id"]
-    cache = load_album_cache(settings)
-    cache[title] = album_id
-    save_album_cache(settings, cache)
-    return album_id
-
-
-def get_or_create_album(settings: Settings, creds: Credentials, title: str) -> str:
-    cache = load_album_cache(settings)
-    cache, cache_changed = normalize_album_cache_aliases(cache)
-    if cache_changed:
-        save_album_cache(settings, cache)
-    similar = find_similar_cached_album(cache, title)
-    if similar:
-        _canonical_title, album_id = similar
-        if title not in cache or cache[title] != album_id:
-            cache[title] = album_id
-            save_album_cache(settings, cache)
-        return album_id
-    if title in cache:
-        return cache[title]
-    return create_album(settings, creds, title)
-
-
-def replace_cached_album_aliases(
-    settings: Settings,
-    album_title: str,
-    album_id: str,
-    stale_album_id: str | None = None,
-) -> None:
-    cache = load_album_cache(settings)
-    album_key = canonical_album_key(album_title)
-    for cached_title, cached_album_id in list(cache.items()):
-        same_product = bool(album_key) and canonical_album_key(cached_title) == album_key
-        stale_alias = bool(stale_album_id) and cached_album_id == stale_album_id
-        if same_product or stale_alias:
-            cache[cached_title] = album_id
-    cache[album_title] = album_id
-    save_album_cache(settings, cache)
-
-
-def upload_bytes(creds: Credentials, image_path: Path) -> str:
-    mime_type = mimetypes.guess_type(str(image_path))[0] or "application/octet-stream"
-    response = requests.post(
-        UPLOAD_URL,
-        headers={
-            **auth_headers(creds),
-            "Content-Type": "application/octet-stream",
-            "X-Goog-Upload-File-Name": image_path.name,
-            "X-Goog-Upload-Protocol": "raw",
-        },
-        data=image_path.read_bytes(),
-        timeout=120,
-    )
-    if response.status_code >= 400:
-        raise RuntimeError(f"Upload bytes failed ({mime_type}): {response.status_code} {response.text}")
-    return response.text
-
-
-def create_media_item(creds: Credentials, upload_token: str, album_id: str, description: str) -> dict[str, Any]:
-    response = requests.post(
-        f"{API_BASE}/mediaItems:batchCreate",
-        headers={**auth_headers(creds), "Content-Type": "application/json"},
-        json={
-            "albumId": album_id,
-            "newMediaItems": [
-                {
-                    "description": description,
-                    "simpleMediaItem": {"uploadToken": upload_token},
-                }
-            ],
-        },
-        timeout=120,
-    )
-    if response.status_code >= 400:
-        raise RuntimeError(f"Create media item failed: {response.status_code} {response.text}")
-    return response.json()
-
-
-def media_item_error_status(result: dict[str, Any]) -> str:
-    media_results = result.get("newMediaItemResults", [])
-    if not media_results:
-        return ""
-    return media_results[0].get("status", {}).get("message", "")
-
-
-def create_media_item_with_album_retry(
-    settings: Settings,
-    creds: Credentials,
-    upload_token: str,
-    album_title: str,
-    description: str,
-) -> tuple[str, dict[str, Any]]:
-    album_id = get_or_create_album(settings, creds, album_title)
-    try:
-        result = create_media_item(creds, upload_token, album_id, description)
-    except RuntimeError as exc:
-        if "does not match any albums" not in str(exc) and "NOT_FOUND" not in str(exc):
-            raise
-        stale_album_id = album_id
-        album_id = create_album(settings, creds, album_title)
-        replace_cached_album_aliases(settings, album_title, album_id, stale_album_id)
-        result = create_media_item(creds, upload_token, album_id, description)
-
-    status = media_item_error_status(result)
-    if "does not match any albums" in status or "NOT_FOUND" in status:
-        stale_album_id = album_id
-        album_id = create_album(settings, creds, album_title)
-        replace_cached_album_aliases(settings, album_title, album_id, stale_album_id)
-        result = create_media_item(creds, upload_token, album_id, description)
-    return album_id, result
-
-
-def classify_by_filename(settings: Settings, image_path: Path, forced_product: str | None) -> str:
-    if forced_product:
-        return forced_product
-
-    if settings.labels_file.exists():
-        labels = json.loads(settings.labels_file.read_text(encoding="utf-8"))
-        haystack = image_path.name.lower()
-        for product in labels.get("products", []):
-            for keyword in product.get("keywords", []):
-                if keyword.lower() in haystack:
-                    return product["name"]
-
-    return settings.default_product
-
-
-def image_average_hash(image_path: Path, size: int = 16) -> str:
-    with Image.open(image_path) as image:
-        image = ImageOps.exif_transpose(image)
-        image = image.convert("L").resize((size, size))
-        pixels = list(image.getdata())
-    avg = sum(pixels) / len(pixels)
-    return "".join("1" if pixel >= avg else "0" for pixel in pixels)
-
-
-def hash_similarity(left: str, right: str) -> float:
-    if not left or not right or len(left) != len(right):
-        return 0.0
-    matches = sum(1 for a, b in zip(left, right) if a == b)
-    return matches / len(left)
-
-
-def load_catalog(settings: Settings) -> dict[str, Any]:
-    if not settings.catalog_file.exists():
-        return {"products": []}
-    return json.loads(settings.catalog_file.read_text(encoding="utf-8"))
-
-
-def save_catalog(settings: Settings, catalog: dict[str, Any]) -> None:
-    settings.catalog_file.write_text(json.dumps(catalog, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-def find_or_create_product(catalog: dict[str, Any], name: str) -> dict[str, Any]:
-    for product in catalog.setdefault("products", []):
-        if product.get("name") == name:
-            product.setdefault("samples", [])
-            return product
-    product = {"name": name, "samples": []}
-    catalog["products"].append(product)
-    return product
-
-
-def add_sample(settings: Settings, product_name: str, image_path: Path) -> dict[str, Any]:
-    catalog = load_catalog(settings)
-    product = find_or_create_product(catalog, product_name)
-
-    samples_dir = settings.root / "samples" / safe_name(product_name)
-    samples_dir.mkdir(parents=True, exist_ok=True)
-    target = samples_dir / image_path.name
-    if image_path.resolve() != target.resolve():
-        shutil.copy2(image_path, target)
-
-    sample = {
-        "path": str(target.relative_to(settings.root)),
-        "hash": image_average_hash(target),
-    }
-    for existing in product["samples"]:
-        if existing.get("path") == sample["path"]:
-            existing.update(sample)
-            save_catalog(settings, catalog)
-            return existing
-    product["samples"].append(sample)
-    save_catalog(settings, catalog)
-    return sample
-
-
-def classify_by_samples(settings: Settings, image_path: Path) -> tuple[str, float]:
-    catalog = load_catalog(settings)
-    image_hash = image_average_hash(image_path)
-    best_product = settings.default_product
-    best_score = 0.0
-
-    for product in catalog.get("products", []):
-        for sample in product.get("samples", []):
-            sample_hash = sample.get("hash")
-            if not sample_hash and sample.get("path"):
-                sample_path = settings.root / sample["path"]
-                if sample_path.exists():
-                    sample_hash = image_average_hash(sample_path)
-                    sample["hash"] = sample_hash
-            score = hash_similarity(image_hash, sample_hash or "")
-            if score > best_score:
-                best_score = score
-                best_product = product.get("name", settings.default_product)
-
-    if best_score < settings.similarity_threshold:
-        best_product = settings.default_product
-
-    save_catalog(settings, catalog)
-    return best_product, best_score
-
-
-def product_names(settings: Settings) -> list[str]:
-    names: list[str] = []
-    catalog = load_catalog(settings)
-    for product in catalog.get("products", []):
-        name = product.get("name")
-        if name and name not in names:
-            names.append(name)
-    if settings.labels_file.exists():
-        labels = json.loads(settings.labels_file.read_text(encoding="utf-8"))
-        for product in labels.get("products", []):
-            name = product.get("name")
-            if name and name not in names:
-                names.append(name)
-    if settings.default_product not in names:
-        names.append(settings.default_product)
-    return names
-
-
-def ai_image_payload(image_path: Path, max_side: int = 1280) -> tuple[str, str]:
-    try:
-        with Image.open(image_path) as image:
-            image = ImageOps.exif_transpose(image).convert("RGB")
-            image.thumbnail((max_side, max_side))
-            buffer = io.BytesIO()
-            image.save(buffer, format="JPEG", quality=82, optimize=True)
-        return "image/jpeg", base64.b64encode(buffer.getvalue()).decode("ascii")
-    except Exception:
-        mime_type = mimetypes.guess_type(str(image_path))[0] or "image/jpeg"
-        return mime_type, base64.b64encode(image_path.read_bytes()).decode("ascii")
-
-
-def image_data_url(image_path: Path) -> str:
-    mime_type, encoded = ai_image_payload(image_path)
-    return f"data:{mime_type};base64,{encoded}"
-
-
-def ai_prompt(names: list[str]) -> str:
-    product_list = "\n".join(f"- {name}" for name in names)
-    return (
-        "You are classifying a product photo for automatic Google Photos album upload.\n"
-        "Pick exactly one product name from the allowed list below. If none match clearly, pick Unsorted.\n"
-        "Return strict JSON only with keys: product, confidence, reason.\n\n"
-        f"Allowed products:\n{product_list}\n"
-    )
-
-
-def discovery_prompt() -> str:
-    return (
-        "You are identifying a retail product from a photo.\n"
-        "Read visible text, brand names, SKU, barcode numbers, package size, color, and product type.\n"
-        "Return strict JSON only with keys: product_name, brand, barcode, search_query, confidence, reason.\n"
-        "If the product cannot be identified, set product_name to Unsorted and confidence below 0.5.\n"
-    )
-
-
-def enrichment_prompt(discoveries: list[dict[str, Any]], candidates: list[dict[str, Any]]) -> str:
-    return (
-        "You are resolving a product name for automatic Google Photos album creation.\n"
-        "Use the AI image observations and web/image-search candidates below.\n"
-        "Choose one concise album title in Vietnamese or the product's package language.\n"
-        "Prefer exact barcode/SKU matches, then exact package text, then brand+product+size matches.\n"
-        "Return strict JSON only with keys: product, confidence, reason.\n"
-        "If not confident, return product as Unsorted and confidence below 0.6.\n\n"
-        f"AI observations:\n{json.dumps(discoveries, ensure_ascii=False, indent=2)}\n\n"
-        f"Web candidates:\n{json.dumps(candidates[:10], ensure_ascii=False, indent=2)}\n"
-    )
-
-
-def parse_ai_json(text: str) -> dict[str, Any]:
-    cleaned = text.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.strip("`")
-        if cleaned.lower().startswith("json"):
-            cleaned = cleaned[4:].strip()
-    start = cleaned.find("{")
-    end = cleaned.rfind("}")
-    if start >= 0 and end > start:
-        cleaned = cleaned[start : end + 1]
-    return json.loads(cleaned)
-
-
-def classify_with_openai(settings: Settings, image_path: Path, names: list[str]) -> tuple[str, float | None, str]:
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set. Put it in .env or set it in PowerShell.")
-
-    response = requests.post(
-        "https://api.openai.com/v1/responses",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={
-            "model": settings.openai_model,
-            "input": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": ai_prompt(names)},
-                        {"type": "input_image", "image_url": image_data_url(image_path), "detail": "low"},
-                    ],
-                }
-            ],
-        },
-        timeout=120,
-    )
-    if response.status_code >= 400:
-        raise RuntimeError(f"OpenAI classification failed: {response.status_code} {response.text}")
-    payload = response.json()
-    text = payload.get("output_text")
-    if not text:
-        parts: list[str] = []
-        for item in payload.get("output", []):
-            for content in item.get("content", []):
-                if content.get("type") == "output_text":
-                    parts.append(content.get("text", ""))
-        text = "\n".join(parts)
-    parsed = parse_ai_json(text)
-    product = parsed.get("product", settings.default_product)
-    if product not in names:
-        product = settings.default_product
-    return product, parsed.get("confidence"), parsed.get("reason", "")
-
-
-def discover_with_openai(settings: Settings, image_path: Path) -> dict[str, Any]:
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set.")
-    response = requests.post(
-        "https://api.openai.com/v1/responses",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={
-            "model": settings.openai_model,
-            "input": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": discovery_prompt()},
-                        {"type": "input_image", "image_url": image_data_url(image_path), "detail": "low"},
-                    ],
-                }
-            ],
-        },
-        timeout=120,
-    )
-    if response.status_code >= 400:
-        raise RuntimeError(f"OpenAI discovery failed: {response.status_code} {response.text}")
-    payload = response.json()
-    text = payload.get("output_text")
-    if not text:
-        parts: list[str] = []
-        for item in payload.get("output", []):
-            for content in item.get("content", []):
-                if content.get("type") == "output_text":
-                    parts.append(content.get("text", ""))
-        text = "\n".join(parts)
-    result = parse_ai_json(text)
-    result["provider"] = "openai"
-    return result
-
-
-def classify_with_gemini(settings: Settings, image_path: Path, names: list[str]) -> tuple[str, float | None, str]:
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY is not set. Put it in .env or set it in PowerShell.")
-
-    mime_type, encoded = ai_image_payload(image_path)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent"
-    response = requests.post(
-        url,
-        params={"key": api_key},
-        headers={"Content-Type": "application/json"},
-        json={
-            "contents": [
-                {
-                    "parts": [
-                        {"text": ai_prompt(names)},
-                        {"inline_data": {"mime_type": mime_type, "data": encoded}},
-                    ]
-                }
-            ],
-            "generationConfig": {"response_mime_type": "application/json"},
-        },
-        timeout=120,
-    )
-    if response.status_code >= 400:
-        raise RuntimeError(f"Gemini classification failed: {response.status_code} {response.text}")
-    payload = response.json()
-    text = payload["candidates"][0]["content"]["parts"][0]["text"]
-    parsed = parse_ai_json(text)
-    product = parsed.get("product", settings.default_product)
-    if product not in names:
-        product = settings.default_product
-    return product, parsed.get("confidence"), parsed.get("reason", "")
-
-
-def discover_with_gemini(settings: Settings, image_path: Path) -> dict[str, Any]:
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY is not set.")
-    mime_type, encoded = ai_image_payload(image_path)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent"
-    response = requests.post(
-        url,
-        params={"key": api_key},
-        headers={"Content-Type": "application/json"},
-        json={
-            "contents": [
-                {
-                    "parts": [
-                        {"text": discovery_prompt()},
-                        {"inline_data": {"mime_type": mime_type, "data": encoded}},
-                    ]
-                }
-            ],
-            "generationConfig": {"response_mime_type": "application/json"},
-        },
-        timeout=120,
-    )
-    if response.status_code >= 400:
-        raise RuntimeError(f"Gemini discovery failed: {response.status_code} {response.text}")
-    payload = response.json()
-    result = parse_ai_json(payload["candidates"][0]["content"]["parts"][0]["text"])
-    result["provider"] = "gemini"
-    return result
-
-
-def search_queries_from_discoveries(discoveries: list[dict[str, Any]]) -> list[str]:
-    queries: list[str] = []
-    for item in discoveries:
-        for key in ("barcode", "search_query", "product_name"):
-            value = str(item.get(key) or "").strip()
-            if value and value.lower() != "unsorted" and value not in queries:
-                queries.append(value)
-    return queries[:3]
-
-
-def web_search_candidates(settings: Settings, queries: list[str]) -> list[dict[str, Any]]:
-    provider = settings.web_enrichment_provider.lower()
-    candidates: list[dict[str, Any]] = []
-    def search_one(query: str) -> list[dict[str, Any]]:
-        if provider == "serpapi":
-            api_key = os.environ.get("SERPAPI_API_KEY")
-            if not api_key:
-                return []
-            response = requests.get(
-                "https://serpapi.com/search.json",
-                params={"engine": "google_images", "q": query, "api_key": api_key},
-                timeout=45,
-            )
-            if response.status_code >= 400:
-                return []
-            results: list[dict[str, Any]] = []
-            for item in response.json().get("images_results", [])[:6]:
-                results.append(
-                    {
-                        "query": query,
-                        "title": item.get("title", ""),
-                        "source": item.get("source", ""),
-                        "link": item.get("link", ""),
-                        "thumbnail": item.get("thumbnail", ""),
-                    }
-                )
-            return results
-        elif provider == "bing":
-            api_key = os.environ.get("BING_SEARCH_API_KEY")
-            if not api_key:
-                return []
-            response = requests.get(
-                "https://api.bing.microsoft.com/v7.0/images/search",
-                headers={"Ocp-Apim-Subscription-Key": api_key},
-                params={"q": query, "count": 6},
-                timeout=45,
-            )
-            if response.status_code >= 400:
-                return []
-            results = []
-            for item in response.json().get("value", [])[:6]:
-                results.append(
-                    {
-                        "query": query,
-                        "title": item.get("name", ""),
-                        "source": item.get("hostPageDisplayUrl", ""),
-                        "link": item.get("contentUrl", ""),
-                        "thumbnail": item.get("thumbnailUrl", ""),
-                    }
-                )
-            return results
-        return []
-
-    if not queries:
-        return []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(3, len(queries))) as executor:
-        futures = [executor.submit(search_one, query) for query in queries]
-        for future in concurrent.futures.as_completed(futures):
-            candidates.extend(future.result())
-    return candidates[:12]
-
-
-def resolve_enriched_product_with_openai(
-    settings: Settings,
-    image_path: Path,
-    discoveries: list[dict[str, Any]],
-    candidates: list[dict[str, Any]],
-) -> tuple[str, float | None, str]:
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set.")
-    response = requests.post(
-        "https://api.openai.com/v1/responses",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={
-            "model": settings.openai_model,
-            "input": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": enrichment_prompt(discoveries, candidates)},
-                        {"type": "input_image", "image_url": image_data_url(image_path), "detail": "low"},
-                    ],
-                }
-            ],
-        },
-        timeout=120,
-    )
-    if response.status_code >= 400:
-        raise RuntimeError(f"OpenAI enrichment failed: {response.status_code} {response.text}")
-    payload = response.json()
-    text = payload.get("output_text")
-    if not text:
-        parts: list[str] = []
-        for item in payload.get("output", []):
-            for content in item.get("content", []):
-                if content.get("type") == "output_text":
-                    parts.append(content.get("text", ""))
-        text = "\n".join(parts)
-    parsed = parse_ai_json(text)
-    return parsed.get("product", settings.default_product), parsed.get("confidence"), parsed.get("reason", "")
-
-
-def classify_by_web_enrichment(settings: Settings, image_path: Path) -> tuple[str, float | None, str]:
-    if not settings.web_enrichment_enabled:
-        return settings.default_product, 0.0, "web enrichment disabled"
-    discoveries: list[dict[str, Any]] = []
-    errors: list[str] = []
-    discoverers = (("openai", discover_with_openai), ("gemini", discover_with_gemini))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        future_map = {
-            executor.submit(discoverer, settings, image_path): name
-            for name, discoverer in discoverers
-        }
-        for future in concurrent.futures.as_completed(future_map):
-            name = future_map[future]
-            try:
-                discoveries.append(future.result())
-            except Exception as exc:
-                errors.append(f"{name}: {exc}")
-    queries = search_queries_from_discoveries(discoveries)
-    candidates = web_search_candidates(settings, queries)
-    if not candidates:
-        reason = f"web enrichment found no candidates; discoveries={discoveries}; errors={errors}"
-        return settings.default_product, 0.0, reason
-    try:
-        product, confidence, reason = resolve_enriched_product_with_openai(settings, image_path, discoveries, candidates)
-    except Exception as exc:
-        return settings.default_product, 0.0, f"web enrichment resolution failed: {exc}; candidates={candidates[:3]}"
-    if product != settings.default_product and float(confidence or 0) >= settings.web_enrichment_confidence_threshold:
-        return product, confidence, f"web enrichment accepted: {reason}"
-    return settings.default_product, confidence, f"web enrichment below threshold: {reason}"
-
-
-def classify_by_ai(settings: Settings, image_path: Path) -> tuple[str, float | None, str]:
-    names = product_names(settings)
-    provider = settings.ai_provider.lower()
-    if provider in {"both", "openai+gemini", "dual"}:
-        results: list[tuple[str, float | None, str, str]] = []
-        errors: list[str] = []
-        classifiers = (("openai", classify_with_openai), ("gemini", classify_with_gemini))
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            future_map = {
-                executor.submit(classifier, settings, image_path, names): name
-                for name, classifier in classifiers
-            }
-            for future in concurrent.futures.as_completed(future_map):
-                name = future_map[future]
-                try:
-                    product, confidence, reason = future.result()
-                    results.append((name, product, confidence, reason))
-                except Exception as exc:
-                    errors.append(f"{name}: {exc}")
-        if not results:
-            raise RuntimeError("; ".join(errors) or "No AI provider returned a result.")
-
-        non_unsorted = [result for result in results if result[1] != settings.default_product]
-        if len(non_unsorted) >= 2 and len({result[1] for result in non_unsorted}) == 1:
-            provider_names = "+".join(result[0] for result in non_unsorted)
-            confidence_values = [result[2] for result in non_unsorted if isinstance(result[2], int | float)]
-            avg_confidence = sum(confidence_values) / len(confidence_values) if confidence_values else None
-            return non_unsorted[0][1], avg_confidence, f"{provider_names} agreed: {non_unsorted[0][3]}"
-
-        chosen = max(
-            results,
-            key=lambda result: (result[1] != settings.default_product, float(result[2] or 0)),
-        )
-        extra = f"; errors: {'; '.join(errors)}" if errors else ""
-        return chosen[1], chosen[2], f"{chosen[0]} selected; dual results={[(r[0], r[1], r[2]) for r in results]}{extra}"
-    if provider == "gemini":
-        return classify_with_gemini(settings, image_path, names)
-    if provider == "openai":
-        return classify_with_openai(settings, image_path, names)
-    raise RuntimeError(f"Unsupported ai_provider: {settings.ai_provider}")
-
-
-def classify_product(settings: Settings, image_path: Path, forced_product: str | None = None) -> tuple[str, float | None, str]:
-    if forced_product:
-        return forced_product, None, "forced by user"
-    if settings.classification_mode == "ai":
-        try:
-            product, score, reason = classify_by_ai(settings, image_path)
-            if product != settings.default_product:
-                return product, score, reason
-            enriched_product, enriched_score, enriched_reason = classify_by_web_enrichment(settings, image_path)
-            if enriched_product != settings.default_product:
-                return enriched_product, enriched_score, enriched_reason
-            return product, score, f"{reason}; {enriched_reason}"
-        except Exception as exc:
-            product, score = classify_by_samples(settings, image_path)
-            if product != settings.default_product:
-                return product, score, f"AI failed; used sample match: {exc}"
-            filename_product = classify_by_filename(settings, image_path, None)
-            return filename_product, score, f"AI failed; used fallback: {exc}"
-    product, score = classify_by_samples(settings, image_path)
-    if product != settings.default_product:
-        return product, score, "sample match"
-    filename_product = classify_by_filename(settings, image_path, None)
-    return filename_product, score, "filename fallback"
+def ensure_dirs(settings: Settings) -> None:
+    settings.inbox_dir.mkdir(parents=True, exist_ok=True)
+    settings.processed_dir.mkdir(parents=True, exist_ok=True)
 
 
 def adb_command(settings: Settings, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -905,9 +75,9 @@ def latest_media_after(settings: Settings, patterns: list[str], min_epoch: int) 
     pattern_text = " ".join(f"{settings.camera_dir}/{pattern}" for pattern in patterns)
     command = (
         f"for f in {pattern_text}; do "
-        "[ -e \"$f\" ] || continue; "
-        "mtime=$(stat -c %Y \"$f\" 2>/dev/null || stat -f %m \"$f\" 2>/dev/null); "
-        f"[ \"$mtime\" -ge {min_epoch} ] && printf '%s %s\\n' \"$mtime\" \"$f\"; "
+        '[ -e "$f" ] || continue; '
+        'mtime=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null); '
+        f'[ "$mtime" -ge {min_epoch} ] && printf \'%s %s\\n\' "$mtime" "$f"; '
         "done | sort -nr | head -n 1 | cut -d' ' -f2-"
     )
     return adb_command(settings, "shell", command, check=False).stdout.strip()
@@ -916,7 +86,6 @@ def latest_media_after(settings: Settings, patterns: list[str], min_epoch: int) 
 def capture_from_pixel(settings: Settings) -> Path:
     ensure_dirs(settings)
     capture_started_at = max(0, device_epoch_seconds(settings) - 1)
-
     adb_command(settings, "shell", "am", "start", "-a", "android.media.action.STILL_IMAGE_CAMERA")
     time.sleep(2)
     adb_command(settings, "shell", "input", "keyevent", "27")
@@ -927,9 +96,8 @@ def capture_from_pixel(settings: Settings) -> Path:
         latest = latest_media_after(settings, ["*.jpg", "*.jpeg"], capture_started_at)
         if latest:
             break
-
     if not latest:
-        raise RuntimeError("Pixel did not create a new photo after capture started. Check Camera focus/permissions and try again.")
+        raise RuntimeError("Pixel did not create a new photo. Check Camera focus/permissions and try again.")
 
     local_path = settings.inbox_dir / Path(latest).name
     adb_command(settings, "pull", latest, str(local_path))
@@ -940,7 +108,6 @@ def capture_video_from_pixel(settings: Settings, duration_seconds: int = 10) -> 
     ensure_dirs(settings)
     duration_seconds = max(1, min(duration_seconds, 300))
     recording_started_at = max(0, device_epoch_seconds(settings) - 1)
-
     adb_command(settings, "shell", "am", "start", "-a", "android.media.action.VIDEO_CAMERA")
     time.sleep(2)
     adb_command(settings, "shell", "input", "keyevent", "27")
@@ -953,228 +120,64 @@ def capture_video_from_pixel(settings: Settings, duration_seconds: int = 10) -> 
         latest = latest_media_after(settings, ["*.mp4", "*.3gp"], recording_started_at)
         if latest:
             break
-
     if not latest:
-        raise RuntimeError("Pixel did not create a new video after recording started. Check Camera focus/permissions and try again.")
+        raise RuntimeError("Pixel did not create a new video. Check Camera focus/permissions and try again.")
 
     local_path = settings.inbox_dir / Path(latest).name
     adb_command(settings, "pull", latest, str(local_path))
     return local_path
 
 
-def upload_photo(settings: Settings, image_path: Path, product: str) -> dict[str, Any]:
-    creds = get_credentials(settings)
-    upload_token = upload_bytes(creds, image_path)
-    album_id, result = create_media_item_with_album_retry(settings, creds, upload_token, product, f"Product: {product}")
-
-    product_dir = settings.processed_dir / safe_name(product)
-    product_dir.mkdir(parents=True, exist_ok=True)
-    target = product_dir / image_path.name
-    if image_path.resolve() != target.resolve():
-        shutil.copy2(image_path, target)
-    return {"album_id": album_id, "api_result": result}
+def pixel_media_path(settings: Settings, local_path: Path) -> str:
+    return f"{settings.camera_dir.rstrip('/')}/{local_path.name}"
 
 
-def upload_media(settings: Settings, media_path: Path, product: str, description_prefix: str = "Product") -> dict[str, Any]:
-    creds = get_credentials(settings)
-    upload_token = upload_bytes(creds, media_path)
-    album_id, result = create_media_item_with_album_retry(
+def delete_pixel_media(settings: Settings, local_path: Path) -> str:
+    remote_path = pixel_media_path(settings, local_path)
+    result = adb_command(settings, "shell", "rm", "-f", "--", remote_path, check=False)
+    if result.returncode != 0:
+        message = (result.stderr or result.stdout or "ADB delete failed").strip()
+        raise RuntimeError(f"Could not delete Pixel media {remote_path}: {message}")
+    adb_command(
         settings,
-        creds,
-        upload_token,
-        product,
-        f"{description_prefix}: {product}",
+        "shell",
+        "am",
+        "broadcast",
+        "-a",
+        "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+        "-d",
+        f"file://{remote_path}",
+        check=False,
     )
-
-    product_dir = settings.processed_dir / safe_name(product)
-    product_dir.mkdir(parents=True, exist_ok=True)
-    target = product_dir / media_path.name
-    if media_path.resolve() != target.resolve():
-        shutil.copy2(media_path, target)
-    return {"album_id": album_id, "api_result": result}
+    return remote_path
 
 
-def print_upload_summary(payload: dict[str, Any]) -> None:
-    result = payload.get("api_result", payload)
-    media_results = result.get("newMediaItemResults", [])
-    media_item = media_results[0].get("mediaItem", {}) if media_results else {}
-    status = media_results[0].get("status", {}) if media_results else {}
-    summary = {
-        "product": payload.get("product"),
-        "match_score": payload.get("match_score"),
-        "classification_reason": payload.get("classification_reason"),
-        "captured": payload.get("captured"),
-        "album_id": payload.get("album_id"),
-        "status": status.get("message"),
-        "filename": media_item.get("filename"),
-        "photo_url": media_item.get("productUrl"),
-    }
-    print(json.dumps(summary, indent=2, ensure_ascii=False))
-    if media_item.get("productUrl"):
-        print(f"\nOpen this Google Photos link:\n{media_item['productUrl']}")
-
-
-def upload_result_summary(payload: dict[str, Any]) -> dict[str, Any]:
-    result = payload.get("api_result", payload)
-    media_results = result.get("newMediaItemResults", [])
-    media_item = media_results[0].get("mediaItem", {}) if media_results else {}
-    status = media_results[0].get("status", {}) if media_results else {}
-    return {
-        "album_id": payload.get("album_id"),
-        "status": status.get("message"),
-        "filename": media_item.get("filename"),
-        "photo_url": media_item.get("productUrl"),
-    }
-
-
-def safe_name(value: str) -> str:
-    return "".join(c if c.isalnum() or c in " ._-" else "_" for c in value).strip() or "Unsorted"
-
-
-def cmd_auth(settings: Settings, _args: argparse.Namespace) -> None:
-    get_credentials(settings)
-    print(f"Authenticated. Token stored at {settings.token_file}")
-
-
-def cmd_capture(settings: Settings, _args: argparse.Namespace) -> None:
-    path = capture_from_pixel(settings)
-    print(path)
-
-
-def cmd_upload(settings: Settings, args: argparse.Namespace) -> None:
-    image_path = Path(args.image).resolve()
-    if not image_path.exists():
-        raise SystemExit(f"Image not found: {image_path}")
-    product, score, reason = classify_product(settings, image_path, args.product)
-    result = upload_photo(settings, image_path, product)
-    print_upload_summary({"product": product, "match_score": score, "classification_reason": reason, **result})
-
-
-def cmd_run_once(settings: Settings, args: argparse.Namespace) -> None:
-    image_path = capture_from_pixel(settings)
-    product, score, reason = classify_product(settings, image_path, args.product)
-    result = upload_photo(settings, image_path, product)
-    print_upload_summary(
-        {"captured": str(image_path), "product": product, "match_score": score, "classification_reason": reason, **result}
-    )
-
-
-def cmd_record_once(settings: Settings, args: argparse.Namespace) -> None:
-    reference_path: Path | None = None
-    if args.product:
-        product, score, reason = args.product, None, "forced by user"
-    else:
-        reference_path = capture_from_pixel(settings)
-        product, score, reason = classify_product(settings, reference_path)
-    video_path = capture_video_from_pixel(settings, args.duration)
-    result = upload_media(settings, video_path, product, "Product video")
-    print_upload_summary(
-        {
-            "captured": str(video_path),
-            "reference_image": str(reference_path) if reference_path else None,
-            "product": product,
-            "match_score": score,
-            "classification_reason": reason,
-            **result,
-        }
-    )
-
-
-def cmd_classify(settings: Settings, args: argparse.Namespace) -> None:
-    image_path = Path(args.image).resolve()
-    if not image_path.exists():
-        raise SystemExit(f"Image not found: {image_path}")
-    product, score, reason = classify_product(settings, image_path, args.product)
-    print(
-        json.dumps(
-            {"image": str(image_path), "product": product, "match_score": score, "classification_reason": reason},
-            indent=2,
-            ensure_ascii=False,
-        )
-    )
-
-
-def cmd_add_sample(settings: Settings, args: argparse.Namespace) -> None:
-    image_path = Path(args.image).resolve()
-    if not image_path.exists():
-        raise SystemExit(f"Image not found: {image_path}")
-    sample = add_sample(settings, args.product, image_path)
-    print(json.dumps({"product": args.product, "sample": sample}, indent=2, ensure_ascii=False))
-
-
-def cmd_watch(settings: Settings, args: argparse.Namespace) -> None:
-    count = 0
-    while args.count <= 0 or count < args.count:
-        count += 1
-        print(f"\nRun {count}: capturing and uploading...")
-        cmd_run_once(settings, args)
-        if args.count > 0 and count >= args.count:
-            break
-        time.sleep(args.interval)
-
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Pixel capture to Google Photos product albums.")
-    parser.add_argument("--config", default="config.json", help="Path to config.json")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    subparsers.add_parser("auth", help="Authorize Google Photos API access")
-    subparsers.add_parser("capture", help="Capture one photo from Pixel via ADB")
-
-    upload = subparsers.add_parser("upload", help="Upload an existing image")
-    upload.add_argument("image")
-    upload.add_argument("--product", help="Force product/album name")
-
-    run_once = subparsers.add_parser("run-once", help="Capture, classify, and upload one photo")
-    run_once.add_argument("--product", help="Force product/album name")
-
-    run_once_auto = subparsers.add_parser("run-once-auto", help="Capture, auto-classify from samples, and upload one photo")
-    run_once_auto.set_defaults(command="run-once")
-
-    record_once = subparsers.add_parser("record-once", help="Record, classify, and upload one video")
-    record_once.add_argument("--product", help="Force product/album name")
-    record_once.add_argument("--duration", type=int, default=10, help="Video duration in seconds")
-
-    classify = subparsers.add_parser("classify", help="Classify an existing image without uploading")
-    classify.add_argument("image")
-    classify.add_argument("--product", help="Force product name")
-
-    add_sample_parser = subparsers.add_parser("add-sample", help="Add a product sample image for offline recognition")
-    add_sample_parser.add_argument("--product", required=True, help="Product/album name")
-    add_sample_parser.add_argument("image")
-
-    watch = subparsers.add_parser("watch", help="Repeatedly capture, auto-classify, and upload")
-    watch.add_argument("--interval", type=int, default=30, help="Seconds between captures")
-    watch.add_argument("--count", type=int, default=0, help="Number of captures; 0 means run forever")
-    watch.add_argument("--product", help="Force product/album name for every capture")
-    return parser
+def print_devices(settings: Settings) -> None:
+    print(adb_command(settings, "devices", check=False).stdout.strip())
 
 
 def main() -> int:
-    parser = build_parser()
+    parser = argparse.ArgumentParser(description="Capture Pixel media for the Drive-first web app.")
+    parser.add_argument("--config", default="config.json", help="Path to config JSON")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers.add_parser("devices", help="List ADB devices")
+    subparsers.add_parser("capture", help="Capture one photo and pull it into inbox")
+    record = subparsers.add_parser("record", help="Record one video and pull it into inbox")
+    record.add_argument("--duration", type=int, default=10)
     args = parser.parse_args()
-    settings = load_settings(Path(args.config).resolve())
-    load_dotenv(settings.root)
-    ensure_dirs(settings)
 
-    handlers = {
-        "auth": cmd_auth,
-        "capture": cmd_capture,
-        "upload": cmd_upload,
-        "run-once": cmd_run_once,
-        "run-once-auto": cmd_run_once,
-        "record-once": cmd_record_once,
-        "classify": cmd_classify,
-        "add-sample": cmd_add_sample,
-        "watch": cmd_watch,
-    }
-    handlers[args.command](settings, args)
+    config_path = Path(args.config).resolve()
+    load_dotenv(config_path.parent)
+    settings = load_settings(config_path)
+
+    if args.command == "devices":
+        print_devices(settings)
+    elif args.command == "capture":
+        print(capture_from_pixel(settings))
+    elif args.command == "record":
+        print(capture_video_from_pixel(settings, args.duration))
     return 0
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except subprocess.CalledProcessError as exc:
-        print(exc.stderr or exc.stdout, file=sys.stderr)
-        raise SystemExit(exc.returncode)
+    raise SystemExit(main())

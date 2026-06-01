@@ -5,4 +5,4 @@ $ProjectDir = "C:\Users\datdt\Documents\Codex\2026-05-27\project-n-y-nousresearc
 Set-Location $ProjectDir
 
 python -m pip install -r requirements.txt
-python .\photo_pipeline.py run-once --product "Ten San Pham Test"
+python .\photo_pipeline.py devices
