@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -293,6 +295,7 @@ HTML = r"""
         </div>
         <div class="top-actions">
           <button class="ghost" onclick="refresh()">L&#224;m m&#7899;i</button>
+          <button id="topPreviewBtn" class="secondary" onclick="openPixelPreview()">Xem m&#224;n h&#236;nh Pixel</button>
           <button id="topCaptureBtn" onclick="captureUpload()">Ch&#7909;p &#7843;nh</button>
           <button id="topRecordBtn" onclick="recordUpload()">Quay video</button>
         </div>
@@ -407,6 +410,7 @@ HTML = r"""
               <div class="hint">Gi&#7899;i h&#7841;n t&#7915; 1 &#273;&#7871;n 300 gi&#226;y cho m&#7895;i l&#7847;n quay.</div>
             </div>
             <div class="button-row">
+              <button id="previewBtn" class="secondary" onclick="openPixelPreview()">Xem m&#224;n h&#236;nh Pixel</button>
               <button id="captureBtn" onclick="captureUpload()">Ch&#7909;p &#7843;nh t&#7915; Pixel v&#224; upload</button>
               <button id="recordBtn" onclick="recordUpload()">Quay video t&#7915; Pixel v&#224; upload</button>
             </div>
@@ -582,6 +586,22 @@ HTML = r"""
       document.getElementById("recordBtn").disabled = isBusy;
       document.getElementById("topCaptureBtn").disabled = isBusy;
       document.getElementById("topRecordBtn").disabled = isBusy;
+    }
+
+    async function openPixelPreview() {
+      const previewBtn = document.getElementById("previewBtn");
+      const topPreviewBtn = document.getElementById("topPreviewBtn");
+      previewBtn.disabled = true;
+      topPreviewBtn.disabled = true;
+      try {
+        const data = await api("/api/open-preview", {});
+        log(data);
+      } catch (err) {
+        log(err);
+      } finally {
+        previewBtn.disabled = false;
+        topPreviewBtn.disabled = false;
+      }
     }
 
     function renderStatus(data) {
@@ -1155,6 +1175,35 @@ def latest_inbox_image(cfg: pipeline.Settings) -> Path:
     return max(images, key=lambda p: p.stat().st_mtime)
 
 
+def find_scrcpy_exe() -> Path:
+    configured = os.environ.get("SCRCPY_PATH", "").strip()
+    candidates = [
+        Path(configured) if configured else None,
+        Path(r"C:\FastbootFirmwareFlasher\ExtraTools\scrcpy\scrcpy.exe"),
+    ]
+    which = shutil.which("scrcpy")
+    if which:
+        candidates.append(Path(which))
+    for candidate in candidates:
+        if candidate and candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        "Khong tim thay scrcpy.exe. Cai scrcpy hoac set SCRCPY_PATH trong .env."
+    )
+
+
+def open_camera_for_preview(cfg: pipeline.Settings) -> None:
+    pipeline.adb_command(
+        cfg,
+        "shell",
+        "am",
+        "start",
+        "-a",
+        "android.media.action.STILL_IMAGE_CAMERA",
+        check=False,
+    )
+
+
 @app.get("/")
 def index():
     return render_template_string(HTML)
@@ -1354,6 +1403,39 @@ def api_classify_latest():
         return jsonify({"image": str(image), "product": product, "score": score, "reason": reason})
     except Exception as exc:
         return error_response(exc)
+
+
+@app.post("/api/open-preview")
+def api_open_preview():
+    try:
+        cfg = settings()
+        scrcpy = find_scrcpy_exe()
+        open_camera_for_preview(cfg)
+        args = [
+            str(scrcpy),
+            "--stay-awake",
+            "--window-title",
+            "Pixel Product Agent - Camera Preview",
+        ]
+        creationflags = 0
+        if os.name == "nt":
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+        subprocess.Popen(
+            args,
+            cwd=str(scrcpy.parent),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creationflags,
+        )
+        return jsonify(
+            {
+                "status": "started",
+                "message": "Da mo man hinh Pixel bang scrcpy. Chinh goc san pham roi bam chup tren app.",
+                "scrcpy": str(scrcpy),
+            }
+        )
+    except Exception as exc:
+        return error_response(exc, 400)
 
 
 @app.post("/api/capture-upload")
