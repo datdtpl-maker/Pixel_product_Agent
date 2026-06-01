@@ -17,6 +17,7 @@ app = Flask(__name__)
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 DOC_EXTS = {".txt", ".csv", ".json", ".docx", ".pdf"}
+SUPPORTED_SEARCH_PROVIDERS = {"serpapi", "bing"}
 
 
 HTML = r"""
@@ -454,7 +455,7 @@ HTML = r"""
           <div class="panel-header">
             <div>
               <h2 class="panel-title">T&#236;m s&#7843;n ph&#7849;m tr&#234;n internet</h2>
-              <p class="panel-subtitle">Khi catalog kh&#244;ng nh&#7853;n ra s&#7843;n ph&#7849;m, agent s&#7869; d&#249;ng OpenAI/Gemini &#273;&#7885;c &#7843;nh, t&#7841;o truy v&#7845;n, t&#236;m h&#236;nh &#7843;nh web, &#273;&#7889;i chi&#7871;u v&#224; ch&#7881; t&#7921; t&#7841;o album khi &#273;&#7911; tin c&#7853;y. Google Custom Search JSON API c&#243; th&#7875; b&#7883; ch&#7863;n v&#7899;i project m&#7899;i; n&#234;n d&#249;ng SerpAPI ho&#7863;c Bing cho t&#224;i kho&#7843;n m&#7899;i.</p>
+              <p class="panel-subtitle">Khi catalog kh&#244;ng nh&#7853;n ra s&#7843;n ph&#7849;m, agent s&#7869; d&#249;ng OpenAI/Gemini &#273;&#7885;c &#7843;nh, t&#7841;o truy v&#7845;n, t&#236;m h&#236;nh &#7843;nh web, &#273;&#7889;i chi&#7871;u v&#224; ch&#7881; t&#7921; t&#7841;o album khi &#273;&#7911; tin c&#7853;y.</p>
             </div>
           </div>
           <div class="panel-body">
@@ -463,7 +464,6 @@ HTML = r"""
                 <label for="searchProvider">Search provider</label>
                 <select id="searchProvider">
                   <option value="serpapi">SerpAPI Google Images</option>
-                  <option value="google_cse">Google Custom Search</option>
                   <option value="bing">Bing Image Search</option>
                 </select>
               </div>
@@ -473,10 +473,6 @@ HTML = r"""
               </div>
             </div>
             <div class="two-col">
-              <div>
-                <label for="googleCseCx">Google CSE CX</label>
-                <input id="googleCseCx" autocomplete="off" placeholder="Ch&#7881; c&#7847;n khi d&#249;ng Google Custom Search">
-              </div>
               <div>
                 <label for="webConfidenceThreshold">Ng&#432;&#7905;ng t&#7921; t&#7841;o album</label>
                 <input id="webConfidenceThreshold" type="number" min="0" max="1" step="0.01" value="0.78">
@@ -747,14 +743,12 @@ HTML = r"""
     async function saveSearchSettings() {
       const provider = document.getElementById("searchProvider").value;
       const apiKey = document.getElementById("searchApiKey").value.trim();
-      const cx = document.getElementById("googleCseCx").value.trim();
       const threshold = Number(document.getElementById("webConfidenceThreshold").value || 0.78);
       document.getElementById("saveSearchSettingsBtn").disabled = true;
       try {
         const data = await api("/api/settings/search", {
           provider,
           api_key: apiKey,
-          google_cse_cx: cx,
           confidence_threshold: threshold
         });
         document.getElementById("searchApiKey").value = "";
@@ -770,9 +764,8 @@ HTML = r"""
     async function checkSearchApi() {
       const provider = document.getElementById("searchProvider").value;
       const apiKey = document.getElementById("searchApiKey").value.trim();
-      const cx = document.getElementById("googleCseCx").value.trim();
       try {
-        const data = await api("/api/settings/check-search", {provider, api_key: apiKey, google_cse_cx: cx});
+        const data = await api("/api/settings/check-search", {provider, api_key: apiKey});
         document.getElementById("searchMetric").innerHTML = data.ok
           ? `<span class="badge ok">Search OK</span>`
           : `<span class="badge warn">${data.status}</span>`;
@@ -865,8 +858,6 @@ def save_env_values(values: dict[str, str]) -> None:
         "OPENAI_API_KEY",
         "GEMINI_API_KEY",
         "SERPAPI_API_KEY",
-        "GOOGLE_CSE_API_KEY",
-        "GOOGLE_CSE_CX",
         "BING_SEARCH_API_KEY",
     ]
     lines: list[str] = []
@@ -891,22 +882,9 @@ def active_search_key(values: dict[str, str], provider: str) -> str:
     provider = provider.lower().strip()
     if provider == "serpapi":
         return os.environ.get("SERPAPI_API_KEY") or values.get("SERPAPI_API_KEY", "")
-    if provider == "google_cse":
-        return os.environ.get("GOOGLE_CSE_API_KEY") or values.get("GOOGLE_CSE_API_KEY", "")
     if provider == "bing":
         return os.environ.get("BING_SEARCH_API_KEY") or values.get("BING_SEARCH_API_KEY", "")
     return ""
-
-
-def normalize_google_cse_cx(value: str) -> str:
-    value = (value or "").strip()
-    if "cx=" not in value:
-        return value.strip().strip('"').strip("'")
-    tail = value.split("cx=", 1)[1]
-    for separator in ['"', "'", "&", ">", " ", "\n", "\r"]:
-        if separator in tail:
-            tail = tail.split(separator, 1)[0]
-    return tail.strip().strip('"').strip("'")
 
 
 def parse_float_input(value: Any, default: float) -> float:
@@ -979,8 +957,6 @@ def readable_http_error(response) -> str:
                 if isinstance(detail, dict) and detail.get("reason"):
                     parts.append(str(detail["reason"]).strip())
         message = " | ".join(part for part in parts if part)
-        if "does not have the access to Custom Search JSON API" in message:
-            message += " | Google Custom Search JSON API is closed to many new projects; use SerpAPI or Bing Image Search instead."
         return message[:700] if message else json.dumps(data, ensure_ascii=False)[:700]
 
     if isinstance(error, str):
@@ -996,6 +972,8 @@ def check_search_key(provider: str, values: dict[str, str]) -> dict[str, Any]:
     import requests
 
     provider = provider.lower().strip()
+    if provider not in SUPPORTED_SEARCH_PROVIDERS:
+        raise ValueError(f"Search provider khong hop le: {provider}")
     if provider == "serpapi":
         api_key = values.get("SERPAPI_API_KEY") or os.environ.get("SERPAPI_API_KEY", "")
         if not api_key:
@@ -1003,16 +981,6 @@ def check_search_key(provider: str, values: dict[str, str]) -> dict[str, Any]:
         response = requests.get(
             "https://serpapi.com/search.json",
             params={"engine": "google_images", "q": "test product", "api_key": api_key},
-            timeout=30,
-        )
-    elif provider == "google_cse":
-        api_key = values.get("GOOGLE_CSE_API_KEY") or os.environ.get("GOOGLE_CSE_API_KEY", "")
-        cx = normalize_google_cse_cx(values.get("GOOGLE_CSE_CX") or os.environ.get("GOOGLE_CSE_CX", ""))
-        if not api_key or not cx:
-            raise ValueError("Chua co GOOGLE_CSE_API_KEY hoac GOOGLE_CSE_CX.")
-        response = requests.get(
-            "https://www.googleapis.com/customsearch/v1",
-            params={"key": api_key, "cx": cx, "q": "test product", "searchType": "image", "num": 1},
             timeout=30,
         )
     elif provider == "bing":
@@ -1025,8 +993,6 @@ def check_search_key(provider: str, values: dict[str, str]) -> dict[str, Any]:
             params={"q": "test product", "count": 1},
             timeout=30,
         )
-    else:
-        raise ValueError(f"Search provider khong hop le: {provider}")
     if response.status_code == 200:
         return {"ok": True, "status": "connected", "message": f"{provider} search API dang hoat dong."}
     if response.status_code in {400, 401, 403}:
@@ -1146,7 +1112,10 @@ def api_status():
     adb = pipeline.adb_command(cfg, "devices", check=False).stdout.splitlines()
     devices = [line.split()[0] for line in adb if "\tdevice" in line]
     values = load_env_values()
-    search_key = active_search_key(values, cfg.web_enrichment_provider)
+    search_provider = cfg.web_enrichment_provider
+    if search_provider not in SUPPORTED_SEARCH_PROVIDERS:
+        search_provider = "serpapi"
+    search_key = active_search_key(values, search_provider)
     return jsonify(
         {
             "adb_device": devices[0] if devices else "",
@@ -1157,7 +1126,7 @@ def api_status():
             "gemini_key_masked": masked_key(os.environ.get("GEMINI_API_KEY") or values.get("GEMINI_API_KEY")),
             "search_key": bool(search_key),
             "search_key_masked": masked_key(search_key),
-            "search_provider": cfg.web_enrichment_provider,
+            "search_provider": search_provider,
             "web_enrichment_enabled": cfg.web_enrichment_enabled,
             "web_confidence_threshold": cfg.web_enrichment_confidence_threshold,
             "ai_provider": cfg.ai_provider if cfg.classification_mode == "ai" else "offline",
@@ -1224,20 +1193,17 @@ def api_save_search_settings():
         payload = request.json or {}
         provider = (payload.get("provider") or "serpapi").lower().strip()
         api_key = (payload.get("api_key") or "").strip()
-        cx = normalize_google_cse_cx(payload.get("google_cse_cx") or "")
         threshold = parse_float_input(payload.get("confidence_threshold"), 0.78)
-        if provider not in {"serpapi", "google_cse", "bing"}:
+        if provider not in SUPPORTED_SEARCH_PROVIDERS:
             raise ValueError("Search provider khong hop le.")
         values = load_env_values()
+        values.pop("GOOGLE_CSE_API_KEY", None)
+        values.pop("GOOGLE_CSE_CX", None)
         if api_key:
             if provider == "serpapi":
                 values["SERPAPI_API_KEY"] = api_key
-            elif provider == "google_cse":
-                values["GOOGLE_CSE_API_KEY"] = api_key
             elif provider == "bing":
                 values["BING_SEARCH_API_KEY"] = api_key
-        if cx:
-            values["GOOGLE_CSE_CX"] = cx
         save_env_values(values)
         update_classification_config(
             {
@@ -1265,16 +1231,13 @@ def api_check_search():
         provider = (payload.get("provider") or "serpapi").lower().strip()
         values = load_env_values()
         api_key = (payload.get("api_key") or "").strip()
-        cx = normalize_google_cse_cx(payload.get("google_cse_cx") or "")
+        if provider not in SUPPORTED_SEARCH_PROVIDERS:
+            raise ValueError("Search provider khong hop le.")
         if api_key:
             if provider == "serpapi":
                 values["SERPAPI_API_KEY"] = api_key
-            elif provider == "google_cse":
-                values["GOOGLE_CSE_API_KEY"] = api_key
             elif provider == "bing":
                 values["BING_SEARCH_API_KEY"] = api_key
-        if cx:
-            values["GOOGLE_CSE_CX"] = cx
         return jsonify(check_search_key(provider, values))
     except Exception as exc:
         return error_response(exc, 400)

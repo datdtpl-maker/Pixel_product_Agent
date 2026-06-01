@@ -59,6 +59,10 @@ def load_settings(config_path: Path) -> Settings:
         path = Path(value)
         return path if path.is_absolute() else root / path
 
+    search_provider = config["classification"].get("web_enrichment_provider", "serpapi")
+    if search_provider not in {"serpapi", "bing"}:
+        search_provider = "serpapi"
+
     return Settings(
         root=root,
         client_secret_file=resolve(config["google"]["client_secret_file"]),
@@ -75,7 +79,7 @@ def load_settings(config_path: Path) -> Settings:
         openai_model=config["classification"].get("openai_model", "gpt-4.1-mini"),
         gemini_model=config["classification"].get("gemini_model", "gemini-2.5-flash"),
         web_enrichment_enabled=bool(config["classification"].get("web_enrichment_enabled", False)),
-        web_enrichment_provider=config["classification"].get("web_enrichment_provider", "serpapi"),
+        web_enrichment_provider=search_provider,
         web_enrichment_confidence_threshold=float(
             config["classification"].get("web_enrichment_confidence_threshold", 0.78)
         ),
@@ -582,28 +586,6 @@ def web_search_candidates(settings: Settings, queries: list[str]) -> list[dict[s
                         "source": item.get("source", ""),
                         "link": item.get("link", ""),
                         "thumbnail": item.get("thumbnail", ""),
-                    }
-                )
-        elif provider == "google_cse":
-            api_key = os.environ.get("GOOGLE_CSE_API_KEY")
-            cx = os.environ.get("GOOGLE_CSE_CX")
-            if not api_key or not cx:
-                continue
-            response = requests.get(
-                "https://www.googleapis.com/customsearch/v1",
-                params={"key": api_key, "cx": cx, "q": query, "searchType": "image", "num": 6},
-                timeout=45,
-            )
-            if response.status_code >= 400:
-                continue
-            for item in response.json().get("items", [])[:6]:
-                candidates.append(
-                    {
-                        "query": query,
-                        "title": item.get("title", ""),
-                        "source": item.get("displayLink", ""),
-                        "link": item.get("link", ""),
-                        "thumbnail": item.get("image", {}).get("thumbnailLink", ""),
                     }
                 )
         elif provider == "bing":
