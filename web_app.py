@@ -196,7 +196,7 @@ HTML = r"""
       background: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
       box-shadow: 0 6px 20px rgba(225, 29, 72, 0.4);
     }
-    input, select {
+    input, select, textarea {
       width: 100%;
       min-height: 44px;
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -207,12 +207,12 @@ HTML = r"""
       outline: none;
       transition: all 0.2s;
     }
-    body.theme-light input, body.theme-light select {
+    body.theme-light input, body.theme-light select, body.theme-light textarea {
       background: #fff;
       border-color: #cbd5e1;
       color: var(--text);
     }
-    input:focus, select:focus {
+    input:focus, select:focus, textarea:focus {
       border-color: var(--brand);
       box-shadow: 0 0 0 3px var(--brand-glow);
     }
@@ -928,7 +928,7 @@ HTML = r"""
           <!-- Prompt input -->
           <div>
             <label for="posterPrompt">Yêu cầu tạo ảnh mới</label>
-            <textarea id="posterPrompt" placeholder="Vui lòng mô tả ý tưởng poster của bạn...&#10;(Ví dụ: Đặt sản phẩm này trên mặt cát, có sóng biển vỗ nhẹ bên cạnh, ánh sáng tự nhiên)" style="width: 100%; height: 110px; background: rgba(13,17,28,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; color: var(--text); padding: 12px; outline: none; resize: none; font-size: 13px; line-height: 1.4; transition: border-color 0.2s;" oninput="updatePromptCount()"></textarea>
+            <textarea id="posterPrompt" placeholder="Vui lòng mô tả ý tưởng poster của bạn...&#10;(Ví dụ: Đặt sản phẩm này trên mặt cát, có sóng biển vỗ nhẹ bên cạnh, ánh sáng tự nhiên)" style="height: 110px; resize: none; font-size: 13px; line-height: 1.4;" oninput="updatePromptCount()"></textarea>
             <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--muted);">
               <span onclick="insertPromptTemplate()" style="cursor: pointer; color: var(--brand); font-weight: 700;">✨ Dùng mẫu prompt</span>
               <span id="promptCharCount">0/1000</span>
@@ -967,7 +967,10 @@ HTML = r"""
           <!-- Export Folder -->
           <div>
             <label for="posterExportDir">Thư mục xuất hình</label>
-            <input id="posterExportDir" placeholder="Mặc định: Thư mục Drive hiện tại" style="font-size: 12px; min-height: 38px;">
+            <div class="field-action">
+              <input id="posterExportDir" placeholder="Mặc định: Thư mục Drive hiện tại" style="font-size: 12px; min-height: 38px;">
+              <button type="button" class="secondary" onclick="browseExportDirectory()" style="min-height: 38px; padding: 0 16px;">Chọn</button>
+            </div>
           </div>
           
           <!-- Submit button -->
@@ -1259,6 +1262,19 @@ HTML = r"""
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({api_key: key, export_dir: dir})
     });
+  }
+  
+  async function browseExportDirectory() {
+    try {
+      const r = await fetch("/api/utils/select-directory", { method: "POST" });
+      const d = await r.json();
+      if (d.directory) {
+        document.getElementById("posterExportDir").value = d.directory;
+        await saveOpenAIConfig();
+      }
+    } catch(e) {
+      alert("Không thể mở hộp thoại chọn thư mục: " + (e.error || e.message || JSON.stringify(e)));
+    }
   }
   
   async function generatePoster() {
@@ -1950,6 +1966,29 @@ def api_record():
         return error_response(exc)
     finally:
         OPERATION_LOCK.release()
+
+
+@app.post("/api/utils/select-directory")
+def api_select_directory():
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        
+        # Tạo cửa sổ gốc ẩn
+        root = tk.Tk()
+        root.withdraw()
+        # Đưa lên phía trước
+        root.attributes('-topmost', True)
+        
+        selected_dir = filedialog.askdirectory(title="Chọn thư mục xuất hình")
+        root.destroy()
+        
+        if selected_dir:
+            return jsonify({"directory": os.path.normpath(selected_dir)})
+        else:
+            return jsonify({"directory": ""})
+    except Exception as exc:
+        return error_response(exc, 500)
 
 
 @app.get("/api/openai/config")
