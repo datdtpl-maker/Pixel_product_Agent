@@ -1,173 +1,121 @@
 # Pixel Drive Capture
 
-Pixel Drive Capture là ứng dụng web local dùng để điều khiển điện thoại Google Pixel chụp ảnh hoặc quay video sản phẩm và lưu trực tiếp vào thư mục Google Drive for desktop trên Windows.
+Ứng dụng Web cục bộ (Local Web App) điều khiển điện thoại Google Pixel chụp ảnh/quay phim sản phẩm và tự động đồng bộ hóa trực tiếp vào thư mục Google Drive (thông qua Google Drive for Desktop) trên Windows. 
 
-Luồng web hiện tại không dùng AI phân loại, không tạo album Google Photos và không cần OAuth Google Photos. Nhân viên chủ động tạo hoặc chọn đúng thư mục sản phẩm trước khi chụp. Sau khi file đã được chép và kiểm tra thành công trong Google Drive đồng bộ, app mới xóa file gốc khỏi Pixel.
+Giao diện ứng dụng được thiết kế hiện đại (Sleek Glassmorphism Dark/Light Mode), giúp tối ưu hóa quy trình làm việc cho nhân viên studio chụp ảnh sản phẩm một cách nhanh chóng và an toàn.
 
-## Quy trình vận hành
+---
 
-1. Mở giao diện web.
-2. Kiểm tra trạng thái Pixel ADB và thư mục Drive.
-3. Tạo thư mục sản phẩm mới hoặc chọn thư mục đã có.
-   Có thể xóa thư mục rỗng được chọn trực tiếp trên giao diện web.
-4. Bấm **Xem màn hình Pixel** để chỉnh góc máy bằng scrcpy.
-5. Bấm **Chụp ảnh** hoặc **Quay video**.
-6. Theo dõi log: kéo file từ Pixel, chép file vào Drive, xác minh dung lượng và xóa file khỏi Pixel.
-7. Bấm **Bật / tắt màn hình Pixel** khi cần khóa hoặc đánh thức màn hình, giúp tránh màn hình sáng liên tục.
+## ✨ Tính Năng Nổi Bật
 
-Thư mục Drive mặc định:
+- **Điều khiển Pixel linh hoạt**: Kết nối và điều khiển Pixel thông qua cáp USB hoặc mạng Wi-Fi không dây nội bộ.
+- **Xem trước thời gian thực (Preview)**: Tích hợp trình chiếu màn hình Pixel qua `scrcpy` để căn góc máy và lấy nét trực tiếp từ máy tính.
+- **Đồng bộ Google Drive an toàn**: Tự động chuyển tệp tin ảnh/video vào đúng thư mục sản phẩm được lựa chọn trên Google Drive for Desktop.
+- **Cơ chế chống mất file**: Xác minh tính toàn vẹn của tệp tin trước khi tiến hành xóa file gốc trên điện thoại để giải phóng bộ nhớ.
+- **Giao diện hiện đại**: Hỗ trợ chuyển đổi chủ động giao diện Sáng/Tối (Light/Dark Mode).
 
-```text
-G:\My Drive\Test hình ảnh shopee
-```
+---
 
-Có thể đổi đường dẫn này trực tiếp trên giao diện web.
+## 💻 Yêu Cầu Hệ Thống
 
-## Yêu cầu
+- **Hệ điều hành**: Windows 10 / 11.
+- **Môi trường**: Python 3.11 trở lên.
+- **Công cụ đi kèm**:
+  - Google Drive for Desktop (đã đăng nhập tài khoản đồng bộ).
+  - Android SDK Platform Tools (đã thêm lệnh `adb` vào PATH).
+  - [scrcpy](https://github.com/Genymobile/scrcpy) (để trình chiếu màn hình).
 
-- Windows 10 hoặc Windows 11.
-- Python 3.11 trở lên.
-- Google Drive for desktop đã đăng nhập và đồng bộ ổ `G:`.
-- Google Pixel hoặc điện thoại Android có bật USB debugging.
-- ADB gọi được bằng lệnh `adb`.
-- scrcpy để xem trước màn hình Pixel.
+---
 
-Khuyến nghị: tắt tính năng backup Google Photos trên điện thoại dùng để chụp sản phẩm. App chỉ xóa file local khỏi Pixel; app không xóa ảnh đã backup trên cloud Google Photos.
+## 🚀 Hướng Dẫn Cài Đặt Nhanh
 
-## Cài đặt
+1. **Tải mã nguồn và cài đặt thư viện**:
+   ```powershell
+   git clone https://github.com/datdtpl-maker/Pixel-Drive-Capture.git
+   cd Pixel-Drive-Capture
+   python -m pip install -r requirements.txt
+   ```
 
-```powershell
-git clone https://github.com/datdtpl-maker/Pixel-Drive-Capture.git
-cd Pixel-Drive-Capture
-python -m pip install -r requirements.txt
-Copy-Item config.example.json config.json
-```
+2. **Khởi tạo tệp cấu hình**:
+   ```powershell
+   Copy-Item config.example.json config.json
+   ```
 
-Kiểm tra kết nối Pixel:
+3. **Thiết lập điện thoại Pixel**:
+   * Kích hoạt **Tùy chọn nhà phát triển** và bật **Gỡ lỗi USB** trên Pixel.
+   * Cắm cáp USB vào máy tính và xác nhận tin cậy thiết bị.
 
-```powershell
-adb devices
-```
+---
 
-Kết quả hợp lệ:
+## 🛠️ Cấu Hình Cục Bộ (`config.json`)
 
-```text
-List of devices attached
-23241JEGR00378    device
-```
-
-Nếu có nhiều điện thoại, điền serial vào `config.json`:
+Mẫu cấu hình cơ bản (không chứa thông tin cá nhân):
 
 ```json
-"pixel": {
-  "adb_serial": "23241JEGR00378",
-  "camera_dir": "/sdcard/DCIM/Camera"
+{
+  "paths": {
+    "inbox_dir": "inbox",
+    "processed_dir": "processed",
+    "drive_root_dir": "G:\\My Drive\\Ten_Thu_Muc_Chinh",
+    "selected_drive_folder": ""
+  },
+  "pixel": {
+    "adb_serial": "",
+    "camera_dir": "/sdcard/DCIM/Camera",
+    "connection_mode": "usb",
+    "wifi_ip": ""
+  }
 }
 ```
 
-## Cấu hình scrcpy
+*Nếu bạn có nhiều thiết bị Android cắm vào máy tính, hãy điền mã serial của Pixel vào mục `adb_serial` để định tuyến chính xác.*
 
-App tìm `scrcpy.exe` theo thứ tự:
+---
 
-1. Biến môi trường `SCRCPY_PATH`.
-2. Đường dẫn mặc định:
+## ⚙️ Hướng Dẫn Vận Hành
 
-```text
-C:\FastbootFirmwareFlasher\ExtraTools\scrcpy\scrcpy.exe
-```
-
-3. Lệnh `scrcpy` trong `PATH`.
-
-Nếu scrcpy nằm ở vị trí khác, tạo file `.env`:
-
-```text
-SCRCPY_PATH=C:\path\to\scrcpy.exe
-```
-
-## Chạy ứng dụng
-
+### 1. Khởi chạy ứng dụng Web
+Chạy lệnh khởi chạy máy chủ:
 ```powershell
 python .\web_app.py
 ```
+Mở trình duyệt và truy cập: **`http://127.0.0.1:8765`**
 
-Mở trình duyệt:
-
-```text
-http://pixel-drive-capture:8765
-```
-
-Để dùng tên miền nội bộ, mở PowerShell bằng quyền Administrator và chạy:
-
+*(Tùy chọn) Để đăng ký và sử dụng tên miền nội bộ `http://pixel-drive-capture:8765`, hãy chạy PowerShell bằng quyền Administrator và thực thi:*
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\add_internal_domain.ps1
 ```
 
-URL dự phòng: `http://127.0.0.1:8765`.
+### 2. Tự động khởi chạy cùng Windows
+* Cài đặt Shortcut vào thư mục Startup:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\install_startup_shortcut.ps1
+  ```
+* Gỡ bỏ cài đặt tự khởi động:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\uninstall_startup_shortcut.ps1
+  ```
 
-## Khởi động cùng Windows
+---
 
-Cài shortcut startup:
+## 🔒 Cơ Chế Bảo Vệ Tệp Tin (Chống Mất File)
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install_startup_shortcut.ps1
-```
+Nhằm đảm bảo an toàn tuyệt đối cho dữ liệu ảnh và video sản phẩm, ứng dụng áp dụng quy trình xử lý 6 bước nghiêm ngặt:
+1. **Định vị thời gian**: Ghi nhận mốc thời gian bắt đầu thao tác chụp/quay.
+2. **Kéo tệp tạm**: Tìm kiếm và sao chép tệp tin mới nhất từ điện thoại vào thư mục tạm `inbox` trên máy tính.
+3. **Đồng bộ Drive**: Chép tệp tin sang thư mục Google Drive đích dưới định dạng tệp tạm thời `.part`.
+4. **Xác minh dung lượng**: So sánh dung lượng byte của tệp tin đích và tệp tin gốc để đảm bảo quá trình đồng bộ hoàn tất 100%.
+5. **Chốt tệp**: Đổi tên tệp tin tạm `.part` thành tên chính thức trên Google Drive.
+6. **Giải phóng bộ nhớ**: Xóa tệp tin gốc trên điện thoại Pixel và tệp tạm trong thư mục `inbox`.
 
-Hoặc cài Scheduled Task:
+*Nếu xảy ra bất kỳ lỗi kết nối Drive nào ở bước trung gian, tệp gốc trên Pixel luôn được giữ nguyên.*
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install_startup_task.ps1
-```
+---
 
-Các script tự nhận diện thư mục cài đặt hiện tại, nên có thể clone repo vào vị trí khác mà không cần sửa đường dẫn thủ công.
+## 🛡️ Bảo Mật & Riêng Tư
 
-Gỡ cài đặt:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\uninstall_startup_shortcut.ps1
-powershell -ExecutionPolicy Bypass -File .\uninstall_startup_task.ps1
-```
-
-## Cấu hình Drive
-
-File `config.json` chứa:
-
-```json
-"paths": {
-  "inbox_dir": "inbox",
-  "processed_dir": "processed",
-  "drive_root_dir": "G:\\My Drive\\Test hình ảnh shopee",
-  "selected_drive_folder": ""
-}
-```
-
-- `drive_root_dir`: thư mục chính chứa các thư mục sản phẩm.
-- `selected_drive_folder`: thư mục sản phẩm đang chọn gần nhất. Giao diện web tự cập nhật giá trị này.
-- `inbox_dir`: thư mục tạm local trong quá trình kéo file từ Pixel.
-
-## Cơ chế chống mất file
-
-Khi chụp hoặc quay, app thực hiện theo thứ tự:
-
-1. Ghi nhận thời điểm bắt đầu thao tác.
-2. Chỉ lấy file mới được Pixel tạo sau thời điểm đó.
-3. Kéo file vào thư mục `inbox`.
-4. Chép sang thư mục Drive bằng file tạm `.part`.
-5. So sánh dung lượng nguồn và đích.
-6. Đổi tên file `.part` thành tên chính thức.
-7. Chỉ sau khi xác minh thành công mới xóa file khỏi Pixel và xóa file tạm local.
-
-Nếu Drive lỗi hoặc bị ngắt kết nối, app giữ nguyên file trên Pixel.
-
-App chỉ cho phép một tác vụ chụp hoặc quay chạy tại một thời điểm. Nếu nhiều tab trình duyệt cùng thao tác, yêu cầu đến sau sẽ bị từ chối để tránh trộn file giữa hai lượt.
-
-## File riêng tư
-
-Không commit các file local hoặc khóa API:
-
-```text
-.env
-config.json
-inbox/
-processed/
-logs/
-```
+Các tệp cấu hình chứa API key, token hoặc thông tin cá nhân được bỏ qua hoàn toàn thông qua `.gitignore` và không bao giờ được đẩy lên kho chứa công cộng:
+- `.env`
+- `config.json`
+- `client_secret.json` / `token.json`
+- Các thư mục log và dữ liệu chạy cục bộ (`inbox/`, `processed/`, `logs/`)
