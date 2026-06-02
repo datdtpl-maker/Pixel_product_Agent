@@ -933,7 +933,12 @@ HTML = r"""
 
 def settings() -> pipeline.Settings:
     pipeline.load_dotenv(ROOT)
-    return pipeline.load_settings(CONFIG_PATH)
+    cfg = pipeline.load_settings(CONFIG_PATH)
+    try:
+        cfg.adb_serial = adb_device_serial(cfg)
+    except Exception:
+        pass
+    return cfg
 
 
 def load_config() -> dict[str, Any]:
@@ -1070,6 +1075,15 @@ def adb_device_serial(cfg: pipeline.Settings) -> str:
             raise ValueError("Chưa cấu hình địa chỉ IP của Pixel để kết nối không dây.")
         target_serial = f"{wifi_ip}:5555"
         
+        # Nếu có các kết nối mạng khác đang tồn tại không khớp với IP mục tiêu, ngắt kết nối chúng
+        network_devices = [d for d in devices if ":" in d and d != target_serial]
+        if network_devices:
+            for nd in network_devices:
+                pipeline.adb_command(cfg, "disconnect", nd, check=False)
+            # Quét lại danh sách sau khi dọn dẹp
+            output = pipeline.adb_command(cfg, "devices", check=False).stdout.splitlines()
+            devices = [line.split()[0] for line in output if "\tdevice" in line]
+            
         # Nếu chưa kết nối wifi, thử adb connect
         if target_serial not in devices:
             pipeline.adb_command(cfg, "connect", target_serial, check=False)
@@ -1192,8 +1206,10 @@ def api_status():
     except Exception:
         folders, ready = [], False
         
+    current_device = cfg.adb_serial if cfg.adb_serial else (devices[0] if devices else "")
+        
     return jsonify({
-        "adb_device": devices[0] if devices else "", 
+        "adb_device": current_device, 
         "drive_root": str(drive_root()), 
         "drive_ready": ready, 
         "selected_folder": selected_folder_name(), 
