@@ -687,6 +687,14 @@ HTML = r"""
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
           Bật / tắt Pixel
         </button>
+        <button class="secondary" onclick="zoomIn()" title="Phóng to Camera">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          Zoom +
+        </button>
+        <button class="secondary" onclick="zoomOut()" title="Thu nhỏ Camera">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          Zoom -
+        </button>
         <button class="btn-capture" onclick="capture()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
           Chụp ảnh
@@ -920,6 +928,8 @@ HTML = r"""
   async function selectFolder(){try{const d=await api("/api/select-folder",{name:selected()});log(d);await refresh()}catch(e){log(e)}}
   async function openPreview(){try{log(await api("/api/open-preview",{}))}catch(e){log(e)}}
   async function togglePixelScreen(){try{log(await api("/api/toggle-screen",{}));await refresh()}catch(e){log(e)}}
+  async function zoomIn(){try{log(await api("/api/pixel/zoom-in",{}))}catch(e){log(e)}}
+  async function zoomOut(){try{log(await api("/api/pixel/zoom-out",{}))}catch(e){log(e)}}
   async function run(path,body){if(!requireFolder()||busy)return;setBusy(true);await api("/api/events/clear",{}).catch(()=>{});lastId=0;startPoll();try{log(await api(path,body));await refresh()}catch(e){log(e)}finally{await stopPoll();setBusy(false)}}
   function capture(){run("/api/capture",{folder:selected()})}
   function record(){run("/api/record",{folder:selected(),duration:Number(document.getElementById("duration").value||10)})}
@@ -1466,6 +1476,28 @@ def api_record():
         return error_response(exc)
     finally:
         OPERATION_LOCK.release()
+
+
+@app.post("/api/pixel/zoom-in")
+def api_pixel_zoom_in():
+    try:
+        cfg = settings()
+        pipeline.adb_command(cfg, "shell", "input", "keyevent", "24", check=False)
+        add_event({"step": "pixel_zoom_in", "message": "Đã phóng to camera Pixel (Zoom +)."})
+        return jsonify({"status": "Đã phóng to camera Pixel."})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/pixel/zoom-out")
+def api_pixel_zoom_out():
+    try:
+        cfg = settings()
+        pipeline.adb_command(cfg, "shell", "input", "keyevent", "25", check=False)
+        add_event({"step": "pixel_zoom_out", "message": "Đã thu nhỏ camera Pixel (Zoom -)."})
+        return jsonify({"status": "Đã thu nhỏ camera Pixel."})
+    except Exception as exc:
+        return error_response(exc, 400)
 
 
 if __name__ == "__main__":
