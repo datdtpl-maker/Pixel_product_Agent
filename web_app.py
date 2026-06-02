@@ -939,13 +939,13 @@ HTML = r"""
           <div>
             <label>Số lượng tạo</label>
             <div class="quantity-selector" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
-              <button type="button" class="secondary select-btn" onclick="selectQuantity(1)">1</button>
-              <button type="button" class="secondary select-btn" onclick="selectQuantity(2)">2</button>
-              <button type="button" class="select-btn" style="background: var(--brand);" id="btnQty4" onclick="selectQuantity(4)">4</button>
-              <button type="button" class="secondary select-btn" onclick="selectQuantity(6)">6</button>
-              <button type="button" class="secondary select-btn" onclick="selectQuantity(9)">9</button>
+              <button type="button" class="select-btn" id="btnQty1" onclick="selectQuantity(this, 1)">1</button>
+              <button type="button" class="secondary select-btn" onclick="selectQuantity(this, 2)">2</button>
+              <button type="button" class="secondary select-btn" onclick="selectQuantity(this, 4)">4</button>
+              <button type="button" class="secondary select-btn" onclick="selectQuantity(this, 6)">6</button>
+              <button type="button" class="secondary select-btn" onclick="selectQuantity(this, 9)">9</button>
             </div>
-            <input type="hidden" id="posterQuantity" value="4">
+            <input type="hidden" id="posterQuantity" value="1">
           </div>
           
           <!-- Aspect ratio -->
@@ -1216,13 +1216,12 @@ HTML = r"""
     document.getElementById("promptCharCount").textContent = `${prompt.length}/1000`;
   }
   
-  function selectQuantity(qty) {
+  function selectQuantity(btn, qty) {
     document.getElementById("posterQuantity").value = qty;
-    document.querySelectorAll(".quantity-selector .select-btn").forEach(btn => {
-      btn.style.background = "rgba(255, 255, 255, 0.06)";
+    document.querySelectorAll(".quantity-selector .select-btn").forEach(b => {
+      b.classList.add("secondary");
     });
-    // Tìm button tương ứng và làm nổi bật
-    event.currentTarget.style.background = "var(--brand)";
+    btn.classList.remove("secondary");
   }
   
   const promptTemplates = [
