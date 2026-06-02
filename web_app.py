@@ -13,6 +13,10 @@ from typing import Any
 
 from flask import Flask, jsonify, render_template_string, request
 
+import base64
+import requests
+from concurrent.futures import ThreadPoolExecutor
+
 import photo_pipeline as pipeline
 
 
@@ -652,6 +656,97 @@ HTML = r"""
       .content { padding: 16px; }
       .buttons button, .actions button { width: 100%; }
     }
+    /* Poster Editor Styles */
+    .spinner {
+      border: 4px solid var(--soft);
+      border-top-color: var(--brand);
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .thumbnail-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--panel-border);
+      background: var(--soft);
+    }
+    .thumbnail-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .thumbnail-wrapper .remove-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--danger);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      padding: 0;
+      min-height: auto;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      transition: background 0.2s;
+    }
+    .thumbnail-wrapper .remove-btn:hover {
+      background: var(--danger-hover);
+    }
+    .poster-card {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--panel-border);
+      background: var(--soft);
+      box-shadow: var(--shadow);
+      transition: all 0.3s;
+    }
+    .poster-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(59,130,246,0.3);
+    }
+    .poster-card img {
+      width: 100%;
+      height: auto;
+      aspect-ratio: inherit;
+      display: block;
+      object-fit: contain;
+      background: #000;
+    }
+    .poster-card .card-actions {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%);
+      padding: 24px 16px 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .poster-card:hover .card-actions {
+      opacity: 1;
+    }
+    .quantity-selector button {
+      min-height: 38px;
+      padding: 4px;
+    }
   </style>
 </head>
 <body>
@@ -665,131 +760,263 @@ HTML = r"""
       <div><span>Pixel ADB</span><span id="navAdb">...</span></div>
     </div>
   </aside>
-  <main class="main">
-    <header class="topbar">
-      <div>
-        <h2>Trung tâm chụp sản phẩm</h2>
-        <p>Chọn thư mục trước, sau đó chụp hoặc quay từ Pixel.</p>
-      </div>
-      <div class="actions">
-        <button id="themeToggleBtn" class="secondary" onclick="toggleTheme()">
-          <!-- Chèn icon SVG tự động bằng Javascript -->
-        </button>
-        <button class="ghost" onclick="refresh()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-          Làm mới
-        </button>
-        <button class="secondary" onclick="openPreview()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-          Xem Pixel
-        </button>
-        <button class="secondary" onclick="togglePixelScreen()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
-          Bật / tắt Pixel
-        </button>
-        <button class="btn-capture" onclick="capture()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-          Chụp ảnh
-        </button>
-        <button class="btn-record" onclick="record()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
-          Quay video
-        </button>
-      </div>
-    </header>
-    <div class="content">
-      <div class="workspace">
-      <div class="work-main">
-      <section class="metrics">
-        <div class="metric"><small>Pixel ADB</small><strong id="adbMetric"><span class="badge warn">Đang kiểm tra</span></strong></div>
-        <div class="metric"><small>Thư mục Drive</small><strong id="driveMetric"><span class="badge warn">Đang kiểm tra</span></strong></div>
-        <div class="metric"><small>Thư mục đang chọn</small><strong id="selectedMetric">Chưa chọn</strong></div>
-        <div class="metric"><small>Số thư mục sản phẩm</small><strong id="folderMetric">0</strong></div>
-        <div class="metric"><small>Trạng thái tác vụ</small><strong id="busyMetric"><span class="badge ok">Sẵn sàng</span></strong></div>
-      </section>
-
-      <section class="layout">
-        <div class="panel">
-          <div class="panel-head"><h3>Thư mục Google Drive</h3><p>App ghi file trực tiếp vào thư mục Google Drive for desktop đang đồng bộ trên máy tính.</p></div>
-          <div class="panel-body">
-            <div class="field-action">
-              <div><label for="driveRoot">Đường dẫn thư mục chính</label><input id="driveRoot" value="G:\My Drive\Test hình ảnh shopee"></div>
-              <button onclick="saveDriveRoot()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                Lưu & quét lại
-              </button>
-            </div>
-            <div class="two">
-              <div><label for="folderSelect">Chọn thư mục sản phẩm</label><select id="folderSelect" onchange="selectFolder()"><option value="">-- Chưa chọn thư mục --</option></select></div>
-              <div><label for="newFolder">Tạo thư mục sản phẩm mới</label><div class="field-action"><input id="newFolder" placeholder="Ví dụ: Eskar Tears 15ml"><button onclick="createFolder()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Tạo</button></div></div>
-            </div>
-            <div class="buttons">
-              <button class="secondary" onclick="scanFolders()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                Quét lại thư mục
-              </button>
-              <button class="danger" onclick="deleteFolder()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                Xóa thư mục đang chọn
-              </button>
-            </div>
-            <div class="hint">Bắt buộc chọn đúng thư mục sản phẩm trước khi chụp hoặc quay. App không tự phân loại và không tự tạo album Google Photos.</div>
-          </div>
+  <main class="main" style="display: flex; flex-direction: column;">
+    <div id="captureDashboard" style="display: block; width: 100%;">
+      <header class="topbar">
+        <div>
+          <h2>Trung tâm chụp sản phẩm</h2>
+          <p>Chọn thư mục trước, sau đó chụp hoặc quay từ Pixel.</p>
         </div>
-        <aside class="panel">
-          <div class="panel-head"><h3>Quy trình vận hành</h3><p>Luồng đơn giản, phù hợp xử lý số lượng lớn.</p></div>
-          <div class="panel-body steps">
-            <div class="step"><span>1</span><div><b>Tạo hoặc chọn thư mục</b><small>Chọn đúng tên sản phẩm trong Drive.</small></div></div>
-            <div class="step"><span>2</span><div><b>Điều chỉnh góc máy</b><small>Mở xem màn hình Pixel trước khi thao tác.</small></div></div>
-            <div class="step"><span>3</span><div><b>Chụp hoặc quay</b><small>File được chép vào Drive, kiểm tra và xóa khỏi Pixel.</small></div></div>
-          </div>
-        </aside>
-      </section>
+        <div class="actions">
+          <button id="themeToggleBtn" class="secondary" onclick="toggleTheme()">
+            <!-- Chèn icon SVG tự động bằng Javascript -->
+          </button>
+          <button class="ghost" onclick="refresh()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            Làm mới
+          </button>
+          <button class="secondary" onclick="openPreview()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            Xem Pixel
+          </button>
+          <button class="secondary" onclick="togglePixelScreen()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+            Bật / tắt Pixel
+          </button>
+          <button class="secondary" onclick="showPosterDashboard()" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%); border-color: rgba(168, 85, 247, 0.3);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a855f7;"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            Tạo Poster AI
+          </button>
+          <button class="btn-capture" onclick="capture()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            Chụp ảnh
+          </button>
+          <button class="btn-record" onclick="record()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            Quay video
+          </button>
+        </div>
+      </header>
+      <div class="content">
+        <div class="workspace">
+        <div class="work-main">
+        <section class="metrics">
+          <div class="metric"><small>Pixel ADB</small><strong id="adbMetric"><span class="badge warn">Đang kiểm tra</span></strong></div>
+          <div class="metric"><small>Thư mục Drive</small><strong id="driveMetric"><span class="badge warn">Đang kiểm tra</span></strong></div>
+          <div class="metric"><small>Thư mục đang chọn</small><strong id="selectedMetric">Chưa chọn</strong></div>
+          <div class="metric"><small>Số thư mục sản phẩm</small><strong id="folderMetric">0</strong></div>
+          <div class="metric"><small>Trạng thái tác vụ</small><strong id="busyMetric"><span class="badge ok">Sẵn sàng</span></strong></div>
+        </section>
 
-      <section class="panel">
-        <div class="panel-head"><h3>Cấu hình hệ thống & kết nối</h3><p>Thiết lập thời lượng quay video và phương thức kết nối điều khiển Pixel.</p></div>
-        <div class="panel-body">
-          <div class="two">
-            <div>
-              <label for="duration">Thời lượng video (giây)</label>
-              <input id="duration" type="number" min="1" max="300" value="10">
-              <div class="hint" style="margin-top: 6px;">Giới hạn từ 1 đến 300 giây cho mỗi lần quay.</div>
+        <section class="layout">
+          <div class="panel">
+            <div class="panel-head"><h3>Thư mục Google Drive</h3><p>App ghi file trực tiếp vào thư mục Google Drive for desktop đang đồng bộ trên máy tính.</p></div>
+            <div class="panel-body">
+              <div class="field-action">
+                <div><label for="driveRoot">Đường dẫn thư mục chính</label><input id="driveRoot" value="G:\My Drive\Test hình ảnh shopee"></div>
+                <button onclick="saveDriveRoot()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                  Lưu & quét lại
+                </button>
+              </div>
+              <div class="two">
+                <div><label for="folderSelect">Chọn thư mục sản phẩm</label><select id="folderSelect" onchange="selectFolder()"><option value="">-- Chưa chọn thư mục --</option></select></div>
+                <div><label for="newFolder">Tạo thư mục sản phẩm mới</label><div class="field-action"><input id="newFolder" placeholder="Ví dụ: Eskar Tears 15ml"><button onclick="createFolder()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Tạo</button></div></div>
+              </div>
+              <div class="buttons">
+                <button class="secondary" onclick="scanFolders()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  Quét lại thư mục
+                </button>
+                <button class="danger" onclick="deleteFolder()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                  Xóa thư mục đang chọn
+                </button>
+              </div>
+              <div class="hint">Bắt buộc chọn đúng thư mục sản phẩm trước khi chụp hoặc quay. App không tự phân loại và không tự tạo album Google Photos.</div>
             </div>
-            <div>
-              <label for="connMode">Kiểu kết nối Pixel</label>
-              <select id="connMode" onchange="changeConnMode()">
-                <option value="usb">🔌 Cắm cáp USB vật lý</option>
-                <option value="wifi">📶 Kết nối Wi-Fi không dây</option>
-              </select>
-              
-              <div id="wifiIpGroup" style="margin-top: 12px; display: none;">
-                <label for="wifiIp">Địa chỉ IP của Pixel (Wi-Fi)</label>
-                <div class="field-action">
-                  <input id="wifiIp" placeholder="Ví dụ: 192.168.1.18">
-                  <button class="secondary" onclick="detectPixelIp()" title="Dò tìm IP tự động khi đang cắm cáp USB">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    Quét IP (USB)
-                  </button>
-                  <button onclick="saveConnSettings()">Kết nối Wifi</button>
+          </div>
+          <aside class="panel">
+            <div class="panel-head"><h3>Quy trình vận hành</h3><p>Luồng đơn giản, phù hợp xử lý số lượng lớn.</p></div>
+            <div class="panel-body steps">
+              <div class="step"><span>1</span><div><b>Tạo hoặc chọn thư mục</b><small>Chọn đúng tên sản phẩm trong Drive.</small></div></div>
+              <div class="step"><span>2</span><div><b>Điều chỉnh góc máy</b><small>Mở xem màn hình Pixel trước khi thao tác.</small></div></div>
+              <div class="step"><span>3</span><div><b>Chụp hoặc quay</b><small>File được chép vào Drive, kiểm tra và xóa khỏi Pixel.</small></div></div>
+            </div>
+          </aside>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><h3>Cấu hình hệ thống & kết nối</h3><p>Thiết lập thời lượng quay video và phương thức kết nối điều khiển Pixel.</p></div>
+          <div class="panel-body">
+            <div class="two">
+              <div>
+                <label for="duration">Thời lượng video (giây)</label>
+                <input id="duration" type="number" min="1" max="300" value="10">
+                <div class="hint" style="margin-top: 6px;">Giới hạn từ 1 đến 300 giây cho mỗi lần quay.</div>
+              </div>
+              <div>
+                <label for="connMode">Kiểu kết nối Pixel</label>
+                <select id="connMode" onchange="changeConnMode()">
+                  <option value="usb">🔌 Cắm cáp USB vật lý</option>
+                  <option value="wifi">📶 Kết nối Wi-Fi không dây</option>
+                </select>
+                
+                <div id="wifiIpGroup" style="margin-top: 12px; display: none;">
+                  <label for="wifiIp">Địa chỉ IP của Pixel (Wi-Fi)</label>
+                  <div class="field-action">
+                    <input id="wifiIp" placeholder="Ví dụ: 192.168.1.18">
+                    <button class="secondary" onclick="detectPixelIp()" title="Dò tìm IP tự động khi đang cắm cáp USB">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                      Quét IP (USB)
+                    </button>
+                    <button onclick="saveConnSettings()">Kết nối Wifi</button>
+                  </div>
+                  <div class="hint" style="margin-top: 6px;">Cắm cáp USB rồi bấm "Quét IP (USB)" để tự động dò IP, sau đó bấm "Kết nối Wifi" và rút cáp ra.</div>
                 </div>
-                <div class="hint" style="margin-top: 6px;">Cắm cáp USB rồi bấm "Quét IP (USB)" để tự động dò IP, sau đó bấm "Kết nối Wifi" và rút cáp ra.</div>
               </div>
             </div>
           </div>
+        </section>
         </div>
-      </section>
-      </div>
 
-      <aside class="panel work-log">
-        <div class="panel-head"><h3>Nhật ký xử lý</h3><p>Theo dõi từng bước: chụp/quay, kéo file, chép vào Drive và xóa khỏi Pixel.</p></div>
-        <div class="panel-body">
-          <div class="buttons"><button class="ghost" onclick="clearLog()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>Xóa log</button></div>
-          <div class="logbox">
-            <div class="loghead"><span>Event stream</span><span id="logCount">0 events</span></div>
-            <div id="log" class="log"></div>
+        <aside class="panel work-log">
+          <div class="panel-head"><h3>Nhật ký xử lý</h3><p>Theo dõi từng bước: chụp/quay, kéo file, chép vào Drive và xóa khỏi Pixel.</p></div>
+          <div class="panel-body">
+            <div class="buttons"><button class="ghost" onclick="clearLog()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>Xóa log</button></div>
+            <div class="logbox">
+              <div class="loghead"><span>Event stream</span><span id="logCount">0 events</span></div>
+              <div id="log" class="log"></div>
+            </div>
+          </div>
+        </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Poster Generator Tab -->
+    <div id="posterDashboard" style="display: none; flex-direction: column; width: 100%;">
+      <header class="topbar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <button class="ghost" onclick="showCaptureDashboard()" style="min-height: 38px; padding: 8px 12px;" title="Quay lại Bảng điều khiển">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          </button>
+          <h2>Tạo ảnh đa năng</h2>
+        </div>
+        <div class="actions">
+          <div style="display: flex; align-items: center; gap: 8px; background: var(--soft); border: 1px solid var(--panel-border); padding: 8px 16px; border-radius: 99px; font-weight: 700; font-size: 13px; color: var(--text);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            GPT-4o + DALL-E 3
           </div>
         </div>
-      </aside>
+      </header>
+      
+      <div class="content" style="padding: 24px; display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 24px; width: 100%;">
+        <!-- Left Sidebar: Configurations -->
+        <aside class="panel" style="display: flex; flex-direction: column; gap: 20px; padding: 24px; height: fit-content;">
+          <!-- Image Dropzone -->
+          <div>
+            <label>Tải lên hình ảnh (Tối đa 4)</label>
+            <div id="imageDropzone" onclick="document.getElementById('posterFiles').click()" style="border: 2px dashed var(--panel-border); border-radius: 12px; height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: rgba(0,0,0,0.12);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); margin-bottom: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              <span style="font-size: 12px; color: var(--muted); font-weight: 500; text-align: center; padding: 0 10px;">Bấm hoặc Kéo thả ảnh sản phẩm</span>
+              <input type="file" id="posterFiles" multiple accept="image/*" style="display: none;" onchange="handlePosterFiles(this.files)">
+            </div>
+            <div id="uploadedThumbnails" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px;"></div>
+          </div>
+          
+          <!-- Prompt input -->
+          <div>
+            <label for="posterPrompt">Yêu cầu tạo ảnh mới</label>
+            <textarea id="posterPrompt" placeholder="Vui lòng mô tả ý tưởng poster của bạn...&#10;(Ví dụ: Đặt sản phẩm này trên mặt cát, có sóng biển vỗ nhẹ bên cạnh, ánh sáng tự nhiên)" style="width: 100%; height: 110px; background: rgba(13,17,28,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; color: var(--text); padding: 12px; outline: none; resize: none; font-size: 13px; line-height: 1.4; transition: border-color 0.2s;" oninput="updatePromptCount()"></textarea>
+            <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--muted);">
+              <span onclick="insertPromptTemplate()" style="cursor: pointer; color: var(--brand); font-weight: 700;">✨ Dùng mẫu prompt</span>
+              <span id="promptCharCount">0/1000</span>
+            </div>
+          </div>
+          
+          <!-- Quantity -->
+          <div>
+            <label>Số lượng tạo</label>
+            <div class="quantity-selector" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
+              <button type="button" class="secondary select-btn" onclick="selectQuantity(1)">1</button>
+              <button type="button" class="secondary select-btn" onclick="selectQuantity(2)">2</button>
+              <button type="button" class="select-btn" style="background: var(--brand);" id="btnQty4" onclick="selectQuantity(4)">4</button>
+              <button type="button" class="secondary select-btn" onclick="selectQuantity(6)">6</button>
+              <button type="button" class="secondary select-btn" onclick="selectQuantity(9)">9</button>
+            </div>
+            <input type="hidden" id="posterQuantity" value="4">
+          </div>
+          
+          <!-- Aspect ratio -->
+          <div>
+            <label for="posterSize">Tỷ lệ kích thước</label>
+            <select id="posterSize" style="font-size: 13px;">
+              <option value="1024x1024">Square (1:1) - 1024x1024 px</option>
+              <option value="1024x1792">Portrait (9:16) - 1024x1792 px</option>
+              <option value="1792x1024">Landscape (16:9) - 1792x1024 px</option>
+            </select>
+          </div>
+
+          <!-- API Settings -->
+          <div>
+            <label for="openaiKey">OpenAI API Key</label>
+            <input type="password" id="openaiKey" placeholder="sk-proj-..." style="font-size: 12px; min-height: 38px;">
+          </div>
+
+          <!-- Export Folder -->
+          <div>
+            <label for="posterExportDir">Thư mục xuất hình</label>
+            <input id="posterExportDir" placeholder="Mặc định: Thư mục Drive hiện tại" style="font-size: 12px; min-height: 38px;">
+          </div>
+          
+          <!-- Submit button -->
+          <button class="btn-capture" id="btnGeneratePoster" onclick="generatePoster()" style="width: 100%; font-size: 14px; padding: 12px; margin-top: 10px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            Tạo Poster AI
+          </button>
+        </aside>
+        
+        <!-- Right Main Panel: Generation Result -->
+        <main class="panel" style="display: flex; flex-direction: column; min-height: 580px; padding: 24px; width: 100%;">
+          <div class="panel-head" style="padding: 0 0 20px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="font-size: 20px; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif;">Poster Quảng Cáo</h3>
+              <p style="margin-top: 4px; color: var(--muted); font-size: 13px;">Giao diện hiển thị poster tạo tự động bằng AI.</p>
+            </div>
+            <div id="generationStatus" style="display: none; align-items: center; gap: 8px;">
+              <span class="badge warn" id="statusBadge" style="padding: 6px 12px;">Đang chuẩn bị...</span>
+            </div>
+          </div>
+          
+          <div class="panel-body" style="flex: 1; padding: 24px 0 0 0; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%;">
+            <!-- Initial view -->
+            <div id="posterPlaceholder" style="display: flex; flex-direction: column; align-items: center; text-align: center; color: var(--muted); max-width: 440px; margin: auto;">
+              <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--soft); border: 1px solid var(--panel-border); display: grid; place-items: center; margin-bottom: 20px; box-shadow: var(--shadow);">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand);"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+              </div>
+              <h4 style="font-size: 16px; color: #fff; margin: 0 0 8px 0; font-family: 'Plus Jakarta Sans', sans-serif;">Chưa có ảnh poster nào được tạo</h4>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0;">Nhập yêu cầu và tải lên ảnh sản phẩm thô ở cột bên trái, sau đó bấm nút "Tạo Poster AI" để bắt đầu thiết kế.</p>
+            </div>
+            
+            <!-- Loading indicator -->
+            <div id="posterLoading" style="display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px; margin: auto;">
+              <div class="spinner"></div>
+              <div style="text-align: center;">
+                <h4 style="font-size: 15px; color: #fff; margin: 0 0 6px 0; font-family: 'Plus Jakarta Sans', sans-serif;" id="loadingText">Đang xử lý tạo ảnh...</h4>
+                <p style="font-size: 12px; color: var(--muted); margin: 0;">Quá trình phân tích Vision và vẽ DALL-E thường mất 10 - 20 giây.</p>
+              </div>
+            </div>
+            
+            <!-- Grid displaying generated images -->
+            <div id="posterGrid" style="display: none; width: 100%; grid-template-columns: repeat(2, 1fr); gap: 24px;"></div>
+          </div>
+          
+          <!-- Bottom disclaimer -->
+          <div style="border-top: 1px solid var(--line); padding-top: 16px; margin-top: 24px; font-size: 11px; color: var(--muted); line-height: 1.5; text-align: center;">
+            Miễn trừ trách nhiệm: Tất cả nội dung được tạo ra bởi dịch vụ này đều được tạo tự động bằng AI và chỉ mang tính chất tham khảo. Chúng tôi không đảm bảo tính chính xác, đầy đủ hoặc tính ứng dụng của nội dung.
+          </div>
+        </main>
       </div>
     </div>
   </main>
@@ -923,6 +1150,263 @@ HTML = r"""
   async function run(path,body){if(!requireFolder()||busy)return;setBusy(true);await api("/api/events/clear",{}).catch(()=>{});lastId=0;startPoll();try{log(await api(path,body));await refresh()}catch(e){log(e)}finally{await stopPoll();setBusy(false)}}
   function capture(){run("/api/capture",{folder:selected()})}
   function record(){run("/api/record",{folder:selected(),duration:Number(document.getElementById("duration").value||10)})}
+  // Poster Creator JS
+  let posterImages = []; // Mảng chứa base64 của ảnh upload
+  
+  function showPosterDashboard() {
+    document.getElementById("captureDashboard").style.display = "none";
+    document.getElementById("posterDashboard").style.display = "flex";
+    // Tải cấu hình OpenAI từ backend lên UI
+    loadOpenAIConfig();
+  }
+  
+  function showCaptureDashboard() {
+    document.getElementById("posterDashboard").style.display = "none";
+    document.getElementById("captureDashboard").style.display = "block";
+  }
+  
+  function handlePosterFiles(files) {
+    const limit = 4;
+    const currentCount = posterImages.length;
+    const remaining = limit - currentCount;
+    const filesToProcess = Array.from(files).slice(0, remaining);
+    
+    filesToProcess.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        posterImages.push({
+          name: file.name,
+          base64: e.target.result
+        });
+        renderThumbnails();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  
+  function renderThumbnails() {
+    const container = document.getElementById("uploadedThumbnails");
+    container.innerHTML = "";
+    
+    posterImages.forEach((img, idx) => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "thumbnail-wrapper";
+      wrapper.innerHTML = `
+        <img src="${img.base64}" alt="${escapeHtml(img.name)}">
+        <button class="remove-btn" onclick="removeUploadedImage(${idx})">×</button>
+      `;
+      container.appendChild(wrapper);
+    });
+    
+    // Cập nhật nhãn đếm ảnh
+    const label = document.querySelector("#posterDashboard label");
+    label.textContent = `Tải lên hình ảnh (Tối đa 4) - Đã chọn ${posterImages.length}/4`;
+  }
+  
+  function removeUploadedImage(idx) {
+    posterImages.splice(idx, 1);
+    renderThumbnails();
+  }
+  
+  function updatePromptCount() {
+    const prompt = document.getElementById("posterPrompt").value;
+    document.getElementById("promptCharCount").textContent = `${prompt.length}/1000`;
+  }
+  
+  function selectQuantity(qty) {
+    document.getElementById("posterQuantity").value = qty;
+    document.querySelectorAll(".quantity-selector .select-btn").forEach(btn => {
+      btn.style.background = "rgba(255, 255, 255, 0.06)";
+    });
+    // Tìm button tương ứng và làm nổi bật
+    event.currentTarget.style.background = "var(--brand)";
+  }
+  
+  const promptTemplates = [
+    "Vui lòng tạo một poster quảng cáo sang trọng cho sản phẩm này, đặt trên một bệ đá cẩm thạch trắng, xung quanh có các giọt nước tinh khiết lấp lánh, ánh sáng studio studio softbox rực rỡ, nền màu gradient xanh dương mát mẻ, phong cách chuyên nghiệp, ảnh quảng cáo mỹ phẩm thương mại.",
+    "Tạo poster quảng cáo thương mại cho sản phẩm, bối cảnh thiên nhiên tự nhiên với các lá trà xanh tươi mát xung quanh, ánh nắng tự nhiên nhẹ nhàng chiếu qua kẽ lá, hậu cảnh bokeh rừng xanh mướt, phong cách organic sạch sẽ, quảng cáo sản phẩm tự nhiên.",
+    "Poster quảng cáo sản phẩm phong cách tương lai huyền ảo, đặt sản phẩm trên đĩa bay hologram phát sáng neon màu tím và xanh lam, nền công nghệ cyber hiện đại mờ ảo, khói huyền ảo bay nhẹ, phong cách 3D render cực kỳ sắc nét.",
+    "Thiết kế poster quảng cáo phong cách tối giản (minimalism) cho sản phẩm, đặt trên một khối gỗ thô mộc mạc, nền trơn màu be ấm áp, ánh sáng mặt trời tự nhiên tạo bóng đổ dài nghệ thuật, phong cách đơn giản, tinh tế, trang nhã."
+  ];
+  let currentTemplateIdx = 0;
+  
+  function insertPromptTemplate() {
+    document.getElementById("posterPrompt").value = promptTemplates[currentTemplateIdx];
+    updatePromptCount();
+    currentTemplateIdx = (currentTemplateIdx + 1) % promptTemplates.length;
+  }
+  
+  async function loadOpenAIConfig() {
+    try {
+      const r = await fetch("/api/openai/config");
+      const d = await r.json();
+      if (d.api_key) {
+        document.getElementById("openaiKey").value = d.api_key;
+      }
+      if (d.export_dir) {
+        document.getElementById("posterExportDir").value = d.export_dir;
+      }
+    } catch(e) {
+      console.error(e);
+    }
+  }
+  
+  async function saveOpenAIConfig() {
+    const key = document.getElementById("openaiKey").value.trim();
+    const dir = document.getElementById("posterExportDir").value.trim();
+    await fetch("/api/openai/config", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({api_key: key, export_dir: dir})
+    });
+  }
+  
+  async function generatePoster() {
+    const prompt = document.getElementById("posterPrompt").value.trim();
+    const key = document.getElementById("openaiKey").value.trim();
+    
+    if (!key) {
+      alert("Vui lòng cấu hình OpenAI API Key ở mục tương ứng trước khi tạo.");
+      return;
+    }
+    if (!prompt) {
+      alert("Vui lòng nhập yêu cầu tạo ảnh mới.");
+      return;
+    }
+    
+    // Lưu cấu hình tự động
+    await saveOpenAIConfig();
+    
+    // Đổi trạng thái UI sang Loading
+    document.getElementById("posterPlaceholder").style.display = "none";
+    document.getElementById("posterGrid").style.display = "none";
+    document.getElementById("posterLoading").style.display = "flex";
+    document.getElementById("generationStatus").style.display = "flex";
+    
+    const qty = Number(document.getElementById("posterQuantity").value);
+    const size = document.getElementById("posterSize").value;
+    
+    const statusText = document.getElementById("loadingText");
+    const statusBadge = document.getElementById("statusBadge");
+    
+    try {
+      if (posterImages.length > 0) {
+        statusText.innerHTML = "Đang gửi ảnh sản phẩm thô lên GPT-4o để phân tích bối cảnh...";
+        statusBadge.innerHTML = "GPT-4o Vision đang xử lý";
+      } else {
+        statusText.innerHTML = "Đang kết nối API OpenAI DALL-E 3 để tạo ảnh...";
+        statusBadge.innerHTML = "DALL-E 3 đang vẽ";
+      }
+      
+      const payload = {
+        prompt: prompt,
+        quantity: qty,
+        size: size,
+        images: posterImages.map(img => img.base64)
+      };
+      
+      // Chạy API gọi AI tạo ảnh
+      const r = await fetch("/api/poster/generate", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+      });
+      const d = await r.json();
+      
+      if (!r.ok) {
+        throw d;
+      }
+      
+      renderPosterGrid(d.images, size);
+      
+    } catch(e) {
+      alert("Lỗi tạo ảnh: " + (e.error || e.message || JSON.stringify(e)));
+      document.getElementById("posterPlaceholder").style.display = "flex";
+      document.getElementById("posterLoading").style.display = "none";
+      document.getElementById("generationStatus").style.display = "none";
+    }
+  }
+  
+  function renderPosterGrid(images, size) {
+    document.getElementById("posterLoading").style.display = "none";
+    document.getElementById("generationStatus").style.display = "none";
+    
+    const grid = document.getElementById("posterGrid");
+    grid.innerHTML = "";
+    grid.style.display = "grid";
+    
+    // Tùy chỉnh tỷ lệ thẻ dựa theo kích thước
+    let aspect = "1/1";
+    if (size === "1024x1792") aspect = "9/16";
+    else if (size === "1792x1024") aspect = "16/9";
+    
+    images.forEach((imgUrl, idx) => {
+      const card = document.createElement("div");
+      card.className = "poster-card";
+      card.style.aspectRatio = aspect;
+      card.innerHTML = `
+        <img src="${imgUrl}" alt="Poster AI ${idx + 1}" style="aspect-ratio: ${aspect};">
+        <div class="card-actions">
+          <button class="ghost" onclick="downloadPosterDirect('${imgUrl}', ${idx + 1})" style="min-height: 32px; padding: 4px 8px; font-size: 12px; background: rgba(0,0,0,0.6);">
+            📥 Tải về máy
+          </button>
+          <button onclick="savePosterToDrive('${imgUrl}', ${idx + 1})" style="min-height: 32px; padding: 4px 8px; font-size: 12px;">
+            💾 Lưu vào Drive
+          </button>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+  
+  async function savePosterToDrive(url, idx) {
+    try {
+      // Gọi API backend tải ảnh và lưu
+      const response = await fetch("/api/poster/save", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          image_url: url,
+          filename: `poster_ai_${new Date().strftime("%Y%m%d_%H%M%S")}_${idx}.png`
+        })
+      });
+      const d = await response.json();
+      if (!response.ok) throw d;
+      alert(`Đã lưu poster thành công vào thư mục: ${d.saved_path}`);
+    } catch(e) {
+      alert("Lỗi lưu ảnh: " + (e.error || e.message || JSON.stringify(e)));
+    }
+  }
+
+  function downloadPosterDirect(url, idx) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.download = `poster_ai_${idx}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+  
+  Date.prototype.strftime = function(format) {
+    const o = {
+      "Y+": this.getFullYear(),
+      "m+": this.getMonth() + 1,
+      "d+": this.getDate(),
+      "H+": this.getHours(),
+      "M+": this.getMinutes(),
+      "S+": this.getSeconds()
+    };
+    let fmt = format;
+    for (let k in o) {
+      if (new RegExp("(" + k + ")").test(fmt)) {
+        const val = String(o[k]);
+        fmt = fmt.replace(RegExp.$1, (RegExp.$1.length === 1) ? val : val.padStart(RegExp.$1.length, "0"));
+      }
+    }
+    return fmt;
+  };
+
   initTheme();
   refresh();
 </script>
@@ -1466,6 +1950,174 @@ def api_record():
         return error_response(exc)
     finally:
         OPERATION_LOCK.release()
+
+
+@app.get("/api/openai/config")
+def api_openai_config_get():
+    config = load_config()
+    openai_cfg = config.get("openai", {})
+    return jsonify({
+        "api_key": openai_cfg.get("api_key", ""),
+        "export_dir": openai_cfg.get("export_dir", "")
+    })
+
+
+@app.post("/api/openai/config")
+def api_openai_config_post():
+    try:
+        payload = request.json or {}
+        api_key = str(payload.get("api_key", "")).strip()
+        export_dir = str(payload.get("export_dir", "")).strip()
+        
+        with CONFIG_LOCK:
+            config = load_config()
+            openai_cfg = config.setdefault("openai", {})
+            openai_cfg["api_key"] = api_key
+            openai_cfg["export_dir"] = export_dir
+            save_config(config)
+            
+        return jsonify({"status": "Đã lưu cấu hình OpenAI."})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/poster/generate")
+def api_poster_generate():
+    try:
+        payload = request.json or {}
+        user_prompt = str(payload.get("prompt", "")).strip()
+        quantity = max(1, min(int(payload.get("quantity") or 4), 9))
+        size = str(payload.get("size", "1024x1024")).strip()
+        images = payload.get("images", []) # Mảng chứa base64
+        
+        config = load_config()
+        api_key = config.get("openai", {}).get("api_key", "").strip()
+        if not api_key:
+            raise ValueError("Chưa cấu hình OpenAI API Key.")
+            
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        
+        # 1. Nếu có ảnh tải lên, dùng GPT-4o Vision để phân tích và sinh prompt chi tiết
+        final_prompt = user_prompt
+        if images:
+            # Lấy ảnh đầu tiên (hoặc phân tích các ảnh)
+            # GPT-4o Vision hỗ trợ gửi ảnh dưới dạng base64 qua data URL
+            message_content = [
+                {
+                    "type": "text",
+                    "text": (
+                        "You are an expert product advertising poster designer. "
+                        "Analyze the raw product image(s) provided (shape, color, label, brand) "
+                        "and combine it with the user's background request: \"" + user_prompt + "\". "
+                        "Write a highly descriptive, professional English prompt for DALL-E 3 "
+                        "to generate a stunning, realistic commercial advertising poster featuring this exact product in the requested setting. "
+                        "Describe the product in detail so DALL-E 3 can recreate it accurately, "
+                        "along with premium studio lighting, soft shadows, and commercial photography style. "
+                        "Only output the raw English prompt for DALL-E 3, nothing else."
+                    )
+                }
+            ]
+            
+            for base64_data in images[:4]: # Giới hạn tối đa 4 ảnh
+                # Lọc bỏ tiền tố data:image/png;base64, nếu có
+                if "," in base64_data:
+                    base64_data = base64_data.split(",", 1)[1]
+                message_content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_data}"
+                    }
+                })
+                
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": message_content}],
+                max_tokens=500
+            )
+            final_prompt = response.choices[0].message.content.strip()
+            # Log prompt đã tối ưu
+            add_event({"step": "poster_gpt_prompt", "message": f"GPT-4o Vision đã tạo prompt vẽ tranh chi tiết: {final_prompt}"})
+
+        # 2. Gọi DALL-E 3 để tạo ảnh poster
+        # DALL-E 3 chỉ hỗ trợ tạo 1 ảnh mỗi lần gọi (n=1). Chúng ta sẽ dùng ThreadPoolExecutor để chạy song song.
+        def generate_single_image():
+            response = client.images.generate(
+                model="dall-e-3",
+                prompt=final_prompt,
+                size=size,
+                quality="hd", # HD chất lượng cao hơn
+                n=1
+            )
+            return response.data[0].url
+
+        add_event({"step": "poster_generating", "message": f"Đang kết nối DALL-E 3 để tạo {quantity} ảnh poster với kích thước {size}..."})
+        
+        urls = []
+        with ThreadPoolExecutor(max_workers=min(quantity, 4)) as executor:
+            futures = [executor.submit(generate_single_image) for _ in range(quantity)]
+            for fut in futures:
+                try:
+                    urls.append(fut.result())
+                except Exception as e:
+                    # Nếu có lỗi khi tạo 1 ảnh lẻ, log lại và bỏ qua hoặc ném lỗi nếu tất cả đều lỗi
+                    add_event({"step": "error", "message": f"Lỗi tạo ảnh đơn lẻ: {e}"})
+                    
+        if not urls:
+            raise RuntimeError("Tất cả các lượt gọi API DALL-E 3 đều thất bại. Hãy kiểm tra kết nối API Key và quota tài khoản.")
+            
+        add_event({"step": "poster_done", "message": f"Đã tạo thành công {len(urls)} ảnh poster quảng cáo từ AI."})
+        return jsonify({"images": urls})
+        
+    except Exception as exc:
+        add_event({"step": "error", "message": str(exc)})
+        return error_response(exc, 400)
+
+
+@app.post("/api/poster/save")
+def api_poster_save():
+    try:
+        payload = request.json or {}
+        image_url = str(payload.get("image_url", "")).strip()
+        filename = str(payload.get("filename", "")).strip()
+        
+        if not image_url or not filename:
+            raise ValueError("Thiếu URL ảnh hoặc tên file.")
+            
+        config = load_config()
+        export_dir = config.get("openai", {}).get("export_dir", "").strip()
+        
+        target_folder = None
+        if export_dir:
+            path = Path(export_dir).expanduser()
+            if path.exists() and path.is_dir():
+                target_folder = path
+                
+        if not target_folder:
+            # Mặc định lưu vào thư mục Drive hiện tại đang chọn
+            try:
+                target_folder = selected_drive_folder()
+            except Exception:
+                # Nếu chưa chọn thư mục, lưu vào drive_root_dir
+                target_folder = drive_root()
+                
+        if not target_folder.exists():
+            target_folder.mkdir(parents=True, exist_ok=True)
+            
+        dest_path = target_folder / filename
+        
+        # Tải ảnh từ OpenAI URL về
+        r = requests.get(image_url, timeout=30)
+        r.raise_for_status()
+        
+        dest_path.write_bytes(r.content)
+        
+        add_event({"step": "poster_saved", "message": f"Đã lưu poster thành công vào thư mục: {dest_path}", "file": str(dest_path)})
+        return jsonify({"status": "Lưu poster thành công.", "saved_path": str(dest_path)})
+        
+    except Exception as exc:
+        add_event({"step": "error", "message": str(exc)})
+        return error_response(exc, 400)
 
 
 if __name__ == "__main__":
