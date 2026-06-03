@@ -2180,7 +2180,7 @@ def api_poster_generate():
                 model="gpt-image-1.5",
                 prompt=final_prompt,
                 size=size,
-                quality="high", # Sử dụng 'high' tương thích với gpt-image-1.5
+                quality="medium", # Sử dụng 'medium' để tiết kiệm chi phí theo yêu cầu người dùng
                 n=1
             )
             return response.data[0].url
