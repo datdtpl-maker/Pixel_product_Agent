@@ -961,8 +961,9 @@ HTML = r"""
           <!-- API Settings -->
           <div>
             <label for="openaiKey">OpenAI API Key</label>
-            <div class="field-action">
+            <div class="field-action" style="grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px;">
               <input type="password" id="openaiKey" placeholder="sk-proj-..." style="font-size: 12px; min-height: 38px;">
+              <button type="button" class="secondary" onclick="saveOpenAIConfigBtn()" style="min-height: 38px; padding: 0 12px;">Lưu</button>
               <button type="button" class="secondary" id="btnCheckAPI" onclick="checkAPIKey()" style="min-height: 38px; padding: 0 12px;">Kiểm tra</button>
             </div>
           </div>
@@ -1262,6 +1263,8 @@ HTML = r"""
       const d = await r.json();
       
       if (d.valid) {
+        // Tự động lưu khi check thành công
+        await saveOpenAIConfig();
         let msg = "Kết nối API Key thành công!\n\n";
         msg += `1. GPT-4o / GPT-4o-mini: ${d.has_gpt4o ? "Sẵn sàng ✅" : "Không có quyền ❌"}\n`;
         msg += `2. GPT-image-1.5: ${d.has_dalle3 ? "Sẵn sàng ✅" : "Không có quyền ❌"}\n\n`;
@@ -1305,6 +1308,15 @@ HTML = r"""
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({api_key: key, export_dir: dir})
     });
+  }
+  
+  async function saveOpenAIConfigBtn() {
+    try {
+      await saveOpenAIConfig();
+      alert("Đã lưu API Key thành công!");
+    } catch(e) {
+      alert("Lỗi lưu API Key: " + (e.message || JSON.stringify(e)));
+    }
   }
   
   async function browseExportDirectory() {
