@@ -957,8 +957,12 @@ HTML = r"""
         <aside class="panel" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; height: 740px;">
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); padding-bottom: 12px;">
             <h4 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 15px;">Thư viện Prompt</h4>
-            <button class="ghost" onclick="openPromptModal()" style="padding: 4px 8px; font-size: 12px; color: var(--brand); font-weight: 700; background: none; border: none; cursor: pointer;">+ Thêm</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="ghost" onclick="triggerImportPrompt()" style="padding: 4px 8px; font-size: 12px; color: var(--ok); font-weight: 700; background: none; border: none; cursor: pointer;" title="Nhập danh sách prompt từ file .txt">+ Nhập file</button>
+              <button class="ghost" onclick="openPromptModal()" style="padding: 4px 8px; font-size: 12px; color: var(--brand); font-weight: 700; background: none; border: none; cursor: pointer;">+ Thêm</button>
+            </div>
           </div>
+          <input type="file" id="promptImportInput" accept=".txt" onchange="handlePromptImport(event)" style="display: none;">
           
           <!-- Lọc danh mục -->
           <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
@@ -1574,6 +1578,43 @@ HTML = r"""
       alert("Lỗi lưu danh mục: " + (e.error || e.message || JSON.stringify(e)));
     }
   };
+
+  function triggerImportPrompt() {
+    document.getElementById('promptImportInput').click();
+  }
+
+  function handlePromptImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    addEvent({step: 'prompt_import', message: `Bắt đầu xử lý nhập tệp: ${file.name}...`});
+    
+    fetch('/api/content/prompts/import', {
+      method: 'POST',
+      body: formData
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (!res.ok) throw data;
+      return data;
+    })
+    .then(data => {
+      addEvent({step: 'prompt_import', message: `Nhập file thành công! Đã thêm ${data.count} prompt mới.`});
+      loadCategories().then(() => {
+        loadPromptsLibrary();
+      });
+    })
+    .catch(err => {
+      console.error(err);
+      addEvent({step: 'error', message: `Lỗi nhập file: ${err.message || err.error || 'Lỗi không xác định'}`});
+    })
+    .finally(() => {
+      event.target.value = '';
+    });
+  }
 
   function openPromptModal(id = "") {
     const modal = document.getElementById("promptModal");
@@ -2906,6 +2947,133 @@ def api_delete_prompt(prompt_id):
             return jsonify({"status": "Xóa thành công."})
         else:
             raise RuntimeError("Không thể ghi file dữ liệu.")
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+def parse_prompts_txt(text: str) -> list[dict[str, str]]:
+    prompts = []
+    # Chuẩn hóa xuống dòng
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    
+    current_prompt = {}
+    current_field = None
+    content_lines = []
+    
+    for raw_line in text.split('\n'):
+        line = raw_line.strip()
+        
+        # Nếu gặp dòng phân cách
+        if line.startswith('---') or line.startswith('==='):
+            if current_prompt.get('title') and (current_prompt.get('content') is not None or content_lines):
+                current_prompt['content'] = '\n'.join(content_lines).strip()
+                prompts.append(current_prompt)
+            current_prompt = {}
+            current_field = None
+            content_lines = []
+            continue
+            
+        # Kiểm tra Danh mục
+        match_cat = re.match(r'^(Danh mục|Category)\s*:\s*(.*)$', line, re.IGNORECASE)
+        if match_cat:
+            if current_prompt.get('title') and (current_prompt.get('content') is not None or content_lines):
+                current_prompt['content'] = '\n'.join(content_lines).strip()
+                prompts.append(current_prompt)
+                current_prompt = {}
+                content_lines = []
+            
+            current_prompt['category'] = match_cat.group(2).strip()
+            current_field = 'category'
+            continue
+            
+        # Kiểm tra Tiêu đề
+        match_title = re.match(r'^(Tiêu đề|Title)\s*:\s*(.*)$', line, re.IGNORECASE)
+        if match_title:
+            current_prompt['title'] = match_title.group(2).strip()
+            current_field = 'title'
+            continue
+            
+        # Kiểm tra Nội dung
+        match_content = re.match(r'^(Nội dung|Content)\s*:\s*(.*)$', line, re.IGNORECASE)
+        if match_content:
+            current_field = 'content'
+            content_lines = [match_content.group(2).strip()]
+            current_prompt['content'] = ''
+            continue
+            
+        # Nội dung nhiều dòng
+        if current_field == 'content':
+            content_lines.append(raw_line)
+            
+    # Lưu prompt cuối cùng
+    if current_prompt.get('title') and (current_prompt.get('content') is not None or content_lines):
+        current_prompt['content'] = '\n'.join(content_lines).strip()
+        prompts.append(current_prompt)
+        
+    return prompts
+
+
+@app.post("/api/content/prompts/import")
+def api_import_prompts():
+    try:
+        if 'file' not in request.files:
+            raise ValueError("Không tìm thấy file trong yêu cầu tải lên.")
+        file = request.files['file']
+        if not file.filename:
+            raise ValueError("Tên file không hợp lệ.")
+            
+        text = file.read().decode('utf-8', errors='ignore')
+        imported_prompts = parse_prompts_txt(text)
+        
+        if not imported_prompts:
+            raise ValueError("Không tìm thấy prompt hợp lệ nào trong file. Vui lòng kiểm tra lại cấu trúc file.")
+            
+        existing_prompts = load_prompts()
+        config = load_config()
+        
+        # Đảm bảo có content_categories trong config
+        if "content_categories" not in config:
+            config["content_categories"] = ["Shopee", "Facebook", "General"]
+            
+        categories = config["content_categories"]
+        categories_modified = False
+        
+        count = 0
+        import uuid
+        for p in imported_prompts:
+            cat = p.get('category', 'General').strip()
+            if not cat:
+                cat = 'General'
+                
+            # Nếu danh mục chưa có, tự động thêm vào config.json
+            if cat not in categories:
+                categories.append(cat)
+                categories_modified = True
+                
+            title = p.get('title', 'Imported Prompt').strip()
+            content = p.get('content', '').strip()
+            
+            if not content:
+                continue
+                
+            # Tạo prompt và lưu
+            p_id = str(uuid.uuid4())
+            existing_prompts.append({
+                "id": p_id,
+                "category": cat,
+                "title": title,
+                "content": content
+            })
+            count += 1
+            
+        if count > 0:
+            save_prompts(existing_prompts)
+            if categories_modified:
+                config["content_categories"] = categories
+                save_config(config)
+                
+        return jsonify({"success": True, "count": count})
+        
     except Exception as exc:
         return error_response(exc, 400)
 
