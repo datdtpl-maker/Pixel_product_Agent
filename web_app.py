@@ -1198,6 +1198,13 @@ HTML = r"""
   }
   function clearLog(){eventCount=0;lastId=0;logBox.innerHTML="";document.getElementById("logCount").textContent="0 events"}
   async function api(path,body){const r=await fetch(path,{method:body?"POST":"GET",headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw d;return d}
+  async function pull(){const d=await api(`/api/events?after=${lastId}`);for(const e of d.events||[]){lastId=Math.max(lastId,e.id||0);log(e.payload)}}
+  function startPoll(){if(!poller){pull().catch(()=>{});poller=setInterval(()=>pull().catch(()=>{}),700)}}
+  async function stopPoll(){if(poller){clearInterval(poller);poller=null}await pull().catch(()=>{})}
+  function selected(){return document.getElementById("folderSelect").value}
+  function requireFolder(){if(!selected()){log({error:"Hãy chọn hoặc tạo thư mục sản phẩm trước khi chụp/quay."});return false}return true}
+  function setBusy(v){busy=v;document.querySelectorAll("button").forEach(b=>b.disabled=v);document.getElementById("themeToggleBtn").disabled=false;if(document.querySelector("#wifiIpGroup button")) document.querySelectorAll("#wifiIpGroup button").forEach(b=>b.disabled=v);}
+  function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
   function render(d){document.getElementById("adbMetric").innerHTML=d.adb_device?`<span class="badge ok">${d.adb_device}</span>`:`<span class="badge warn">Chưa thấy Pixel</span>`;document.getElementById("driveMetric").innerHTML=d.drive_ready?`<span class="badge ok">Đã kết nối</span>`:`<span class="badge warn">Không tìm thấy</span>`;document.getElementById("selectedMetric").textContent=d.selected_folder||"Chưa chọn";document.getElementById("folderMetric").textContent=(d.folders||[]).length;document.getElementById("busyMetric").innerHTML=d.operation_busy?`<span class="badge warn">Đang xử lý</span>`:`<span class="badge ok">Sẵn sàng</span>`;document.getElementById("navFolders").textContent=(d.folders||[]).length;document.getElementById("navDrive").textContent=d.drive_ready?"OK":"Lỗi";document.getElementById("navAdb").textContent=d.adb_device?"OK":"Offline";document.getElementById("driveRoot").value=d.drive_root;document.getElementById("connMode").value=d.connection_mode||"usb";document.getElementById("wifiIp").value=d.wifi_ip||"";changeConnMode();const s=document.getElementById("folderSelect"),current=d.selected_folder||s.value;s.innerHTML='<option value="">-- Chưa chọn thư mục --</option>'+d.folders.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("");s.value=current;const pb=document.getElementById("previewBtn"),pt=document.getElementById("previewBtnText");if(pb&&pt){if(d.scrcpy_running){pb.classList.add("pulse-warn");pt.textContent="Đóng xem Pixel"}else{pb.classList.remove("pulse-warn");pt.textContent="Xem Pixel"}}}
   async function refresh(){try{render(await api("/api/status"))}catch(e){log(e)}}
   async function scanFolders(){try{render(await api("/api/status"));log({status:"Đã quét lại danh sách thư mục."})}catch(e){log(e)}}
@@ -3214,6 +3221,18 @@ def api_import_prompts():
         return error_response(exc, 400)
 
 
+def parse_version(v_str):
+    if not v_str:
+        return (0, 0, 0)
+    cleaned = v_str.strip().lower().lstrip('v')
+    parts = []
+    for p in cleaned.split('.'):
+        num_str = ''.join(c for c in p if c.isdigit())
+        parts.append(int(num_str) if num_str else 0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
 @app.get("/api/app/check-update")
 def api_check_update():
     try:
@@ -3248,8 +3267,10 @@ def api_check_update():
             download_url = release_data.get("zipball_url", "")
             
         has_update = False
-        if latest_version and latest_version != CURRENT_VERSION:
-            has_update = True
+        if latest_version:
+            # So sánh phiên bản chuyên nghiệp Semantic Versioning (chỉ báo update nếu bản trên git cao hơn bản hiện tại)
+            if parse_version(latest_version) > parse_version(CURRENT_VERSION):
+                has_update = True
             
         return jsonify({
             "has_update": has_update,
@@ -3991,7 +4012,150 @@ def cleanup_old_instances():
     time.sleep(0.5)
 
 
+def is_file_stable(cfg, remote_path, wait_seconds=1.5):
+    # Lấy kích thước file lần 1
+    cmd_size = f'stat -c %s "{remote_path}" 2>/dev/null || stat -f %z "{remote_path}" 2>/dev/null'
+    try:
+        size1 = pipeline.adb_command(cfg, "shell", cmd_size, check=False).stdout.strip()
+        time.sleep(wait_seconds)
+        size2 = pipeline.adb_command(cfg, "shell", cmd_size, check=False).stdout.strip()
+        if not size1 or not size2:
+            return False
+        return size1 == size2
+    except Exception:
+        return False
+
+
+def process_auto_media(cfg, media_path, folder_name):
+    # Đảm bảo không tranh chấp với các tác vụ chụp/quay khác
+    if not OPERATION_LOCK.acquire(blocking=True, timeout=5.0):
+        print(f"[Watcher] Không thể acquire lock để xử lý file {media_path} do bận.")
+        return
+        
+    try:
+        # Kiểm tra độ ổn định của file (đảm bảo camera đã ghi xong file hoàn toàn)
+        # Đối với video, ta cần chờ cho đến khi dừng quay (kích thước file ổn định)
+        stable = False
+        for _ in range(10): # Thử tối đa 15 giây
+            if is_file_stable(cfg, media_path, wait_seconds=1.5):
+                stable = True
+                break
+            time.sleep(1.0)
+            
+        if not stable:
+            print(f"[Watcher] File {media_path} không ổn định sau nhiều lần thử. Bỏ qua.")
+            return
+            
+        f_name = Path(media_path).name
+        add_event({"step": "auto_detect", "message": f"Phát hiện phương tiện mới trên Pixel: {f_name}. Đang tự động kéo về Drive...", "file": f_name})
+        
+        # 1. Kéo file về máy tính
+        pipeline.ensure_dirs(cfg)
+        local_path = cfg.inbox_dir / f_name
+        
+        # Thử pull file
+        res = pipeline.adb_command(cfg, "pull", media_path, str(local_path), check=False)
+        if res.returncode != 0:
+            raise RuntimeError(f"Không thể adb pull file {f_name}: {res.stderr}")
+            
+        add_event({"step": "pulled", "message": f"Đã kéo tự động file: {f_name}"})
+        
+        # 2. Tải lên thư mục Google Drive đang chọn
+        folder = selected_drive_folder(folder_name)
+        target = copy_media_to_drive(local_path, folder)
+        add_event({"step": "drive_saved", "message": f"Đã chép tự động vào Drive: {f_name}", "file": str(target), "size": target.stat().st_size})
+        
+        # 3. Xóa file trên điện thoại Pixel và dọn dẹp file cục bộ
+        cleanup = finalize_pixel_media(cfg, local_path)
+        
+        add_event({"step": "done", "message": f"Tự động xử lý hoàn tất file: {f_name}", "file": f_name})
+        
+    except Exception as e:
+        add_event({"step": "error", "message": f"Lỗi xử lý tự động file {media_path}: {e}"})
+    finally:
+        OPERATION_LOCK.release()
+
+
+def media_watcher_loop():
+    import time
+    last_known_epoch = None
+    last_device_serial = None
+    
+    print("[Watcher] Luồng giám sát phương tiện mới trên Pixel đã bắt đầu.")
+    
+    while True:
+        try:
+            # 1. Nếu đang bận xử lý nút bấm chụp/quay từ web, ta tạm bỏ qua chu kỳ này
+            if OPERATION_LOCK.locked():
+                time.sleep(1.0)
+                continue
+                
+            cfg = settings()
+            serial = ""
+            try:
+                serial = adb_device_serial(cfg)
+            except Exception:
+                pass
+                
+            if not serial:
+                # Không thấy thiết bị kết nối, reset trạng thái watcher
+                last_known_epoch = None
+                last_device_serial = None
+                time.sleep(2.0)
+                continue
+                
+            cfg.adb_serial = serial
+            
+            # Nếu đổi thiết bị, reset lại mốc thời gian ban đầu
+            if serial != last_device_serial:
+                last_device_serial = serial
+                last_known_epoch = pipeline.device_epoch_seconds(cfg)
+                print(f"[Watcher] Đã chuyển sang thiết bị {serial}. Mốc thời gian ban đầu: {last_known_epoch}")
+                time.sleep(1.5)
+                continue
+                
+            # 2. Kiểm tra xem có thư mục sản phẩm được chọn chưa
+            folder_name = selected_folder_name()
+            if not folder_name:
+                # Chưa chọn thư mục, bỏ qua
+                time.sleep(1.5)
+                continue
+                
+            # 3. Lấy mốc thời gian nếu chưa có
+            if last_known_epoch is None:
+                last_known_epoch = pipeline.device_epoch_seconds(cfg)
+                
+            # 4. Quét tìm file mới nhất có mtime >= last_known_epoch
+            patterns = ["*.jpg", "*.jpeg", "*.mp4"]
+            latest_file = pipeline.latest_media_after(cfg, patterns, last_known_epoch)
+            
+            if latest_file:
+                # Lấy mtime của file vừa quét được
+                cmd_stat = f'stat -c %Y "{latest_file}" 2>/dev/null || stat -f %m "{latest_file}" 2>/dev/null'
+                mtime_str = pipeline.adb_command(cfg, "shell", cmd_stat, check=False).stdout.strip()
+                try:
+                    file_mtime = int(mtime_str.splitlines()[-1])
+                except Exception:
+                    file_mtime = last_known_epoch
+                    
+                # Cập nhật mốc thời gian tiếp theo để tránh trùng
+                last_known_epoch = file_mtime + 1
+                
+                # Chạy thread xử lý file mới phát hiện
+                threading.Thread(target=process_auto_media, args=(cfg, latest_file, folder_name), daemon=True).start()
+                
+        except Exception as e:
+            print(f"[Watcher] Lỗi vòng lặp: {e}")
+            
+        time.sleep(1.5)
+
+
+def start_media_watcher():
+    threading.Thread(target=media_watcher_loop, daemon=True).start()
+
+
 if __name__ == "__main__":
     cleanup_old_instances()
+    start_media_watcher()
     threading.Thread(target=launch_desktop_gui, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8765")), debug=False, threaded=True)
