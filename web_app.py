@@ -906,7 +906,7 @@ HTML = r"""
         <div class="actions">
           <div style="display: flex; align-items: center; gap: 8px; background: var(--soft); border: 1px solid var(--panel-border); padding: 8px 16px; border-radius: 99px; font-weight: 700; font-size: 13px; color: var(--text);">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-            GPT-4o + DALL-E 3
+            GPT-4o + GPT Image 1.5
           </div>
         </div>
       </header>
@@ -1010,7 +1010,7 @@ HTML = r"""
               <div class="spinner"></div>
               <div style="text-align: center;">
                 <h4 style="font-size: 15px; color: #fff; margin: 0 0 6px 0; font-family: 'Plus Jakarta Sans', sans-serif;" id="loadingText">Đang xử lý tạo ảnh...</h4>
-                <p style="font-size: 12px; color: var(--muted); margin: 0;">Quá trình phân tích Vision và vẽ DALL-E thường mất 10 - 20 giây.</p>
+                <p style="font-size: 12px; color: var(--muted); margin: 0;">Quá trình phân tích Vision và vẽ tranh thường mất 10 - 20 giây.</p>
               </div>
             </div>
             
@@ -1264,9 +1264,9 @@ HTML = r"""
       if (d.valid) {
         let msg = "Kết nối API Key thành công!\n\n";
         msg += `1. GPT-4o / GPT-4o-mini: ${d.has_gpt4o ? "Sẵn sàng ✅" : "Không có quyền ❌"}\n`;
-        msg += `2. DALL-E 3: ${d.has_dalle3 ? "Sẵn sàng ✅" : "Không có quyền ❌"}\n\n`;
+        msg += `2. GPT-image-1.5: ${d.has_dalle3 ? "Sẵn sàng ✅" : "Không có quyền ❌"}\n\n`;
         if (!d.has_dalle3) {
-          msg += "⚠️ CẢNH BÁO: Tài khoản của bạn gọi được GPT-4o nhưng DALL-E 3 bị OpenAI báo không tồn tại. Vui lòng kiểm tra xem bạn đã nạp đủ $5 (lên Tier 1) chưa hoặc xem trong mục Settings -> Projects -> Limits/Models trên trang OpenAI xem model dall-e-3 có bị tắt (disabled) không.";
+          msg += "⚠️ CẢNH BÁO: Tài khoản của bạn gọi được GPT-4o nhưng mô hình gpt-image-1.5 bị OpenAI báo không tồn tại. Vui lòng kiểm tra xem bạn đã nạp đủ $5 (lên Tier 1) chưa hoặc xem trong mục Settings -> Projects -> Limits/Models trên trang OpenAI xem model gpt-image-1.5 có bị tắt (disabled) không.";
         } else {
           msg += "🎉 Tài khoản của bạn đã đầy đủ quyền và sẵn sàng hoạt động!";
         }
@@ -1353,8 +1353,8 @@ HTML = r"""
         statusText.innerHTML = "Đang gửi ảnh sản phẩm thô lên GPT-4o để phân tích bối cảnh...";
         statusBadge.innerHTML = "GPT-4o Vision đang xử lý";
       } else {
-        statusText.innerHTML = "Đang kết nối API OpenAI DALL-E 3 để tạo ảnh...";
-        statusBadge.innerHTML = "DALL-E 3 đang vẽ";
+        statusText.innerHTML = "Đang kết nối API OpenAI để tạo ảnh...";
+        statusBadge.innerHTML = "gpt-image-1.5 đang vẽ";
       }
       
       const payload = {
@@ -2060,7 +2060,7 @@ def api_openai_check():
         dalle3_error_msg = ""
         try:
             client.images.generate(
-                model="dall-e-3",
+                model="gpt-image-1.5",
                 prompt="",
                 n=1,
                 size="1024x1024"
@@ -2069,7 +2069,7 @@ def api_openai_check():
             err_str = str(e)
             if "does not exist" in err_str:
                 has_dalle3 = False
-                dalle3_error_msg = "Mô hình DALL-E 3 bị khóa hoặc chưa được cấp quyền (tài khoản Tier 0 hoặc bị tắt trong Project)."
+                dalle3_error_msg = "Mô hình gpt-image-1.5 bị khóa hoặc chưa được cấp quyền (tài khoản Tier 0 hoặc bị tắt trong Project)."
             else:
                 has_dalle3 = True
                 
