@@ -2307,7 +2307,7 @@ def index():
 @app.get("/favicon.ico")
 def favicon():
     from flask import send_from_directory
-    return send_from_directory(str(ROOT), "favicon.ico", mimetype="image/vnd.microsoft.icon")
+    return send_from_directory(str(BUNDLE_DIR), "favicon.ico", mimetype="image/vnd.microsoft.icon")
 
 
 @app.get("/api/events")
