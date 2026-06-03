@@ -3759,6 +3759,61 @@ def api_get_latest_photo():
     except Exception as exc:
         return error_response(exc, 400)
 
+def wait_for_port(port, host="127.0.0.1", timeout=20.0):
+    import socket
+    start_time = time.time()
+    while True:
+        try:
+            with socket.create_connection((host, port), timeout=1.0):
+                return True
+        except (socket.timeout, ConnectionRefusedError):
+            if time.time() - start_time > timeout:
+                return False
+            time.sleep(0.3)
+
+
+def launch_desktop_gui():
+    port = int(os.environ.get("PORT", "8765"))
+    if not wait_for_port(port, timeout=20.0):
+        print(f"Lỗi: Flask server không khởi động kịp trên cổng {port}")
+        return
+    
+    # Tìm đường dẫn Chrome cài đặt trên Windows
+    chrome_path = None
+    paths = [
+        Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "Google" / "Chrome" / "Application" / "chrome.exe",
+        Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)")) / "Google" / "Chrome" / "Application" / "chrome.exe",
+        Path(os.environ.get("LOCALAPPDATA", "C:\\Users\\datdt\\AppData\\Local")) / "Google" / "Chrome" / "Application" / "chrome.exe"
+    ]
+    for p in paths:
+        if p.exists():
+            chrome_path = str(p)
+            break
+            
+    port = int(os.environ.get("PORT", "8765"))
+    url = f"http://127.0.0.1:{port}"
+    
+    try:
+        if chrome_path:
+            # Chạy trực tiếp chrome.exe ở chế độ app mode
+            subprocess.run([chrome_path, f"--app={url}", "--window-size=1320,880"])
+        else:
+            # Fallback msedge.exe
+            edge_path = Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)")) / "Microsoft" / "Edge" / "Application" / "msedge.exe"
+            if edge_path.exists():
+                subprocess.run([str(edge_path), f"--app={url}", "--window-size=1320,880"])
+            else:
+                # Fallback cuối cùng: mở trình duyệt mặc định bằng webbrowser
+                import webbrowser
+                webbrowser.open(url)
+                return  # Tránh tắt app khi mở bằng trình duyệt mặc định
+                
+        # Khi người dùng đóng cửa sổ app mode, subprocess.run kết thúc, ta sẽ tắt luôn server Flask ngầm
+        os._exit(0)
+    except Exception as e:
+        print(f"Lỗi khởi chạy GUI App Mode: {e}")
+
 
 if __name__ == "__main__":
+    threading.Thread(target=launch_desktop_gui, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8765")), debug=False, threaded=True)
