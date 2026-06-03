@@ -1059,7 +1059,10 @@ HTML = r"""
         <aside class="panel" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; height: 740px;">
           <div style="border-bottom: 1px solid var(--panel-border); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
             <h4 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 15px;">Ảnh kết quả</h4>
-            <button class="ghost" onclick="loadDownloadedImages()" style="padding: 4px 8px; font-size: 12px; color: var(--brand); background: none; border: none; cursor: pointer;">Làm mới</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="ghost" onclick="clearToolCache()" style="padding: 4px 8px; font-size: 12px; color: var(--danger); background: none; border: none; cursor: pointer; font-weight: 700;" title="Xóa toàn bộ ảnh tạm và ảnh kết quả cũ">Xóa cache</button>
+              <button class="ghost" onclick="loadDownloadedImages()" style="padding: 4px 8px; font-size: 12px; color: var(--brand); background: none; border: none; cursor: pointer; font-weight: 700;">Làm mới</button>
+            </div>
           </div>
           
           <!-- Khung danh sách ảnh kết quả -->
@@ -1813,6 +1816,34 @@ HTML = r"""
     } catch(e) {
       appendAutomationLog("Lỗi: " + (e.error || e.message || JSON.stringify(e)));
       alert("Lỗi gửi yêu cầu: " + (e.error || e.message || JSON.stringify(e)));
+    }
+  }
+
+  async function clearToolCache() {
+    if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ ảnh tạm trong inbox và các ảnh kết quả 'chatgpt_*' cũ không?")) {
+      return;
+    }
+    try {
+      const response = await fetch("/api/automation/clear-cache", { method: "POST" });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        // Xóa preview ảnh thô
+        if (typeof clearContentImage === "function") {
+          clearContentImage();
+        }
+        // Làm mới danh sách ảnh kết quả
+        await loadDownloadedImages();
+        // Clear log box
+        const logBox = document.getElementById("automationLogBox");
+        if (logBox) {
+          logBox.innerHTML = "Đã xóa sạch cache. Sẵn sàng cho tác vụ mới.";
+        }
+        alert("Đã xóa sạch bộ nhớ tạm và các ảnh kết quả cũ thành công!");
+      } else {
+        alert("Lỗi xóa cache: " + (data.error || data.message));
+      }
+    } catch (e) {
+      alert("Lỗi kết nối khi xóa cache: " + e.message);
     }
   }
 
@@ -3691,6 +3722,50 @@ def api_image_reveal():
             
         subprocess.run(["explorer.exe", "/select,", str(file_path)])
         return jsonify({"status": "Đã mở thư mục và chọn file."})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/automation/clear-cache")
+def api_clear_cache():
+    try:
+        # 1. Xóa file trong inbox
+        inbox_dir = ROOT / "inbox"
+        if inbox_dir.exists():
+            for ext in ("*.png", "*.jpg", "*.jpeg"):
+                for f in inbox_dir.glob(ext):
+                    try:
+                        f.unlink()
+                    except Exception:
+                        pass
+                        
+        # 2. Xóa file trong processed
+        processed_dir = ROOT / "processed"
+        if processed_dir.exists():
+            for ext in ("*.png", "*.jpg", "*.jpeg"):
+                for f in processed_dir.glob(ext):
+                    try:
+                        f.unlink()
+                    except Exception:
+                        pass
+                        
+        # 3. Xóa file chatgpt_* trong export_dir
+        config = load_config()
+        export_dir = config.get("openai", {}).get("export_dir", "").strip()
+        if not export_dir:
+            export_dir = str(Path.home() / "Downloads")
+        out_dir = Path(export_dir)
+        if out_dir.exists():
+            for ext in ("*.png", "*.jpg", "*.jpeg"):
+                for f in out_dir.glob(ext):
+                    if f.name.startswith("chatgpt_"):
+                        try:
+                            f.unlink()
+                        except Exception:
+                            pass
+                            
+        add_event({"step": "clear_cache", "message": "Đã xóa sạch bộ nhớ tạm và các ảnh kết quả cũ."})
+        return jsonify({"success": True, "message": "Đã xóa cache thành công."})
     except Exception as exc:
         return error_response(exc, 400)
 
