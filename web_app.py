@@ -2173,19 +2173,19 @@ def api_poster_generate():
             # Log prompt đã tối ưu
             add_event({"step": "poster_gpt_prompt", "message": f"GPT-4o Vision đã tạo prompt vẽ tranh chi tiết: {final_prompt}"})
 
-        # 2. Gọi DALL-E 3 để tạo ảnh poster
-        # DALL-E 3 chỉ hỗ trợ tạo 1 ảnh mỗi lần gọi (n=1). Chúng ta sẽ dùng ThreadPoolExecutor để chạy song song.
+        # 2. Gọi gpt-image-1.5 để tạo ảnh poster
+        # gpt-image-1.5 hỗ trợ tạo 1 ảnh mỗi lần gọi (n=1). Chúng ta sẽ dùng ThreadPoolExecutor để chạy song song.
         def generate_single_image():
             response = client.images.generate(
-                model="dall-e-3",
+                model="gpt-image-1.5",
                 prompt=final_prompt,
                 size=size,
-                quality="hd", # HD chất lượng cao hơn
+                quality="high", # Sử dụng 'high' tương thích với gpt-image-1.5
                 n=1
             )
             return response.data[0].url
 
-        add_event({"step": "poster_generating", "message": f"Đang kết nối DALL-E 3 để tạo {quantity} ảnh poster với kích thước {size}..."})
+        add_event({"step": "poster_generating", "message": f"Đang kết nối gpt-image-1.5 để tạo {quantity} ảnh poster với kích thước {size}..."})
         
         urls = []
         with ThreadPoolExecutor(max_workers=min(quantity, 4)) as executor:
@@ -2198,7 +2198,7 @@ def api_poster_generate():
                     add_event({"step": "error", "message": f"Lỗi tạo ảnh đơn lẻ: {e}"})
                     
         if not urls:
-            raise RuntimeError("Tất cả các lượt gọi API DALL-E 3 đều thất bại. Hãy kiểm tra kết nối API Key và quota tài khoản.")
+            raise RuntimeError("Tất cả các lượt gọi API gpt-image-1.5 đều thất bại. Hãy kiểm tra kết nối API Key và quota tài khoản.")
             
         add_event({"step": "poster_done", "message": f"Đã tạo thành công {len(urls)} ảnh poster quảng cáo từ AI."})
         return jsonify({"images": urls})
