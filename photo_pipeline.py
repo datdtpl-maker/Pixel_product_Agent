@@ -83,12 +83,28 @@ def latest_media_after(settings: Settings, patterns: list[str], min_epoch: int) 
     return adb_command(settings, "shell", command, check=False).stdout.strip()
 
 
+def is_camera_open(settings: Settings) -> bool:
+    try:
+        # Lấy trạng thái activity đang hiển thị trên foreground để check GCamera
+        output = adb_command(settings, "shell", "dumpsys activity resumed", check=False).stdout
+        return "com.google.android.GoogleCamera" in output
+    except Exception:
+        return False
+
+
 def capture_from_pixel(settings: Settings) -> Path:
     ensure_dirs(settings)
-    capture_started_at = max(0, device_epoch_seconds(settings) - 1)
-    adb_command(settings, "shell", "am", "start", "-a", "android.media.action.STILL_IMAGE_CAMERA")
-    time.sleep(2)
-    adb_command(settings, "shell", "input", "keyevent", "27")
+    capture_started_at = max(0, device_epoch_seconds(settings) - 5)
+    
+    # Chỉ gọi lệnh mở camera nếu camera chưa được mở sẵn trên foreground (giúp giữ nguyên mức zoom của người dùng)
+    if not is_camera_open(settings):
+        adb_command(settings, "shell", "am", "start", "-a", "android.media.action.STILL_IMAGE_CAMERA")
+        time.sleep(3)
+    else:
+        time.sleep(0.5)
+        
+    # Gửi phím Volume Down (25) để chụp ảnh trên Google Camera
+    adb_command(settings, "shell", "input", "keyevent", "25")
 
     latest = ""
     for _ in range(12):
@@ -107,12 +123,20 @@ def capture_from_pixel(settings: Settings) -> Path:
 def capture_video_from_pixel(settings: Settings, duration_seconds: int = 10) -> Path:
     ensure_dirs(settings)
     duration_seconds = max(1, min(duration_seconds, 300))
-    recording_started_at = max(0, device_epoch_seconds(settings) - 1)
-    adb_command(settings, "shell", "am", "start", "-a", "android.media.action.VIDEO_CAMERA")
-    time.sleep(2)
-    adb_command(settings, "shell", "input", "keyevent", "27")
+    recording_started_at = max(0, device_epoch_seconds(settings) - 5)
+    
+    # Chỉ gọi lệnh mở camera video nếu camera chưa được mở sẵn trên foreground
+    if not is_camera_open(settings):
+        adb_command(settings, "shell", "am", "start", "-a", "android.media.action.VIDEO_CAMERA")
+        time.sleep(3)
+    else:
+        time.sleep(0.5)
+        
+    # Gửi phím Volume Down (25) để bắt đầu quay video
+    adb_command(settings, "shell", "input", "keyevent", "25")
     time.sleep(duration_seconds)
-    adb_command(settings, "shell", "input", "keyevent", "27")
+    # Gửi phím Volume Down (25) để dừng quay video
+    adb_command(settings, "shell", "input", "keyevent", "25")
 
     latest = ""
     for _ in range(20):

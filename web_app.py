@@ -894,136 +894,119 @@ HTML = r"""
       </div>
     </div>
 
-    <!-- AI Poster Generator Tab -->
+    <!-- AI Poster Generator Tab (Content Helper Tool) -->
     <div id="posterDashboard" style="display: none; flex-direction: column; width: 100%;">
-      <header class="topbar">
+      <header class="topbar" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); padding-bottom: 16px; margin-bottom: 24px;">
         <div style="display: flex; align-items: center; gap: 16px;">
           <button class="ghost" onclick="showCaptureDashboard()" style="min-height: 38px; padding: 8px 12px;" title="Quay lại Bảng điều khiển">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
           </button>
-          <h2>Tạo ảnh đa năng</h2>
+          <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 22px;">Tạo ảnh đa năng (Content Helper)</h2>
         </div>
-        <div class="actions">
-          <div style="display: flex; align-items: center; gap: 8px; background: var(--soft); border: 1px solid var(--panel-border); padding: 8px 16px; border-radius: 99px; font-weight: 700; font-size: 13px; color: var(--text);">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-            GPT-4o + GPT Image 1.5
+        <div class="actions" style="display: flex; gap: 12px; align-items: center;">
+          <div id="chromeStatusBadge" class="badge danger" style="padding: 8px 16px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; border-radius: 99px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;" id="chromeStatusDot"></span>
+            <span id="chromeStatusText">Chrome Debug: Offline</span>
           </div>
+          <button type="button" class="btn-capture" onclick="startChromeDebug()" style="min-height: 36px; padding: 0 16px; font-size: 12px; background: var(--brand); border-radius: 8px; font-weight: 700;">
+            Khởi động Chrome
+          </button>
         </div>
       </header>
       
-      <div class="content" style="padding: 24px; display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 24px; width: 100%;">
-        <!-- Left Sidebar: Configurations -->
-        <aside class="panel" style="display: flex; flex-direction: column; gap: 20px; padding: 24px; height: fit-content;">
-          <!-- Image Dropzone -->
-          <div>
-            <label>Tải lên hình ảnh (Tối đa 4)</label>
-            <div id="imageDropzone" onclick="document.getElementById('posterFiles').click()" style="border: 2px dashed var(--panel-border); border-radius: 12px; height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: rgba(0,0,0,0.12);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); margin-bottom: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-              <span style="font-size: 12px; color: var(--muted); font-weight: 500; text-align: center; padding: 0 10px;">Bấm hoặc Kéo thả ảnh sản phẩm</span>
-              <input type="file" id="posterFiles" multiple accept="image/*" style="display: none;" onchange="handlePosterFiles(this.files)">
-            </div>
-            <div id="uploadedThumbnails" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px;"></div>
+      <div class="content" style="padding: 0; display: grid; grid-template-columns: 340px 1fr 360px; gap: 24px; width: 100%; align-items: start;">
+        <!-- Cột 1: Thư viện Prompt (Prompts Library) -->
+        <aside class="panel" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; height: 740px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); padding-bottom: 12px;">
+            <h4 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 15px;">Thư viện Prompt</h4>
+            <button class="ghost" onclick="openPromptModal()" style="padding: 4px 8px; font-size: 12px; color: var(--brand); font-weight: 700; background: none; border: none; cursor: pointer;">+ Thêm</button>
           </div>
           
-          <!-- Prompt input -->
-          <div>
-            <label for="posterPrompt">Yêu cầu tạo ảnh mới</label>
-            <textarea id="posterPrompt" placeholder="Vui lòng mô tả ý tưởng poster của bạn...&#10;(Ví dụ: Đặt sản phẩm này trên mặt cát, có sóng biển vỗ nhẹ bên cạnh, ánh sáng tự nhiên)" style="height: 110px; resize: none; font-size: 13px; line-height: 1.4;" oninput="updatePromptCount()"></textarea>
-            <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--muted);">
-              <span onclick="insertPromptTemplate()" style="cursor: pointer; color: var(--brand); font-weight: 700;">✨ Dùng mẫu prompt</span>
-              <span id="promptCharCount">0/1000</span>
-            </div>
-          </div>
-          
-          <!-- Quantity -->
-          <div>
-            <label>Số lượng tạo</label>
-            <div class="quantity-selector" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
-              <button type="button" class="select-btn" id="btnQty1" onclick="selectQuantity(this, 1)">1</button>
-              <button type="button" class="secondary select-btn" onclick="selectQuantity(this, 2)">2</button>
-              <button type="button" class="secondary select-btn" onclick="selectQuantity(this, 4)">4</button>
-              <button type="button" class="secondary select-btn" onclick="selectQuantity(this, 6)">6</button>
-              <button type="button" class="secondary select-btn" onclick="selectQuantity(this, 9)">9</button>
-            </div>
-            <input type="hidden" id="posterQuantity" value="1">
-          </div>
-          
-          <!-- Aspect ratio -->
-          <div>
-            <label for="posterSize">Tỷ lệ kích thước</label>
-            <select id="posterSize" style="font-size: 13px;">
-              <option value="1024x1024">Square (1:1) - 1024x1024 px</option>
-              <option value="1024x1792">Portrait (9:16) - 1024x1792 px</option>
-              <option value="1792x1024">Landscape (16:9) - 1792x1024 px</option>
+          <!-- Lọc danh mục -->
+          <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+            <select id="promptCategoryFilter" onchange="filterPromptsList()" style="font-size: 12px; min-height: 34px; flex: 1;">
+              <option value="all">Tất cả danh mục</option>
             </select>
-          </div>
-
-          <!-- API Settings -->
-          <div>
-            <label for="openaiKey">OpenAI API Key</label>
-            <div class="field-action" style="grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px;">
-              <input type="password" id="openaiKey" placeholder="sk-proj-..." style="font-size: 12px; min-height: 38px;">
-              <button type="button" class="secondary" onclick="saveOpenAIConfigBtn()" style="min-height: 38px; padding: 0 12px;">Lưu</button>
-              <button type="button" class="secondary" id="btnCheckAPI" onclick="checkAPIKey()" style="min-height: 38px; padding: 0 12px;">Kiểm tra</button>
-            </div>
-          </div>
-
-          <!-- Export Folder -->
-          <div>
-            <label for="posterExportDir">Thư mục xuất hình</label>
-            <div class="field-action">
-              <input id="posterExportDir" placeholder="Mặc định: Thư mục Drive hiện tại" style="font-size: 12px; min-height: 38px;">
-              <button type="button" class="secondary" onclick="browseExportDirectory()" style="min-height: 38px; padding: 0 16px;">Chọn</button>
-            </div>
+            <button class="ghost" onclick="openCategoryModal()" style="padding: 6px; min-height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid var(--panel-border); border-radius: 8px;" title="Quản lý danh mục">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted);"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </button>
           </div>
           
-          <!-- Submit button -->
-          <button class="btn-capture" id="btnGeneratePoster" onclick="generatePoster()" style="width: 100%; font-size: 14px; padding: 12px; margin-top: 10px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-            Tạo Poster AI
-          </button>
+          <!-- Danh sách prompts -->
+          <div id="promptsLibraryContainer" style="display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; padding-right: 4px;">
+            <!-- Load động từ API -->
+          </div>
         </aside>
         
-        <!-- Right Main Panel: Generation Result -->
-        <main class="panel" style="display: flex; flex-direction: column; min-height: 580px; padding: 24px; width: 100%;">
-          <div class="panel-head" style="padding: 0 0 20px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <h3 style="font-size: 20px; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif;">Poster Quảng Cáo</h3>
-              <p style="margin-top: 4px; color: var(--muted); font-size: 13px;">Giao diện hiển thị poster tạo tự động bằng AI.</p>
-            </div>
-            <div id="generationStatus" style="display: none; align-items: center; gap: 8px;">
-              <span class="badge warn" id="statusBadge" style="padding: 6px 12px;">Đang chuẩn bị...</span>
+        <!-- Cột 2: Bảng điều khiển và Soạn thảo (Control Panel) -->
+        <main class="panel" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; min-height: 740px; height: 740px;">
+          <div style="border-bottom: 1px solid var(--panel-border); padding-bottom: 12px;">
+            <h4 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 15px;">Bảng Điều Khiển Gửi</h4>
+          </div>
+          
+          <!-- Đường dẫn lưu ảnh kết quả -->
+          <div style="margin-bottom: 4px;">
+            <label style="margin-bottom: 6px; display: block; font-weight: 600; font-size: 13px;">Thư mục lưu ảnh kết quả</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="posterExportDir" placeholder="Mặc định: Downloads" style="flex: 1; min-height: 36px; padding: 6px 12px; font-size: 13px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); border-radius: 8px; color: var(--text);" readonly>
+              <button type="button" class="secondary" onclick="browseExportDirectory()" style="min-height: 36px; padding: 0 14px; font-size: 12px; border-radius: 8px; font-weight: 600; cursor: pointer;">Chọn...</button>
             </div>
           </div>
           
-          <div class="panel-body" style="flex: 1; padding: 24px 0 0 0; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%;">
-            <!-- Initial view -->
-            <div id="posterPlaceholder" style="display: flex; flex-direction: column; align-items: center; text-align: center; color: var(--muted); max-width: 440px; margin: auto;">
-              <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--soft); border: 1px solid var(--panel-border); display: grid; place-items: center; margin-bottom: 20px; box-shadow: var(--shadow);">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand);"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          <!-- Ảnh sản phẩm được chọn -->
+          <div>
+            <label style="margin-bottom: 6px; display: block; font-weight: 600; font-size: 13px;">Ảnh sản phẩm thô (Gửi kèm)</label>
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 12px;">
+              <div id="contentImgDropzone" onclick="document.getElementById('contentImgFile').click()" style="border: 2px dashed var(--panel-border); border-radius: 12px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: rgba(0,0,0,0.12); flex: 1;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); margin-bottom: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span id="contentImgLabel" style="font-size: 11px; color: var(--muted); text-align: center; padding: 0 10px; font-weight: 500;">Bấm hoặc Kéo thả ảnh sản phẩm</span>
+                <input type="file" id="contentImgFile" accept="image/*" style="display: none;" onchange="handleContentImageSelect(this.files)">
               </div>
-              <h4 style="font-size: 16px; color: #fff; margin: 0 0 8px 0; font-family: 'Plus Jakarta Sans', sans-serif;">Chưa có ảnh poster nào được tạo</h4>
-              <p style="font-size: 13px; line-height: 1.5; margin: 0;">Nhập yêu cầu và tải lên ảnh sản phẩm thô ở cột bên trái, sau đó bấm nút "Tạo Poster AI" để bắt đầu thiết kế.</p>
-            </div>
-            
-            <!-- Loading indicator -->
-            <div id="posterLoading" style="display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px; margin: auto;">
-              <div class="spinner"></div>
-              <div style="text-align: center;">
-                <h4 style="font-size: 15px; color: #fff; margin: 0 0 6px 0; font-family: 'Plus Jakarta Sans', sans-serif;" id="loadingText">Đang xử lý tạo ảnh...</h4>
-                <p style="font-size: 12px; color: var(--muted); margin: 0;">Quá trình phân tích Vision và vẽ tranh thường mất 10 - 20 giây.</p>
+              <div id="contentImgPreviewContainer" style="width: 70px; height: 70px; border-radius: 12px; border: 1px solid var(--panel-border); display: none; overflow: hidden; position: relative; background: var(--bg);">
+                <img id="contentImgPreview" src="" style="width: 100%; height: 100%; object-fit: contain;">
+                <button type="button" onclick="clearContentImage()" style="position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); border: none; border-radius: 50%; width: 20px; height: 20px; display: grid; place-items: center; color: #fff; cursor: pointer; font-size: 11px;">×</button>
               </div>
             </div>
-            
-            <!-- Grid displaying generated images -->
-            <div id="posterGrid" style="display: none; width: 100%; grid-template-columns: repeat(2, 1fr); gap: 24px;"></div>
+            <!-- Nút lấy ảnh chụp Pixel mới nhất -->
+            <button type="button" class="secondary" onclick="useLatestPixelPhoto()" style="width: 100%; min-height: 32px; font-size: 11px; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; border-radius: 6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+              Lấy ảnh Pixel vừa chụp mới nhất
+            </button>
           </div>
           
-          <!-- Bottom disclaimer -->
-          <div style="border-top: 1px solid var(--line); padding-top: 16px; margin-top: 24px; font-size: 11px; color: var(--muted); line-height: 1.5; text-align: center;">
-            Miễn trừ trách nhiệm: Tất cả nội dung được tạo ra bởi dịch vụ này đều được tạo tự động bằng AI và chỉ mang tính chất tham khảo. Chúng tôi không đảm bảo tính chính xác, đầy đủ hoặc tính ứng dụng của nội dung.
+          <!-- Nội dung Prompt soạn thảo -->
+          <div style="display: flex; flex-direction: column; flex: 1; min-height: 140px;">
+            <label for="contentEditorPrompt" style="margin-bottom: 8px; display: block; font-weight: 600; font-size: 13px;">Nội dung Prompt</label>
+            <textarea id="contentEditorPrompt" placeholder="Nhập yêu cầu bối cảnh ở đây hoặc click chọn từ thư viện bên trái..." style="flex: 1; width: 100%; min-height: 100px; resize: none; font-size: 13px; line-height: 1.4; border-radius: 8px; padding: 10px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); color: var(--text);"></textarea>
+          </div>
+          
+          <!-- Nút bấm Gửi -->
+          <button class="btn-capture" id="btnSendToChatGPT" onclick="sendToChatGPT()" style="width: 100%; font-size: 14px; padding: 12px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            Gửi Lên ChatGPT
+          </button>
+          
+          <!-- Nhật ký tiến trình (Live Log) -->
+          <div style="display: flex; flex-direction: column; height: 200px; min-height: 200px;">
+            <label style="margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--muted);">Nhật ký tiến trình (Realtime Log)</label>
+            <div id="automationLogBox" style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11px; overflow-y: auto; color: var(--muted); line-height: 1.5; height: 170px;">
+              Chưa có hoạt động nào. Hãy kết nối Chrome và gửi ảnh để bắt đầu.
+            </div>
           </div>
         </main>
+        
+        <!-- Cột 3: Danh sách ảnh kết quả tải về (Results Panel) -->
+        <aside class="panel" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; height: 740px;">
+          <div style="border-bottom: 1px solid var(--panel-border); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 15px;">Ảnh kết quả</h4>
+            <button class="ghost" onclick="loadDownloadedImages()" style="padding: 4px 8px; font-size: 12px; color: var(--brand); background: none; border: none; cursor: pointer;">Làm mới</button>
+          </div>
+          
+          <!-- Khung danh sách ảnh kết quả -->
+          <div id="downloadedImagesList" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; align-content: start; padding-right: 4px;">
+            <!-- Load động từ API -->
+          </div>
+        </aside>
       </div>
     </div>
   </main>
@@ -1118,8 +1101,22 @@ HTML = r"""
       text = JSON.stringify(v, null, 2);
       const step = v.step || "";
       if (step === "error" || v.error) isError = true;
-      if (step === "done" || step === "drive_saved" || step === "pulled" || step === "capture" || step === "record" || step === "wifi_connected" || step === "usb_mode" || step === "ip_detected") isSuccess = true;
+      if (step === "done" || step === "drive_saved" || step === "pulled" || step === "capture" || step === "record" || step === "wifi_connected" || step === "usb_mode" || step === "ip_detected" || step === "chatgpt_done") isSuccess = true;
       if (step === "cleanup" && v.cleanup_warning) isWarning = true;
+      
+      // Tích hợp Realtime Log cho Content Helper Tool
+      if (step === "chatgpt_automation" || step === "chatgpt_done" || step === "error") {
+        const autoLogBox = document.getElementById("automationLogBox");
+        if (autoLogBox) {
+          const timeStr = new Date().toLocaleTimeString();
+          const color = step === "error" ? "#ef4444" : (step === "chatgpt_done" ? "#22c55e" : "var(--text)");
+          autoLogBox.innerHTML += `<div style="color: ${color}; margin-bottom: 4px;">[${timeStr}] ${escapeHtml(v.message || text)}</div>`;
+          autoLogBox.scrollTop = autoLogBox.scrollHeight;
+        }
+        if (step === "chatgpt_done") {
+          loadDownloadedImages();
+        }
+      }
     }
     
     let colorClass = "log-info";
@@ -1289,11 +1286,13 @@ HTML = r"""
     try {
       const r = await fetch("/api/openai/config");
       const d = await r.json();
-      if (d.api_key) {
-        document.getElementById("openaiKey").value = d.api_key;
+      const keyEl = document.getElementById("openaiKey");
+      if (keyEl && d.api_key) {
+        keyEl.value = d.api_key;
       }
-      if (d.export_dir) {
-        document.getElementById("posterExportDir").value = d.export_dir;
+      const dirEl = document.getElementById("posterExportDir");
+      if (dirEl && d.export_dir) {
+        dirEl.value = d.export_dir;
       }
     } catch(e) {
       console.error(e);
@@ -1301,8 +1300,10 @@ HTML = r"""
   }
   
   async function saveOpenAIConfig() {
-    const key = document.getElementById("openaiKey").value.trim();
-    const dir = document.getElementById("posterExportDir").value.trim();
+    const keyEl = document.getElementById("openaiKey");
+    const key = keyEl ? keyEl.value.trim() : "";
+    const dirEl = document.getElementById("posterExportDir");
+    const dir = dirEl ? dirEl.value.trim() : "";
     await fetch("/api/openai/config", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
@@ -1324,141 +1325,456 @@ HTML = r"""
       const r = await fetch("/api/utils/select-directory", { method: "POST" });
       const d = await r.json();
       if (d.directory) {
-        document.getElementById("posterExportDir").value = d.directory;
+        const dirEl = document.getElementById("posterExportDir");
+        if (dirEl) {
+          dirEl.value = d.directory;
+        }
         await saveOpenAIConfig();
+        loadDownloadedImages();
       }
     } catch(e) {
       alert("Không thể mở hộp thoại chọn thư mục: " + (e.error || e.message || JSON.stringify(e)));
     }
   }
   
-  async function generatePoster() {
-    const prompt = document.getElementById("posterPrompt").value.trim();
-    const key = document.getElementById("openaiKey").value.trim();
-    
-    if (!key) {
-      alert("Vui lòng cấu hình OpenAI API Key ở mục tương ứng trước khi tạo.");
-      return;
-    }
-    if (!prompt) {
-      alert("Vui lòng nhập yêu cầu tạo ảnh mới.");
-      return;
-    }
-    
-    // Lưu cấu hình tự động
-    await saveOpenAIConfig();
-    
-    // Đổi trạng thái UI sang Loading
-    document.getElementById("posterPlaceholder").style.display = "none";
-    document.getElementById("posterGrid").style.display = "none";
-    document.getElementById("posterLoading").style.display = "flex";
-    document.getElementById("generationStatus").style.display = "flex";
-    
-    const qty = Number(document.getElementById("posterQuantity").value);
-    const size = document.getElementById("posterSize").value;
-    
-    const statusText = document.getElementById("loadingText");
-    const statusBadge = document.getElementById("statusBadge");
-    
+  // ==========================================
+  // CONTENT IMAGE HELPER TOOL JS
+  // ==========================================
+  let promptsList = [];
+  let categoriesList = ["Shopee", "Facebook", "General"];
+  let editingCategories = [];
+  let contentSelectedImageBase64 = null;
+  let chromeStatusInterval = null;
+
+  async function loadPromptsLibrary() {
     try {
-      if (posterImages.length > 0) {
-        statusText.innerHTML = "Đang gửi ảnh sản phẩm thô lên GPT-4o để phân tích bối cảnh...";
-        statusBadge.innerHTML = "GPT-4o Vision đang xử lý";
-      } else {
-        statusText.innerHTML = "Đang kết nối API OpenAI để tạo ảnh...";
-        statusBadge.innerHTML = "gpt-image-1.5 đang vẽ";
-      }
-      
-      const payload = {
-        prompt: prompt,
-        quantity: qty,
-        size: size,
-        images: posterImages.map(img => img.base64)
-      };
-      
-      // Chạy API gọi AI tạo ảnh
-      const r = await fetch("/api/poster/generate", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload)
-      });
-      const d = await r.json();
-      
-      if (!r.ok) {
-        throw d;
-      }
-      
-      renderPosterGrid(d.images, size);
-      
+      const response = await fetch("/api/content/prompts");
+      promptsList = await response.json();
+      renderPromptsLibrary();
     } catch(e) {
-      alert("Lỗi tạo ảnh: " + (e.error || e.message || JSON.stringify(e)));
-      document.getElementById("posterPlaceholder").style.display = "flex";
-      document.getElementById("posterLoading").style.display = "none";
-      document.getElementById("generationStatus").style.display = "none";
+      console.error("Lỗi tải thư viện prompts:", e);
     }
   }
-  
-  function renderPosterGrid(images, size) {
-    document.getElementById("posterLoading").style.display = "none";
-    document.getElementById("generationStatus").style.display = "none";
+
+  function renderPromptsLibrary() {
+    const filter = document.getElementById("promptCategoryFilter").value;
+    const container = document.getElementById("promptsLibraryContainer");
+    container.innerHTML = "";
     
-    const grid = document.getElementById("posterGrid");
-    grid.innerHTML = "";
-    grid.style.display = "grid";
+    const filtered = promptsList.filter(p => filter === "all" || p.category === filter);
     
-    // Tùy chỉnh tỷ lệ thẻ dựa theo kích thước
-    let aspect = "1/1";
-    if (size === "1024x1792") aspect = "9/16";
-    else if (size === "1792x1024") aspect = "16/9";
+    if (filtered.length === 0) {
+      container.innerHTML = `<div style="text-align:center; color:var(--muted); font-size:12px; margin-top:20px;">Thư viện trống.</div>`;
+      return;
+    }
     
-    images.forEach((imgUrl, idx) => {
+    filtered.forEach(p => {
       const card = document.createElement("div");
-      card.className = "poster-card";
-      card.style.aspectRatio = aspect;
+      card.className = "prompt-library-card";
+      card.style = "background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); border-radius: 8px; padding: 12px; cursor: pointer; position: relative; transition: all 0.2s;";
       card.innerHTML = `
-        <img src="${imgUrl}" alt="Poster AI ${idx + 1}" style="aspect-ratio: ${aspect};">
-        <div class="card-actions">
-          <button class="ghost" onclick="downloadPosterDirect('${imgUrl}', ${idx + 1})" style="min-height: 32px; padding: 4px 8px; font-size: 12px; background: rgba(0,0,0,0.6);">
-            📥 Tải về máy
-          </button>
-          <button onclick="savePosterToDrive('${imgUrl}', ${idx + 1})" style="min-height: 32px; padding: 4px 8px; font-size: 12px;">
-            💾 Lưu vào Drive
-          </button>
+        <div style="font-weight: 700; font-size: 13px; color: var(--text); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; padding-right: 85px;">
+          <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 220px; color: var(--text);" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</span>
+        </div>
+        <div style="font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; padding-right: 20px;">
+          ${escapeHtml(p.content)}
+        </div>
+        <div style="position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; z-index: 10;">
+          <span onclick="event.stopPropagation(); openPromptModal('${p.id}')" style="color:var(--brand); font-size: 10px; cursor:pointer; font-weight:700; background:rgba(59,130,246,0.15); padding: 2px 6px; border-radius: 4px; transition: background 0.2s;">Sửa</span>
+          <span onclick="event.stopPropagation(); deletePromptTemplate('${p.id}')" style="color:#ef4444; font-size: 10px; cursor:pointer; font-weight:700; background:rgba(239,68,68,0.15); padding: 2px 6px; border-radius: 4px; transition: background 0.2s;">Xóa</span>
         </div>
       `;
-      grid.appendChild(card);
+      card.onclick = () => selectPromptTemplate(p.id);
+      
+      card.onmouseenter = () => { card.style.background = "rgba(255,255,255,0.07)"; card.style.borderColor = "var(--brand)"; };
+      card.onmouseleave = () => { card.style.background = "rgba(255,255,255,0.03)"; card.style.borderColor = "var(--panel-border)"; };
+      
+      container.appendChild(card);
     });
   }
-  
-  async function savePosterToDrive(url, idx) {
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+
+  function selectPromptTemplate(id) {
+    const p = promptsList.find(item => item.id === id);
+    if (p) {
+      document.getElementById("contentEditorPrompt").value = p.content;
+    }
+  }
+
+  function filterPromptsList() {
+    renderPromptsLibrary();
+  }
+
+  async function loadCategories() {
     try {
-      // Gọi API backend tải ảnh và lưu
-      const response = await fetch("/api/poster/save", {
+      const response = await fetch("/api/content/categories");
+      categoriesList = await response.json();
+      updateCategoryDropdowns();
+    } catch(e) {
+      console.error("Lỗi tải danh mục:", e);
+    }
+  }
+
+  function updateCategoryDropdowns() {
+    const filterSelect = document.getElementById("promptCategoryFilter");
+    const currentFilterVal = filterSelect.value;
+    filterSelect.innerHTML = `<option value="all">Tất cả danh mục</option>`;
+    categoriesList.forEach(cat => {
+      filterSelect.innerHTML += `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`;
+    });
+    if (categoriesList.includes(currentFilterVal)) {
+      filterSelect.value = currentFilterVal;
+    } else {
+      filterSelect.value = "all";
+    }
+
+    const modalSelect = document.getElementById("promptModalCategory");
+    modalSelect.innerHTML = "";
+    categoriesList.forEach(cat => {
+      modalSelect.innerHTML += `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`;
+    });
+  }
+
+  window.openCategoryModal = function() {
+    editingCategories = [...categoriesList];
+    renderCategoriesManageList();
+    document.getElementById("categoryModal").style.display = "flex";
+  };
+
+  window.closeCategoryModal = function() {
+    document.getElementById("categoryModal").style.display = "none";
+  };
+
+  function renderCategoriesManageList() {
+    const container = document.getElementById("categoriesListContainer");
+    container.innerHTML = "";
+    
+    if (editingCategories.length === 0) {
+      container.innerHTML = `<div style="text-align:center; color:var(--muted); font-size:12px; margin: 10px 0;">Chưa có danh mục nào. Hãy bấm thêm mới ở dưới.</div>`;
+      return;
+    }
+    
+    editingCategories.forEach((cat, index) => {
+      const row = document.createElement("div");
+      row.style = "display: flex; gap: 8px; align-items: center; width: 100%;";
+      row.innerHTML = `
+        <input type="text" value="${escapeHtml(cat)}" onchange="updateEditingCategoryValue(${index}, this.value)" style="flex: 1; min-height: 36px; padding: 0 10px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text); font-size: 13px;">
+        <button type="button" class="ghost" onclick="deleteCategoryInModal(${index})" style="min-height: 36px; padding: 8px; border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; color: #ef4444; cursor: pointer; display: flex; align-items: center; justify-content: center; background: none;" title="Xóa danh mục">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+        </button>
+      `;
+      container.appendChild(row);
+    });
+  }
+
+  window.updateEditingCategoryValue = function(index, val) {
+    editingCategories[index] = val.trim();
+  };
+
+  window.addCategoryRowInModal = function() {
+    editingCategories.push("");
+    renderCategoriesManageList();
+    setTimeout(() => {
+      const container = document.getElementById("categoriesListContainer");
+      container.scrollTop = container.scrollHeight;
+      const inputs = container.querySelectorAll("input");
+      if (inputs.length > 0) {
+        inputs[inputs.length - 1].focus();
+      }
+    }, 50);
+  };
+
+  window.deleteCategoryInModal = function(index) {
+    editingCategories.splice(index, 1);
+    renderCategoriesManageList();
+  };
+
+  window.saveCategoriesFromModal = async function() {
+    const newCategories = editingCategories.map(c => c.trim()).filter(c => c !== "");
+    if (newCategories.length === 0) {
+      alert("Bạn phải giữ lại ít nhất 1 danh mục.");
+      return;
+    }
+    
+    const rename_map = {};
+    const deleted = [];
+    
+    const minLen = Math.min(categoriesList.length, newCategories.length);
+    for (let i = 0; i < minLen; i++) {
+      if (categoriesList[i] !== newCategories[i]) {
+        rename_map[categoriesList[i]] = newCategories[i];
+      }
+    }
+    
+    if (categoriesList.length > newCategories.length) {
+      for (let i = newCategories.length; i < categoriesList.length; i++) {
+        deleted.push(categoriesList[i]);
+      }
+    }
+    
+    try {
+      const response = await fetch("/api/content/categories", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
-          image_url: url,
-          filename: `poster_ai_${new Date().strftime("%Y%m%d_%H%M%S")}_${idx}.png`
+          categories: newCategories,
+          rename_map: rename_map,
+          deleted: deleted
         })
       });
       const d = await response.json();
       if (!response.ok) throw d;
-      alert(`Đã lưu poster thành công vào thư mục: ${d.saved_path}`);
+      
+      closeCategoryModal();
+      await loadCategories();
+      await loadPromptsLibrary();
     } catch(e) {
-      alert("Lỗi lưu ảnh: " + (e.error || e.message || JSON.stringify(e)));
+      alert("Lỗi lưu danh mục: " + (e.error || e.message || JSON.stringify(e)));
+    }
+  };
+
+  function openPromptModal(id = "") {
+    const modal = document.getElementById("promptModal");
+    const title = document.getElementById("promptModalTitle");
+    const idInput = document.getElementById("promptModalId");
+    const catSelect = document.getElementById("promptModalCategory");
+    const titleInput = document.getElementById("promptModalTitleInput");
+    const contentInput = document.getElementById("promptModalContentInput");
+    
+    if (id) {
+      title.innerText = "Sửa Prompt Mẫu";
+      const p = promptsList.find(item => item.id === id);
+      if (p) {
+        idInput.value = p.id;
+        catSelect.value = p.category;
+        titleInput.value = p.title;
+        contentInput.value = p.content;
+      }
+    } else {
+      title.innerText = "Thêm Prompt Mới";
+      idInput.value = "";
+      catSelect.value = categoriesList.length > 0 ? categoriesList[0] : "";
+      titleInput.value = "";
+      contentInput.value = "";
+    }
+    
+    modal.style.display = "flex";
+  }
+
+  function closePromptModal() {
+    document.getElementById("promptModal").style.display = "none";
+  }
+
+  async function savePromptFromModal() {
+    const id = document.getElementById("promptModalId").value;
+    const category = document.getElementById("promptModalCategory").value;
+    const title = document.getElementById("promptModalTitleInput").value.trim();
+    const content = document.getElementById("promptModalContentInput").value.trim();
+    
+    if (!title || !content) {
+      alert("Vui lòng nhập đầy đủ tiêu đề và nội dung.");
+      return;
+    }
+    
+    try {
+      const response = await fetch("/api/content/prompts", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ id, category, title, content })
+      });
+      const d = await response.json();
+      if (!response.ok) throw d;
+      
+      closePromptModal();
+      await loadPromptsLibrary();
+    } catch(e) {
+      alert("Lỗi lưu prompt: " + (e.error || e.message || JSON.stringify(e)));
     }
   }
 
-  function downloadPosterDirect(url, idx) {
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.download = `poster_ai_${idx}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  async function deletePromptTemplate(id) {
+    if (!confirm("Bạn có chắc chắn muốn xóa prompt này không?")) return;
+    try {
+      const response = await fetch(`/api/content/prompts/${id}`, { method: "DELETE" });
+      const d = await response.json();
+      if (!response.ok) throw d;
+      await loadPromptsLibrary();
+    } catch(e) {
+      alert("Lỗi xóa prompt: " + (e.error || e.message || JSON.stringify(e)));
+    }
   }
-  
+
+  async function startChromeDebug() {
+    try {
+      const response = await fetch("/api/automation/chrome/start", { method: "POST" });
+      const d = await response.json();
+      if (!response.ok) throw d;
+      alert("Đã kích hoạt tệp mở Chrome Debug. Cửa sổ Chrome thật sẽ tự động hiển thị.");
+      setTimeout(checkChromeStatus, 1500);
+    } catch(e) {
+      alert("Không thể chạy lệnh Chrome: " + (e.message || JSON.stringify(e)));
+    }
+  }
+
+  async function checkChromeStatus() {
+    try {
+      const response = await fetch("/api/automation/chrome/status");
+      const d = await response.json();
+      const badge = document.getElementById("chromeStatusBadge");
+      const dot = document.getElementById("chromeStatusDot");
+      const text = document.getElementById("chromeStatusText");
+      
+      if (d.online) {
+        badge.className = "badge success";
+        dot.style.background = "#22c55e";
+        text.innerText = "Chrome Debug: Online";
+      } else {
+        badge.className = "badge danger";
+        dot.style.background = "#ef4444";
+        text.innerText = "Chrome Debug: Offline";
+      }
+    } catch(e) {
+      console.error("Lỗi kiểm tra trạng thái Chrome Debug:", e);
+    }
+  }
+
+  function handleContentImageSelect(files) {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      contentSelectedImageBase64 = e.target.result;
+      document.getElementById("contentImgPreview").src = contentSelectedImageBase64;
+      document.getElementById("contentImgPreviewContainer").style.display = "block";
+      document.getElementById("contentImgDropzone").style.display = "none";
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearContentImage() {
+    contentSelectedImageBase64 = null;
+    document.getElementById("contentImgPreview").src = "";
+    document.getElementById("contentImgPreviewContainer").style.display = "none";
+    document.getElementById("contentImgDropzone").style.display = "flex";
+    document.getElementById("contentImgFile").value = "";
+  }
+
+  async function useLatestPixelPhoto() {
+    try {
+      const response = await fetch("/api/automation/latest-photo");
+      const d = await response.json();
+      if (!response.ok) throw d;
+      
+      contentSelectedImageBase64 = d.base64;
+      document.getElementById("contentImgPreview").src = contentSelectedImageBase64;
+      document.getElementById("contentImgPreviewContainer").style.display = "block";
+      document.getElementById("contentImgDropzone").style.display = "none";
+      
+      appendAutomationLog(`Đã tải thành công ảnh thô mới nhất từ Pixel: ${d.name}`);
+    } catch(e) {
+      alert("Lỗi lấy ảnh Pixel: " + (e.error || e.message || JSON.stringify(e)));
+    }
+  }
+
+  function appendAutomationLog(msg) {
+    const logBox = document.getElementById("automationLogBox");
+    const time = new Date().strftime("%H:%M:%S");
+    logBox.innerHTML += `<div>[${time}] ${msg}</div>`;
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  async function sendToChatGPT() {
+    const prompt = document.getElementById("contentEditorPrompt").value.trim();
+    if (!prompt) {
+      alert("Vui lòng nhập nội dung prompt.");
+      return;
+    }
+    
+    document.getElementById("automationLogBox").innerHTML = "";
+    appendAutomationLog("Bắt đầu tiến trình gửi yêu cầu...");
+    
+    startPoll();
+    
+    try {
+      const response = await fetch("/api/automation/chatgpt/send", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          prompt: prompt,
+          image: contentSelectedImageBase64
+        })
+      });
+      const d = await response.json();
+      if (!response.ok) throw d;
+      
+      appendAutomationLog("Backend đã nhận lệnh. Tiến trình Playwright đang chạy ngầm...");
+    } catch(e) {
+      appendAutomationLog("Lỗi: " + (e.error || e.message || JSON.stringify(e)));
+      alert("Lỗi gửi yêu cầu: " + (e.error || e.message || JSON.stringify(e)));
+    }
+  }
+
+  async function loadDownloadedImages() {
+    try {
+      const response = await fetch("/api/automation/images/list");
+      const images = await response.json();
+      renderDownloadedImages(images);
+    } catch(e) {
+      console.error("Lỗi lấy danh sách ảnh đã tải:", e);
+    }
+  }
+
+  function renderDownloadedImages(images) {
+    const container = document.getElementById("downloadedImagesList");
+    container.innerHTML = "";
+    
+    if (images.length === 0) {
+      container.innerHTML = `<div style="grid-column: span 2; text-align:center; color:var(--muted); font-size:12px; margin-top:40px;">Chưa có ảnh nào tải về.</div>`;
+      return;
+    }
+    
+    images.forEach(img => {
+      const card = document.createElement("div");
+      card.className = "poster-card";
+      card.innerHTML = `
+        <img src="${img.url}" alt="${img.name}">
+        <div class="card-actions" style="flex-direction: column; gap: 6px; align-items: stretch; justify-content: flex-end; padding: 12px; background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.5) 60%, transparent 100%);">
+          <div style="font-size: 10px; color: #fff; font-weight: 600; text-align: center; text-shadow: 0 1px 2px rgba(0,0,0,0.8); margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; word-break: break-all;">
+            ${img.name}
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px; width: 100%;">
+            <button class="ghost" onclick="event.stopPropagation(); revealImageFolder('${img.file_path.replace(/\\/g, '\\\\')}')" style="min-height: 28px; font-size: 10.5px; padding: 4px 8px; font-weight: 700; border-radius: 6px; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; text-shadow: 0 1px 1px rgba(0,0,0,0.5); width: 100%;">
+              📂 Mở thư mục
+            </button>
+            <button onclick="event.stopPropagation(); window.open('https://www.canva.com', '_blank')" style="min-height: 28px; font-size: 10.5px; padding: 4px 8px; font-weight: 700; border-radius: 6px; background: var(--brand); border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; text-shadow: 0 1px 1px rgba(0,0,0,0.3); width: 100%;">
+              🎨 Mở Canva
+            </button>
+          </div>
+        </div>
+      `;
+      
+      container.appendChild(card);
+    });
+  }
+
+  async function revealImageFolder(filePath) {
+    try {
+      const response = await fetch("/api/automation/image/reveal", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ file_path: filePath })
+      });
+      const d = await response.json();
+      if (!response.ok) throw d;
+    } catch(e) {
+      alert("Lỗi mở thư mục: " + (e.error || e.message || JSON.stringify(e)));
+    }
+  }
+
   Date.prototype.strftime = function(format) {
     const o = {
       "Y+": this.getFullYear(),
@@ -1480,7 +1796,69 @@ HTML = r"""
 
   initTheme();
   refresh();
+  
+  // Khoi tao Content Helper Tool
+  loadOpenAIConfig();
+  loadCategories().then(() => {
+    loadPromptsLibrary();
+  });
+  loadDownloadedImages();
+  checkChromeStatus();
+  chromeStatusInterval = setInterval(checkChromeStatus, 4000);
 </script>
+<!-- Modal them/sua prompt -->
+<div id="promptModal" class="modal-overlay" style="display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:9999; justify-content:center; align-items:center;">
+  <div class="panel" style="width: 460px; padding: 24px; display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--panel-border); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5); background: var(--bg);">
+    <h3 id="promptModalTitle" style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; margin: 0 0 4px 0; font-size: 18px;">Thêm Prompt Mới</h3>
+    <input type="hidden" id="promptModalId">
+    
+    <div>
+      <label for="promptModalCategory" style="margin-bottom: 6px; display: block; font-weight: 600;">Danh mục</label>
+      <select id="promptModalCategory" style="font-size: 13px; width: 100%; min-height: 38px;">
+        <!-- Load động từ JS -->
+      </select>
+    </div>
+    
+    <div>
+      <label for="promptModalTitleInput" style="margin-bottom: 6px; display: block; font-weight: 600;">Tiêu đề</label>
+      <input type="text" id="promptModalTitleInput" placeholder="Ví dụ: Bối cảnh biển mùa hè" style="width: 100%; min-height: 38px; padding: 0 10px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text);">
+    </div>
+    
+    <div>
+      <label for="promptModalContentInput" style="margin-bottom: 6px; display: block; font-weight: 600;">Nội dung prompt</label>
+      <textarea id="promptModalContentInput" placeholder="Vui lòng nhập prompt..." style="height: 120px; font-size: 13px; line-height: 1.4; resize: none; width: 100%; padding: 10px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text);"></textarea>
+    </div>
+    
+    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
+      <button type="button" class="secondary" onclick="closePromptModal()" style="min-height: 36px; padding: 0 16px; font-size: 13px; font-weight: 600;">Hủy</button>
+      <button type="button" class="btn-capture" onclick="savePromptFromModal()" style="min-height: 36px; padding: 0 20px; font-size: 13px; font-weight: 700;">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal quan ly danh muc -->
+<div id="categoryModal" class="modal-overlay" style="display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:9999; justify-content:center; align-items:center;">
+  <div class="panel" style="width: 460px; padding: 24px; display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--panel-border); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5); background: var(--bg);">
+    <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; margin: 0 0 4px 0; font-size: 18px;">Quản Lý Danh Mục</h3>
+    
+    <div style="font-size: 11px; color: var(--muted); margin-bottom: 2px; line-height: 1.4;">
+      * Lưu ý: Khi đổi tên hoặc xóa danh mục, các prompt mẫu thuộc danh mục đó sẽ được tự động đồng bộ hóa tương ứng.
+    </div>
+
+    <div id="categoriesListContainer" style="display: flex; flex-direction: column; gap: 10px; max-height: 280px; overflow-y: auto; padding-right: 4px; margin-bottom: 4px;">
+      <!-- Danh sach danh muc se duoc render bang JS -->
+    </div>
+    
+    <button type="button" class="secondary" onclick="addCategoryRowInModal()" style="width: 100%; min-height: 36px; font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+      ➕ Thêm danh mục mới
+    </button>
+    
+    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px; border-top: 1px solid var(--panel-border); padding-top: 16px;">
+      <button type="button" class="secondary" onclick="closeCategoryModal()" style="min-height: 36px; padding: 0 16px; font-size: 13px; font-weight: 600;">Hủy</button>
+      <button type="button" class="btn-capture" onclick="saveCategoriesFromModal()" style="min-height: 36px; padding: 0 20px; font-size: 13px; font-weight: 700;">Lưu thay đổi</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
 """
@@ -2127,6 +2505,101 @@ def api_openai_config_post():
         return error_response(exc, 400)
 
 
+def process_hybrid_composition(bg_url_or_base64: str, product_base64_data: str, size_str: str) -> str:
+    import io
+    import base64
+    import requests
+    from PIL import Image, ImageFilter, ImageDraw
+    import rembg
+
+    # 1. Load ảnh nền (AI sinh)
+    if bg_url_or_base64.startswith("data:image/"):
+        header, encoded = bg_url_or_base64.split(",", 1)
+        bg_data = base64.b64decode(encoded)
+        bg_img = Image.open(io.BytesIO(bg_data)).convert("RGBA")
+    else:
+        # Tải từ URL
+        resp = requests.get(bg_url_or_base64, timeout=30)
+        resp.raise_for_status()
+        bg_img = Image.open(io.BytesIO(resp.content)).convert("RGBA")
+        
+    bg_w, bg_h = bg_img.size
+    
+    # 2. Load ảnh sản phẩm (người dùng tải lên)
+    if "," in product_base64_data:
+        header, encoded = product_base64_data.split(",", 1)
+    else:
+        encoded = product_base64_data
+    prod_data = base64.b64decode(encoded)
+    prod_raw = Image.open(io.BytesIO(prod_data)).convert("RGBA")
+    
+    # 3. Tách nền bằng rembg
+    prod_rgba = rembg.remove(prod_raw)
+    
+    # 4. Tự động crop sát biên sản phẩm (autocrop)
+    bbox = prod_rgba.getbbox()
+    if bbox:
+        prod_cropped = prod_rgba.crop(bbox)
+    else:
+        prod_cropped = prod_rgba
+        
+    p_w, p_h = prod_cropped.size
+    
+    # 5. Tính toán kích thước resize sản phẩm
+    # Chiều cao sản phẩm chiếm khoảng 52% chiều cao ảnh nền
+    target_h = int(bg_h * 0.52)
+    target_w = int(p_w * (target_h / p_h))
+    
+    # Nếu chiều rộng sản phẩm vượt quá 70% chiều rộng ảnh nền, resize theo chiều rộng
+    if target_w > int(bg_w * 0.7):
+        target_w = int(bg_w * 0.7)
+        target_h = int(p_h * (target_w / p_w))
+        
+    prod_resized = prod_cropped.resize((target_w, target_h), Image.Resampling.LANCZOS)
+    
+    # 6. Tạo bóng đổ mềm (soft shadow) ở chân sản phẩm
+    shadow_mask = Image.new("RGBA", (bg_w, bg_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(shadow_mask)
+    
+    # Vị trí đặt sản phẩm
+    # Căn giữa theo chiều ngang
+    paste_x = (bg_w - target_w) // 2
+    # Chân sản phẩm cách đáy 22% chiều cao ảnh nền
+    offset_y = int(bg_h * 0.22)
+    paste_y = bg_h - target_h - offset_y
+    
+    if paste_y < 10:
+        paste_y = 10
+        
+    # Kích thước bóng đổ: hình elip dẹt dưới chân sản phẩm
+    shadow_w = int(target_w * 0.9)
+    shadow_h_ell = int(shadow_w * 0.12)
+    
+    shadow_x0 = paste_x + (target_w - shadow_w) // 2
+    shadow_y0 = paste_y + target_h - (shadow_h_ell // 2)
+    shadow_x1 = shadow_x0 + shadow_w
+    shadow_y1 = shadow_y0 + shadow_h_ell
+    
+    # Vẽ bóng đổ màu đen mờ (alpha = 110 trong 255)
+    draw.ellipse([shadow_x0, shadow_y0, shadow_x1, shadow_y1], fill=(0, 0, 0, 110))
+    
+    # Blur bóng đổ
+    blur_radius = max(5, int(shadow_w * 0.08))
+    shadow_blurred = shadow_mask.filter(ImageFilter.GaussianBlur(blur_radius))
+    
+    # 7. Ghép bóng đổ và sản phẩm lên nền
+    bg_img.alpha_composite(shadow_blurred)
+    bg_img.alpha_composite(prod_resized, (paste_x, paste_y))
+    
+    # 8. Chuyển ảnh kết quả về base64
+    buffered = io.BytesIO()
+    final_rgb = bg_img.convert("RGB")
+    final_rgb.save(buffered, format="JPEG", quality=95)
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    
+    return f"data:image/jpeg;base64,{img_str}"
+
+
 @app.post("/api/poster/generate")
 def api_poster_generate():
     try:
@@ -2135,6 +2608,7 @@ def api_poster_generate():
         quantity = max(1, min(int(payload.get("quantity") or 4), 9))
         size = str(payload.get("size", "1024x1024")).strip()
         images = payload.get("images", []) # Mảng chứa base64
+        keep_original = bool(payload.get("keep_original", False))
         
         config = load_config()
         api_key = config.get("openai", {}).get("api_key", "").strip()
@@ -2144,29 +2618,44 @@ def api_poster_generate():
         from openai import OpenAI
         client = OpenAI(api_key=api_key)
         
-        # 1. Nếu có ảnh tải lên, dùng GPT-4o Vision để phân tích và sinh prompt chi tiết
+        # 1. Nếu có ảnh tải lên, dùng GPT-4o Vision để phân tích và sinh prompt chi tiết cho ảnh nền hoặc ảnh poster
         final_prompt = user_prompt
         if images:
-            # Lấy ảnh đầu tiên (hoặc phân tích các ảnh)
-            # GPT-4o Vision hỗ trợ gửi ảnh dưới dạng base64 qua data URL
-            message_content = [
-                {
+            message_content = []
+            if keep_original:
+                # Chế độ Hybrid: Chỉ sinh bối cảnh nền trống (không vẽ lại sản phẩm)
+                message_content.append({
+                    "type": "text",
+                    "text": (
+                        "You are an expert product advertising poster designer. "
+                        "We will remove the background of the user's product image and place it directly onto the new generated background. "
+                        "Your job is to analyze the product style (colors, mood, aesthetics) and design a matching background scene for it. "
+                        "The user's scene requirement is: \"" + user_prompt + "\". "
+                        "Write a highly descriptive, professional English prompt for gpt-image-1-mini to generate this background scene. "
+                        "CRITICAL REQUIREMENT: The background must feature a clean, empty stand, platform, podium, shelf, or flat surface in the center to place the product later. "
+                        "The podium/surface must be completely empty, with no objects or bottles on it. "
+                        "DO NOT include the product itself or any bottles in the prompt. "
+                        "Describe premium studio lighting, soft shadows, matching colors, and high-end advertising photography style. "
+                        "Output ONLY the final raw descriptive English prompt for gpt-image-1-mini, nothing else."
+                    )
+                })
+            else:
+                # Chế độ vẽ lại hoàn toàn bằng AI
+                message_content.append({
                     "type": "text",
                     "text": (
                         "You are an expert product advertising poster designer. "
                         "Analyze the raw product image(s) provided (shape, color, label, brand) "
                         "and combine it with the user's background request: \"" + user_prompt + "\". "
-                        "Write a highly descriptive, professional English prompt for DALL-E 3 "
+                        "Write a highly descriptive, professional English prompt for gpt-image-1-mini "
                         "to generate a stunning, realistic commercial advertising poster featuring this exact product in the requested setting. "
-                        "Describe the product in detail so DALL-E 3 can recreate it accurately, "
+                        "Describe the product in detail so gpt-image-1-mini can recreate it accurately, "
                         "along with premium studio lighting, soft shadows, and commercial photography style. "
-                        "Only output the raw English prompt for DALL-E 3, nothing else."
+                        "Only output the raw English prompt for gpt-image-1-mini, nothing else."
                     )
-                }
-            ]
+                })
             
             for base64_data in images[:4]: # Giới hạn tối đa 4 ảnh
-                # Lọc bỏ tiền tố data:image/png;base64, nếu có
                 if "," in base64_data:
                     base64_data = base64_data.split(",", 1)[1]
                 message_content.append({
@@ -2183,37 +2672,63 @@ def api_poster_generate():
             )
             final_prompt = response.choices[0].message.content.strip()
             # Log prompt đã tối ưu
-            add_event({"step": "poster_gpt_prompt", "message": f"GPT-4o Vision đã tạo prompt vẽ tranh chi tiết: {final_prompt}"})
+            add_event({"step": "poster_gpt_prompt", "message": f"GPT-4o Vision đã tạo prompt vẽ nền: {final_prompt}" if keep_original else f"GPT-4o Vision đã tạo prompt vẽ tranh chi tiết: {final_prompt}"})
 
-        # 2. Gọi gpt-image-1.5 để tạo ảnh poster
-        # gpt-image-1.5 hỗ trợ tạo 1 ảnh mỗi lần gọi (n=1). Chúng ta sẽ dùng ThreadPoolExecutor để chạy song song.
+        # 2. Gọi gpt-image-1-mini để tạo ảnh poster/nền
         def generate_single_image():
             response = client.images.generate(
-                model="gpt-image-1.5",
+                model="gpt-image-1-mini",
                 prompt=final_prompt,
                 size=size,
                 quality="medium", # Sử dụng 'medium' để tiết kiệm chi phí theo yêu cầu người dùng
                 n=1
             )
-            return response.data[0].url
+            img_obj = response.data[0]
+            if hasattr(img_obj, "url") and img_obj.url:
+                return img_obj.url
+            elif hasattr(img_obj, "b64_json") and img_obj.b64_json:
+                return f"data:image/png;base64,{img_obj.b64_json}"
+            elif isinstance(img_obj, dict):
+                if img_obj.get("url"):
+                    return img_obj["url"]
+                elif img_obj.get("b64_json"):
+                    return f"data:image/png;base64,{img_obj['b64_json']}"
+            return None
 
-        add_event({"step": "poster_generating", "message": f"Đang kết nối gpt-image-1.5 để tạo {quantity} ảnh poster với kích thước {size}..."})
+        msg_type = "ảnh nền AI" if (keep_original and images) else "ảnh poster từ AI"
+        add_event({"step": "poster_generating", "message": f"Đang kết nối gpt-image-1-mini để tạo {quantity} {msg_type} với kích thước {size}..."})
         
-        urls = []
+        raw_urls = []
         with ThreadPoolExecutor(max_workers=min(quantity, 4)) as executor:
             futures = [executor.submit(generate_single_image) for _ in range(quantity)]
             for fut in futures:
                 try:
-                    urls.append(fut.result())
+                    res = fut.result()
+                    if res:
+                        raw_urls.append(res)
                 except Exception as e:
-                    # Nếu có lỗi khi tạo 1 ảnh lẻ, log lại và bỏ qua hoặc ném lỗi nếu tất cả đều lỗi
                     add_event({"step": "error", "message": f"Lỗi tạo ảnh đơn lẻ: {e}"})
                     
-        if not urls:
-            raise RuntimeError("Tất cả các lượt gọi API gpt-image-1.5 đều thất bại. Hãy kiểm tra kết nối API Key và quota tài khoản.")
+        if not raw_urls:
+            raise RuntimeError("Tất cả các lượt gọi API gpt-image-1-mini đều thất bại. Hãy kiểm tra kết nối API Key và quota tài khoản.")
             
-        add_event({"step": "poster_done", "message": f"Đã tạo thành công {len(urls)} ảnh poster quảng cáo từ AI."})
-        return jsonify({"images": urls})
+        # 3. Nếu ở chế độ Hybrid, thực hiện ghép ảnh sản phẩm thật lên nền
+        final_images = []
+        if keep_original and images:
+            add_event({"step": "hybrid_processing", "message": "Đang thực hiện tách nền sản phẩm thật và ghép đè lên nền AI..."})
+            product_base64 = images[0]
+            for bg_url in raw_urls:
+                try:
+                    composed_base64 = process_hybrid_composition(bg_url, product_base64, size)
+                    final_images.append(composed_base64)
+                except Exception as e:
+                    add_event({"step": "hybrid_error_warning", "message": f"Lỗi ghép ảnh: {e}. Hệ thống tự động sử dụng ảnh nền gốc."})
+                    final_images.append(bg_url)
+        else:
+            final_images = raw_urls
+            
+        add_event({"step": "poster_done", "message": f"Đã tạo thành công {len(final_images)} ảnh poster quảng cáo."})
+        return jsonify({"images": final_images})
         
     except Exception as exc:
         add_event({"step": "error", "message": str(exc)})
@@ -2252,17 +2767,583 @@ def api_poster_save():
             
         dest_path = target_folder / filename
         
-        # Tải ảnh từ OpenAI URL về
-        r = requests.get(image_url, timeout=30)
-        r.raise_for_status()
-        
-        dest_path.write_bytes(r.content)
+        if image_url.startswith("data:image/"):
+            try:
+                if "," in image_url:
+                    header, encoded = image_url.split(",", 1)
+                else:
+                    encoded = image_url
+                data = base64.b64decode(encoded)
+                dest_path.write_bytes(data)
+            except Exception as e:
+                raise ValueError(f"Không thể giải mã dữ liệu ảnh Base64: {e}")
+        else:
+            # Tải ảnh từ OpenAI URL về
+            r = requests.get(image_url, timeout=30)
+            r.raise_for_status()
+            dest_path.write_bytes(r.content)
         
         add_event({"step": "poster_saved", "message": f"Đã lưu poster thành công vào thư mục: {dest_path}", "file": str(dest_path)})
         return jsonify({"status": "Lưu poster thành công.", "saved_path": str(dest_path)})
         
     except Exception as exc:
         add_event({"step": "error", "message": str(exc)})
+        return error_response(exc, 400)
+
+
+# ==========================================
+# CONTENT IMAGE HELPER TOOL AUTOMATION API
+# ==========================================
+
+PROMPTS_FILE = ROOT / "content_prompts.json"
+
+def load_prompts():
+    if not PROMPTS_FILE.exists():
+        return []
+    try:
+        with open(PROMPTS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_prompts(prompts_list):
+    try:
+        with open(PROMPTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(prompts_list, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+@app.get("/api/content/prompts")
+def api_get_prompts():
+    return jsonify(load_prompts())
+
+@app.post("/api/content/prompts")
+def api_save_prompt():
+    try:
+        data = request.json or {}
+        p_id = data.get("id")
+        category = str(data.get("category", "General")).strip()
+        title = str(data.get("title", "")).strip()
+        content = str(data.get("content", "")).strip()
+        
+        if not title or not content:
+            raise ValueError("Tiêu đề và nội dung không được để trống.")
+            
+        prompts = load_prompts()
+        
+        if p_id:
+            # Update
+            found = False
+            for p in prompts:
+                if p["id"] == p_id:
+                    p["category"] = category
+                    p["title"] = title
+                    p["content"] = content
+                    found = True
+                    break
+            if not found:
+                prompts.append({"id": p_id, "category": category, "title": title, "content": content})
+        else:
+            # Create new
+            import uuid
+            p_id = str(uuid.uuid4())
+            prompts.append({"id": p_id, "category": category, "title": title, "content": content})
+            
+        if save_prompts(prompts):
+            return jsonify({"status": "Lưu thành công.", "prompt": {"id": p_id, "category": category, "title": title, "content": content}})
+        else:
+            raise RuntimeError("Không thể ghi file dữ liệu.")
+    except Exception as exc:
+        return error_response(exc, 400)
+
+@app.delete("/api/content/prompts/<prompt_id>")
+def api_delete_prompt(prompt_id):
+    try:
+        prompts = load_prompts()
+        updated = [p for p in prompts if p["id"] != prompt_id]
+        if len(updated) == len(prompts):
+            raise ValueError("Không tìm thấy prompt tương ứng.")
+        if save_prompts(updated):
+            return jsonify({"status": "Xóa thành công."})
+        else:
+            raise RuntimeError("Không thể ghi file dữ liệu.")
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.get("/api/content/categories")
+def api_get_categories():
+    try:
+        config = load_config()
+        categories = config.get("content_categories")
+        if not categories:
+            categories = ["Shopee", "Facebook", "General"]
+            with CONFIG_LOCK:
+                config = load_config()
+                config["content_categories"] = categories
+                save_config(config)
+        return jsonify(categories)
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/content/categories")
+def api_save_categories():
+    try:
+        data = request.json or {}
+        categories = data.get("categories")
+        rename_map = data.get("rename_map", {})
+        deleted_list = data.get("deleted", [])
+        
+        if not isinstance(categories, list):
+            raise ValueError("Categories phải là một danh sách.")
+            
+        cleaned_categories = []
+        for cat in categories:
+            cat_str = str(cat).strip()
+            if cat_str and cat_str not in cleaned_categories:
+                cleaned_categories.append(cat_str)
+                
+        if not cleaned_categories:
+            cleaned_categories = ["Shopee", "Facebook", "General"]
+            
+        with CONFIG_LOCK:
+            config = load_config()
+            config["content_categories"] = cleaned_categories
+            save_config(config)
+            
+        # Đồng bộ hóa prompt category
+        prompts = load_prompts()
+        prompts_changed = False
+        
+        # Đổi tên danh mục
+        if rename_map:
+            for p in prompts:
+                old_cat = p.get("category")
+                if old_cat in rename_map:
+                    p["category"] = rename_map[old_cat]
+                    prompts_changed = True
+                    
+        # Xóa danh mục
+        default_cat = cleaned_categories[0] if cleaned_categories else "General"
+        if deleted_list:
+            for p in prompts:
+                old_cat = p.get("category")
+                if old_cat in deleted_list:
+                    if old_cat not in rename_map:
+                        p["category"] = default_cat
+                        prompts_changed = True
+                        
+        if prompts_changed:
+            save_prompts(prompts)
+            
+        return jsonify({"status": "Lưu danh mục thành công.", "categories": cleaned_categories})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/automation/chrome/start")
+def api_chrome_start():
+    try:
+        bat_path = ROOT / "run_debug_chrome.bat"
+        if not bat_path.exists():
+            raise FileNotFoundError("Không tìm thấy file run_debug_chrome.bat")
+        
+        import subprocess
+        # Khởi chạy bất đồng bộ để tránh treo app Flask
+        subprocess.Popen([str(bat_path)], shell=True, cwd=str(bat_path.parent))
+        
+        add_event({"step": "chrome_automation", "message": "Đã phát lệnh kích hoạt Chrome Debugging Port 9222."})
+        return jsonify({"status": "Đã kích hoạt Chrome Debug."})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.get("/api/automation/chrome/status")
+def api_chrome_status():
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(0.5)
+    try:
+        s.connect(("127.0.0.1", 9222))
+        s.close()
+        return jsonify({"online": True, "message": "Chrome Debug Port 9222 đang online."})
+    except Exception:
+        return jsonify({"online": False, "message": "Chrome Debug Port 9222 chưa hoạt động."})
+
+
+def run_chatgpt_automation_thread(image_path: str | None, prompt_text: str, export_dir: str):
+    from playwright.sync_api import sync_playwright
+    import os
+    import base64
+    from datetime import datetime
+    
+    add_event({"step": "chatgpt_automation", "message": "Bắt đầu tiến trình tự động hóa ChatGPT..."})
+    
+    try:
+        with sync_playwright() as p:
+            add_event({"step": "chatgpt_automation", "message": "Đang kết nối tới Chrome Debug qua cổng 9222..."})
+            try:
+                browser = p.chromium.connect_over_cdp("http://localhost:9222")
+            except Exception as e:
+                add_event({"step": "error", "message": f"Không kết nối được Chrome Debug. Vui lòng bấm 'Khởi động Chrome' và đăng nhập ChatGPT. Chi tiết: {e}"})
+                return
+                
+            context = browser.contexts[0]
+            
+            # Tìm tab ChatGPT
+            page = None
+            for p_page in context.pages:
+                if "chatgpt.com" in p_page.url:
+                    page = p_page
+                    break
+            
+            if not page:
+                add_event({"step": "chatgpt_automation", "message": "Không tìm thấy tab ChatGPT đang mở. Đang mở tab mới..."})
+                page = context.new_page()
+                page.goto("https://chatgpt.com")
+                # Đợi trang tải
+                page.wait_for_load_state("load")
+                
+            # Đợi ô nhập text sẵn sàng
+            try:
+                page.wait_for_selector("#prompt-textarea", timeout=15000)
+            except Exception:
+                add_event({"step": "error", "message": "Không tìm thấy ô nhập liệu '#prompt-textarea'. Vui lòng kiểm tra lại trang web ChatGPT."})
+                return
+                
+            # Upload ảnh nếu có
+            if image_path and os.path.exists(image_path):
+                add_event({"step": "chatgpt_automation", "message": f"Đang upload ảnh sản phẩm: {os.path.basename(image_path)}..."})
+                file_input = page.query_selector('input[type="file"]')
+                if file_input:
+                    file_input.set_input_files(image_path)
+                    time.sleep(6.0) # Đợi 6 giây cho quá trình tải lên hoàn tất
+                else:
+                    add_event({"step": "chatgpt_automation", "message": "Cảnh báo: Không tìm thấy input tải file của ChatGPT."})
+            
+            # Điền prompt
+            add_event({"step": "chatgpt_automation", "message": "Đang nhập prompt..."})
+            try:
+                page.focus("#prompt-textarea")
+                page.click("#prompt-textarea")
+                # Điền nội dung prompt bằng innerHTML và phát sự kiện input để kích hoạt React state của ChatGPT
+                page.evaluate("""(text) => {
+                    const el = document.getElementById("prompt-textarea");
+                    if (el) {
+                        el.innerHTML = `<p>${text}</p>`;
+                        el.dispatchEvent(new Event("input", { bubbles: true }));
+                    }
+                }""", prompt_text)
+                time.sleep(0.5)
+                # Nhấn Space và Backspace để React chắc chắn nhận diện thay đổi state
+                page.keyboard.press("Space")
+                page.keyboard.press("Backspace")
+                time.sleep(1.5)
+            except Exception as e_fill:
+                print(f"[ChatGPT Auto] Lỗi điền prompt bằng evaluate: {e_fill}")
+                page.fill("#prompt-textarea", prompt_text)
+                time.sleep(1.5)
+            
+            # Đếm số ảnh lớn hiện có trên toàn trang trước khi gửi prompt mới
+            initial_img_count = 0
+            try:
+                initial_img_count = page.evaluate("""() => {
+                    const imgs = Array.from(document.querySelectorAll('img'));
+                    const largeImgs = imgs.filter(img => {
+                        const w = img.naturalWidth || img.width;
+                        const h = img.naturalHeight || img.height;
+                        if (w < 200 || h < 200) return false;
+                        if (img.src.startsWith('data:image/svg')) return false;
+                        return true;
+                    });
+                    return largeImgs.length;
+                }""")
+                print(f"[ChatGPT Auto] So luong anh lon ban dau: {initial_img_count}")
+            except Exception as e_count:
+                print(f"[ChatGPT Auto] Loi dem anh ban dau: {e_count}")
+            
+            # Thử click nút gửi (mũi tên đi lên màu đen)
+            # Cập nhật thêm các selectors mới của ChatGPT
+            send_selectors = [
+                'button[data-testid="send-button"]',
+                'button[data-testid="fruitjuice-send-button"]',
+                'button[aria-label="Send prompt"]',
+                'button[aria-label="Gửi phản hồi"]',
+                'button.mb-1.mr-1',
+                'button:has(svg)',
+                'button:has(path[d*="M12"])',
+                '#prompt-textarea ~ button',
+                'div[contenteditable="true"] ~ button'
+            ]
+            
+            clicked = False
+            for sel in send_selectors:
+                try:
+                    btn = page.query_selector(sel)
+                    if btn and btn.is_enabled():
+                        btn.click(timeout=2000)
+                        clicked = True
+                        add_event({"step": "chatgpt_automation", "message": "Đã click nút gửi ChatGPT thành công."})
+                        break
+                except Exception:
+                    continue
+            
+            if not clicked:
+                add_event({"step": "chatgpt_automation", "message": "Không click được nút gửi. Thử nhấn phím Enter..."})
+                try:
+                    page.focus("#prompt-textarea")
+                    page.click("#prompt-textarea")
+                    page.keyboard.press("Enter")
+                    add_event({"step": "chatgpt_automation", "message": "Đã gửi lệnh phím Enter qua keyboard."})
+                    clicked = True
+                except Exception as press_ex:
+                    print(f"[ChatGPT Auto] Lỗi phím Enter (bỏ qua): {press_ex}")
+                    try:
+                        page.press("#prompt-textarea", "Enter", timeout=2000)
+                    except Exception:
+                        pass
+                
+            time.sleep(1.0)
+            add_event({"step": "chatgpt_automation", "message": "Đã gửi prompt thành công. Đang chờ ChatGPT / DALL-E sinh ảnh mới..."})
+            
+            # Quét định kỳ để phát hiện ảnh mới
+            start_time = time.time()
+            found_image = False
+            image_base64_data = None
+            
+            while time.time() - start_time < 240: # Tăng timeout lên 240 giây (4 phút)
+                time.sleep(3.0)
+                try:
+                    res = page.evaluate("""async (prevCount) => {
+                        const imgs = Array.from(document.querySelectorAll('img'));
+                        const largeImgs = imgs.filter(img => {
+                            const w = img.naturalWidth || img.width;
+                            const h = img.naturalHeight || img.height;
+                            if (w < 200 || h < 200) return false;
+                            if (img.src.startsWith('data:image/svg')) return false;
+                            return true;
+                        });
+                        
+                        if (largeImgs.length <= prevCount) {
+                            return "waiting";
+                        }
+                        
+                        const lastImg = largeImgs[largeImgs.length - 1];
+                        if (!lastImg.complete || lastImg.naturalWidth === 0) {
+                            return "loading";
+                        }
+                        
+                        try {
+                            const response = await fetch(lastImg.src);
+                            const blob = await response.blob();
+                            return await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result);
+                                reader.onerror = () => reject(new Error('FileReader error'));
+                                reader.readAsDataURL(blob);
+                            });
+                        } catch (err) {
+                            try {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = lastImg.naturalWidth || lastImg.width;
+                                canvas.height = lastImg.naturalHeight || lastImg.height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(lastImg, 0, 0);
+                                return canvas.toDataURL('image/png');
+                            } catch (canvasErr) {
+                                return 'error: ' + err.message + ' | canvas: ' + canvasErr.message;
+                            }
+                        }
+                    }""", initial_img_count)
+                    
+                    if res == "waiting" or res == "loading":
+                        continue
+                    elif res and res.startswith("error:"):
+                        continue
+                    elif res and res.startswith("data:image/"):
+                        image_base64_data = res
+                        found_image = True
+                        break
+                except Exception:
+                    continue
+            
+            if found_image and image_base64_data:
+                add_event({"step": "chatgpt_automation", "message": "Đã phát hiện ảnh kết quả mới từ ChatGPT. Đang tải về..."})
+                
+                header, encoded = image_base64_data.split(",", 1)
+                img_data = base64.b64decode(encoded)
+                
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"chatgpt_{timestamp}.png"
+                
+                out_dir = Path(export_dir)
+                if not out_dir.exists():
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                
+                dest_path = out_dir / filename
+                dest_path.write_bytes(img_data)
+                
+                add_event({
+                    "step": "chatgpt_done", 
+                    "message": f"Tải ảnh thành công! Đã lưu file: {filename}",
+                    "file_path": str(dest_path),
+                    "filename": filename
+                })
+            else:
+                add_event({"step": "error", "message": "Quá thời gian chờ hoặc không phát hiện ảnh mới từ ChatGPT."})
+                
+    except Exception as exc:
+        add_event({"step": "error", "message": f"Lỗi trong quá trình tự động hóa: {exc}"})
+
+
+@app.post("/api/automation/chatgpt/send")
+def api_chatgpt_send():
+    try:
+        payload = request.json or {}
+        prompt_text = str(payload.get("prompt", "")).strip()
+        image_base64 = payload.get("image", None)
+        
+        if not prompt_text:
+            raise ValueError("Nội dung prompt không được trống.")
+            
+        config = load_config()
+        export_dir = config.get("openai", {}).get("export_dir", "").strip()
+        if not export_dir:
+            export_dir = str(Path.home() / "Downloads")
+            
+        temp_img_path = None
+        if image_base64:
+            if "," in image_base64:
+                header, encoded = image_base64.split(",", 1)
+            else:
+                encoded = image_base64
+            img_data = base64.b64decode(encoded)
+            
+            inbox_path = ROOT / config.get("paths", {}).get("inbox_dir", "inbox")
+            inbox_path.mkdir(parents=True, exist_ok=True)
+            temp_img_path = str(inbox_path / "temp_chatgpt_upload.png")
+            with open(temp_img_path, "wb") as f:
+                f.write(img_data)
+                
+        t = threading.Thread(
+            target=run_chatgpt_automation_thread,
+            args=(temp_img_path, prompt_text, export_dir)
+        )
+        t.daemon = True
+        t.start()
+        
+        return jsonify({"status": "Tiến trình gửi lên ChatGPT đã được bắt đầu."})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/automation/image/reveal")
+def api_image_reveal():
+    try:
+        payload = request.json or {}
+        file_path_str = payload.get("file_path", "")
+        if not file_path_str:
+            raise ValueError("Thiếu đường dẫn tệp tin.")
+            
+        file_path = Path(file_path_str)
+        if not file_path.exists():
+            raise FileNotFoundError(f"Không tìm thấy tệp tin: {file_path_str}")
+            
+        subprocess.run(["explorer.exe", "/select,", str(file_path)])
+        return jsonify({"status": "Đã mở thư mục và chọn file."})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.get("/api/automation/images/list")
+def api_list_downloaded_images():
+    try:
+        config = load_config()
+        export_dir = config.get("openai", {}).get("export_dir", "").strip()
+        if not export_dir:
+            export_dir = str(Path.home() / "Downloads")
+            
+        out_dir = Path(export_dir)
+        if not out_dir.exists():
+            return jsonify([])
+            
+        img_files = []
+        for ext in ("*.png", "*.jpg", "*.jpeg"):
+            for f in out_dir.glob(ext):
+                if f.name.startswith("chatgpt_"):
+                    img_files.append(f)
+                    
+        img_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        
+        results = []
+        for f in img_files[:24]:
+            results.append({
+                "name": f.name,
+                "file_path": str(f),
+                "url": f"/api/automation/images/view?name={f.name}",
+                "time": datetime.fromtimestamp(f.stat().st_mtime).strftime("%d/%m/%Y %H:%M:%S")
+            })
+            
+        return jsonify(results)
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.get("/api/automation/images/view")
+def api_view_downloaded_image():
+    from flask import send_from_directory
+    try:
+        filename = request.args.get("name", "")
+        if not filename:
+            raise ValueError("Thiếu tên file.")
+            
+        config = load_config()
+        export_dir = config.get("openai", {}).get("export_dir", "").strip()
+        if not export_dir:
+            export_dir = str(Path.home() / "Downloads")
+            
+        return send_from_directory(export_dir, filename)
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.get("/api/automation/latest-photo")
+def api_get_latest_photo():
+    try:
+        config = load_config()
+        inbox_dir = ROOT / config.get("paths", {}).get("inbox_dir", "inbox")
+        
+        # Tìm các file ảnh trong inbox
+        photos = []
+        for ext in ("*.png", "*.jpg", "*.jpeg"):
+            photos.extend(inbox_dir.glob(ext))
+            
+        if not photos:
+            # Nếu inbox trống, tìm trong drive_root / selected_drive_folder
+            drive_root_path = Path(config.get("paths", {}).get("drive_root_dir", ""))
+            selected_folder = config.get("paths", {}).get("selected_drive_folder", "")
+            target_dir = drive_root_path / selected_folder
+            if target_dir.exists():
+                for ext in ("*.png", "*.jpg", "*.jpeg"):
+                    photos.extend(target_dir.glob(ext))
+                    
+        if not photos:
+            raise FileNotFoundError("Không tìm thấy ảnh nào trong thư mục inbox hoặc Google Drive.")
+            
+        # Lấy ảnh mới nhất theo thời gian sửa đổi
+        latest_photo = max(photos, key=lambda x: x.stat().st_mtime)
+        
+        # Đọc ảnh và chuyển sang base64
+        with open(latest_photo, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode("utf-8")
+            
+        return jsonify({
+            "name": latest_photo.name,
+            "base64": f"data:image/png;base64,{encoded}"
+        })
+    except Exception as exc:
         return error_response(exc, 400)
 
 
