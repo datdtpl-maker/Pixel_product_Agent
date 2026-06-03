@@ -1180,6 +1180,9 @@ HTML = r"""
           loadDownloadedImages();
         }
       }
+      if (step === "done") {
+        refresh();
+      }
     }
     
     let colorClass = "log-info";
@@ -1215,7 +1218,7 @@ HTML = r"""
   async function selectFolder(){try{const d=await api("/api/select-folder",{name:selected()});log(d);await refresh()}catch(e){log(e)}}
   async function openPreview(){try{log(await api("/api/open-preview",{}))}catch(e){log(e)}}
   async function togglePixelScreen(){try{log(await api("/api/toggle-screen",{}));await refresh()}catch(e){log(e)}}
-  async function run(path,body){if(!requireFolder()||busy)return;setBusy(true);await api("/api/events/clear",{}).catch(()=>{});lastId=0;startPoll();try{log(await api(path,body));await refresh()}catch(e){log(e)}finally{await stopPoll();setBusy(false)}}
+  async function run(path,body){if(!requireFolder()||busy)return;setBusy(true);try{log(await api(path,body));await refresh()}catch(e){log(e)}finally{setBusy(false)}}
   function capture(){run("/api/capture",{folder:selected()})}
   function record(){run("/api/record",{folder:selected(),duration:Number(document.getElementById("duration").value||10)})}
   // Poster Creator JS
@@ -1994,6 +1997,7 @@ HTML = r"""
   checkChromeStatus();
   chromeStatusInterval = setInterval(checkChromeStatus, 4000);
   checkAppUpdate(true);
+  startPoll();
 </script>
 <!-- Modal them/sua prompt -->
 <div id="promptModal" class="modal-overlay" style="display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:9999; justify-content:center; align-items:center;">
