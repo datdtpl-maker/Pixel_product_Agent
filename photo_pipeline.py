@@ -60,7 +60,24 @@ def adb_command(settings: Settings, *args: str, check: bool = True) -> subproces
     if settings.adb_serial:
         command += ["-s", settings.adb_serial]
     command += list(args)
-    return subprocess.run(command, text=True, capture_output=True, check=check)
+    
+    # Ẩn cửa sổ console đen của adb trên Windows
+    startupinfo = None
+    creationflags = 0
+    if os.name == "nt":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0 # SW_HIDE
+        creationflags = 0x08000000 # CREATE_NO_WINDOW
+        
+    return subprocess.run(
+        command, 
+        text=True, 
+        capture_output=True, 
+        check=check, 
+        startupinfo=startupinfo, 
+        creationflags=creationflags
+    )
 
 
 def device_epoch_seconds(settings: Settings) -> int:

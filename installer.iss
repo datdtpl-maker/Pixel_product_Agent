@@ -26,6 +26,7 @@ OutputBaseFilename=PixelDriveCaptureSetup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=app_icon.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

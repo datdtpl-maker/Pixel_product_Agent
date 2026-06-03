@@ -79,10 +79,13 @@ def build():
         "--clean",
         "--noconfirm",
         "--noconsole",
+        "--icon=app_icon.ico",
         "--collect-all", "playwright",
         "--add-data", "config.example.json;.",
         "--add-data", "content_prompts.json;.",
         "--add-data", "run_debug_chrome.bat;.",
+        "--add-data", "favicon.ico;.",
+        "--add-data", "app_icon.ico;.",
         str(web_app_py)
     ]
     

@@ -2247,20 +2247,34 @@ def pixel_screen_is_on(cfg: pipeline.Settings) -> bool:
 
 def stop_existing_scrcpy() -> None:
     if os.name == "nt":
-        subprocess.run(["taskkill", "/IM", "scrcpy.exe", "/F"], text=True, capture_output=True, check=False)
+        creationflags = 0x08000000
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0
+        subprocess.run(["taskkill", "/IM", "scrcpy.exe", "/F"], text=True, capture_output=True, check=False, startupinfo=startupinfo, creationflags=creationflags)
 
 
 def running_scrcpy_processes() -> list[str]:
     if os.name != "nt":
         return []
     command = "Get-Process scrcpy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id"
-    output = subprocess.run(["powershell", "-NoProfile", "-Command", command], text=True, capture_output=True, check=False).stdout
+    creationflags = 0x08000000
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = 0
+    output = subprocess.run(["powershell", "-NoProfile", "-Command", command], text=True, capture_output=True, check=False, startupinfo=startupinfo, creationflags=creationflags).stdout
     return [line.strip() for line in output.splitlines() if line.strip()]
 
 
 @app.get("/")
 def index():
     return render_template_string(HTML)
+
+
+@app.get("/favicon.ico")
+def favicon():
+    from flask import send_from_directory
+    return send_from_directory(str(ROOT), "favicon.ico", mimetype="image/vnd.microsoft.icon")
 
 
 @app.get("/api/events")
@@ -3361,8 +3375,20 @@ def api_chrome_start():
             raise FileNotFoundError("Không tìm thấy file run_debug_chrome.bat")
         
         import subprocess
-        # Khởi chạy bất đồng bộ để tránh treo app Flask
-        subprocess.Popen([str(bat_path)], shell=True, cwd=str(bat_path.parent))
+        creationflags = 0x08000000 if os.name == "nt" else 0
+        startupinfo = None
+        if os.name == "nt":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
+        # Khởi chạy bất đồng bộ để tránh treo app Flask và ẩn cửa sổ console đen
+        subprocess.Popen(
+            [str(bat_path)], 
+            shell=True, 
+            cwd=str(bat_path.parent),
+            startupinfo=startupinfo,
+            creationflags=creationflags
+        )
         
         add_event({"step": "chrome_automation", "message": "Đã phát lệnh kích hoạt Chrome Debugging Port 9222."})
         return jsonify({"status": "Đã kích hoạt Chrome Debug."})
