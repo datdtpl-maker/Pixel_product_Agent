@@ -29,6 +29,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
+CURRENT_VERSION = "v1.1.0"
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
 if not CONFIG_PATH.exists():
@@ -124,6 +125,17 @@ HTML = r"""
       --danger: #dc2626;
       --danger-hover: #b91c1c;
       --shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+    }
+    
+    @keyframes pulseWarn {
+      0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+    }
+    .pulse-warn {
+      animation: pulseWarn 2s infinite;
+      border-color: var(--warn) !important;
+      color: var(--warn) !important;
     }
     
     * { box-sizing: border-box; }
@@ -806,6 +818,10 @@ HTML = r"""
           <p>Chọn thư mục trước, sau đó chụp hoặc quay từ Pixel.</p>
         </div>
         <div class="actions">
+          <button id="updateAppBtn" class="secondary" onclick="checkAppUpdate(false)" style="color: var(--brand); font-weight: 700; display: flex; align-items: center; gap: 6px; font-size: 13px;" title="Kiểm tra cập nhật phần mềm">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            <span id="updateAppText">v1.1.0</span>
+          </button>
           <button id="themeToggleBtn" class="secondary" onclick="toggleTheme()">
             <!-- Chèn icon SVG tự động bằng Javascript -->
           </button>
@@ -1854,6 +1870,64 @@ HTML = r"""
     }
   }
 
+  async function checkAppUpdate(autoAlert = false) {
+    try {
+      const response = await fetch('/api/app/check-update');
+      const data = await response.json();
+      if (!response.ok) throw data;
+      
+      const updateBtn = document.getElementById("updateAppBtn");
+      const updateText = document.getElementById("updateAppText");
+      
+      if (data.has_update) {
+        updateBtn.classList.add("pulse-warn");
+        updateText.innerText = `Cập nhật (${data.latest_version})`;
+        
+        if (!autoAlert) {
+          const confirmUpdate = confirm(`Có phiên bản mới: ${data.latest_version}\n\nNội dung: ${data.release_notes || 'Không có ghi chú.'}\n\nBạn có muốn tải về và tự động cài đè cập nhật ngay bây giờ không?\n(Chương trình sẽ tự động đóng và khởi động lại sau khi hoàn thành)`);
+          if (confirmUpdate) {
+            startAppUpdate(data.download_url);
+          }
+        }
+      } else {
+        updateBtn.classList.remove("pulse-warn");
+        updateText.innerText = `Phiên bản: ${CURRENT_VERSION}`;
+        if (!autoAlert) {
+          alert("Bạn đang sử dụng phiên bản mới nhất!");
+        }
+      }
+    } catch (e) {
+      console.error("Lỗi kiểm tra cập nhật:", e);
+      if (!autoAlert) {
+        alert("Lỗi kiểm tra cập nhật: " + (e.error || e.message || JSON.stringify(e)));
+      }
+    }
+  }
+
+  async function startAppUpdate(downloadUrl) {
+    if (typeof appendAutomationLog === 'function') {
+      appendAutomationLog("Bắt đầu tải bản cập nhật mới từ GitHub Releases...");
+    }
+    
+    try {
+      const response = await fetch('/api/app/perform-update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({download_url: downloadUrl})
+      });
+      const data = await response.json();
+      if (!response.ok) throw data;
+      
+      if (typeof appendAutomationLog === 'function') {
+        appendAutomationLog("Tải bản cập nhật thành công! Đang kích hoạt updater và khởi động lại ứng dụng...");
+      }
+      alert("Đã chuẩn bị xong! Ứng dụng sẽ tự động đóng và khởi động lại phiên bản mới sau vài giây. Vui lòng chờ.");
+      window.close();
+    } catch (e) {
+      alert("Lỗi cập nhật: " + (e.error || e.message || JSON.stringify(e)));
+    }
+  }
+
   Date.prototype.strftime = function(format) {
     const o = {
       "Y+": this.getFullYear(),
@@ -1884,6 +1958,7 @@ HTML = r"""
   loadDownloadedImages();
   checkChromeStatus();
   chromeStatusInterval = setInterval(checkChromeStatus, 4000);
+  checkAppUpdate(true);
 </script>
 <!-- Modal them/sua prompt -->
 <div id="promptModal" class="modal-overlay" style="display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:9999; justify-content:center; align-items:center;">
@@ -3075,6 +3150,134 @@ def api_import_prompts():
         return jsonify({"success": True, "count": count})
         
     except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.get("/api/app/check-update")
+def api_check_update():
+    try:
+        url = "https://api.github.com/repos/datdtpl-maker/Pixel-Drive-Capture/releases/latest"
+        headers = {"User-Agent": "PixelDriveCapture-Updater"}
+        
+        r = requests.get(url, headers=headers, timeout=5)
+        if r.status_code == 404:
+            return jsonify({
+                "has_update": False,
+                "current_version": CURRENT_VERSION,
+                "latest_version": CURRENT_VERSION,
+                "download_url": "",
+                "release_notes": "Chưa có bản cập nhật nào được phát hành trên GitHub."
+            })
+            
+        r.raise_for_status()
+        release_data = r.json()
+        
+        latest_version = release_data.get("tag_name", "").strip()
+        release_notes = release_data.get("body", "").strip()
+        
+        download_url = ""
+        assets = release_data.get("assets", [])
+        for asset in assets:
+            name = asset.get("name", "")
+            if name.endswith(".zip"):
+                download_url = asset.get("browser_download_url", "")
+                break
+                
+        if not download_url:
+            download_url = release_data.get("zipball_url", "")
+            
+        has_update = False
+        if latest_version and latest_version != CURRENT_VERSION:
+            has_update = True
+            
+        return jsonify({
+            "has_update": has_update,
+            "current_version": CURRENT_VERSION,
+            "latest_version": latest_version,
+            "download_url": download_url,
+            "release_notes": release_notes
+        })
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/app/perform-update")
+def api_perform_update():
+    try:
+        data = request.json or {}
+        download_url = data.get("download_url", "").strip()
+        if not download_url:
+            raise ValueError("Thiếu link tải bản cập nhật.")
+            
+        add_event({"step": "app_update", "message": "Bắt đầu tải tệp tin cập nhật từ GitHub..."})
+        
+        zip_path = ROOT / "update_tmp.zip"
+        headers = {"User-Agent": "PixelDriveCapture-Updater"}
+        r = requests.get(download_url, headers=headers, stream=True)
+        r.raise_for_status()
+        with open(zip_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+                
+        extract_dir = ROOT / "update_tmp_extract"
+        if extract_dir.exists():
+            shutil.rmtree(extract_dir, ignore_errors=True)
+        extract_dir.mkdir(exist_ok=True)
+        
+        add_event({"step": "app_update", "message": "Đang giải nén dữ liệu cập nhật..."})
+        import zipfile
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(extract_dir)
+            
+        extract_source = extract_dir
+        sub_dir = extract_dir / "PixelDriveCapture"
+        if sub_dir.exists() and sub_dir.is_dir():
+            extract_source = sub_dir
+            
+        exe_path = ROOT / "PixelDriveCapture.exe"
+        bat_path = ROOT / "updater.bat"
+        
+        bat_content = f"""@echo off
+chcp 65001 > nul
+title Pixel Drive Capture - Updater
+echo ==================================================
+echo   DANG CAP NHAT PHAN MEM - VUI LONG CHO...
+echo ==================================================
+echo.
+
+timeout /t 2 /nobreak > nul
+
+:: Thuc hien di chuyen file de de len thu muc cu, loai tru config.json va config.example.json
+robocopy "{extract_source}" "{ROOT}" /E /MOVE /Y /XF config.json config.example.json /R:3 /W:1 > nul
+
+:: Xoa sach thu muc tam
+if exist "{extract_dir}" rd /s /q "{extract_dir}"
+if exist "{zip_path}" del /f /q "{zip_path}"
+
+echo.
+echo Cap nhat thanh cong! Dang khoi dong lai Pixel Drive Capture...
+start "" "{exe_path}"
+
+(goto) 2>nul & del "%~f0"
+"""
+        bat_path.write_text(bat_content, encoding="utf-8")
+        
+        add_event({"step": "app_update", "message": "Đã tạo tập lệnh cập nhật. Đang khởi động tiến trình updater..."})
+        
+        # Khởi chạy batch updater độc lập
+        subprocess.Popen([str(bat_path)], shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+        
+        # Tắt ứng dụng hiện tại để giải phóng file
+        def shutdown():
+            time.sleep(0.5)
+            os._exit(0)
+            
+        threading.Thread(target=shutdown).start()
+        
+        return jsonify({"success": True, "message": "Đang tiến hành cập nhật và khởi động lại..."})
+        
+    except Exception as exc:
+        add_event({"step": "error", "message": f"Lỗi trong quá trình cập nhật: {exc}"})
         return error_response(exc, 400)
 
 

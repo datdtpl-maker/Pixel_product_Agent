@@ -118,6 +118,19 @@ Nội dung có thể xuống dòng viết tiếp ở đây thoải mái
 2. Chọn tệp tin `.txt` chứa danh sách prompt của bạn.
 3. Nhật ký hệ thống sẽ thông báo số lượng prompt đã import thành công, giao diện Thư viện Prompt và bộ lọc sẽ tự động làm mới để cập nhật dữ liệu.
 
+## 🔄 Tự Động Cập Nhật Phần Mềm (Auto-Update)
+
+Ứng dụng hỗ trợ kiểm tra và cập nhật tự động trực tiếp từ GitHub Releases:
+
+1. **Hiển thị phiên bản**: Phiên bản hiện tại của phần mềm được hiển thị trên nút ở góc trên bên phải (ví dụ: `v1.1.0`).
+2. **Kiểm tra tự động**: Mỗi khi mở ứng dụng, phần mềm sẽ tự động kiểm tra ngầm phiên bản mới trên GitHub Releases. Nếu phát hiện có phiên bản mới hơn trên GitHub, nút phiên bản sẽ tự động đổi màu và **nhấp nháy nhịp thở (`pulse-warn`)** để báo hiệu cho bạn.
+3. **Quy trình cập nhật cài đè an toàn**: 
+   - Khi click vào nút phiên bản, một hộp thoại thông tin bản cập nhật mới sẽ hiển thị.
+   - Nếu bạn chọn đồng ý, ứng dụng sẽ tải tệp tin cập nhật dạng `.zip` từ GitHub Releases về thư mục tạm, tự động giải nén và kích hoạt một tiến trình updater chạy độc lập.
+   - Ứng dụng cũ sẽ tự tắt để giải phóng khóa tệp, tiến trình updater sẽ ghi đè toàn bộ các file mới vào thư mục hiện tại (ngoại trừ tệp `config.json` và `config.example.json` để **giữ lại nguyên vẹn cấu hình của bạn**), sau đó tự khởi động lại phiên bản mới và dọn dẹp các tệp tạm.
+
+---
+
 ## 🛠️ Cấu Hướng Hệ Thống (`config.json`)
 
 Mẫu cấu hình cơ bản (các thông tin nhạy cảm đã được bỏ qua qua `.gitignore`):
