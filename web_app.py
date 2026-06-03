@@ -3794,14 +3794,32 @@ def launch_desktop_gui():
     url = f"http://127.0.0.1:{port}"
     
     try:
+        # Đường dẫn profile trình duyệt tạm thời để cô lập tiến trình
+        profile_dir = Path(os.environ.get("LOCALAPPDATA", "C:\\Users\\datdt\\AppData\\Local")) / "PixelDriveCapture" / "browser_profile"
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        
         if chrome_path:
-            # Chạy trực tiếp chrome.exe ở chế độ app mode
-            subprocess.run([chrome_path, f"--app={url}", "--window-size=1320,880"])
+            # Chạy trực tiếp chrome.exe ở chế độ app mode với profile riêng biệt
+            subprocess.run([
+                chrome_path, 
+                f"--app={url}", 
+                f"--user-data-dir={profile_dir}",
+                "--window-size=1320,880",
+                "--no-first-run",
+                "--no-default-browser-check"
+            ])
         else:
             # Fallback msedge.exe
             edge_path = Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)")) / "Microsoft" / "Edge" / "Application" / "msedge.exe"
             if edge_path.exists():
-                subprocess.run([str(edge_path), f"--app={url}", "--window-size=1320,880"])
+                subprocess.run([
+                    str(edge_path), 
+                    f"--app={url}", 
+                    f"--user-data-dir={profile_dir}",
+                    "--window-size=1320,880",
+                    "--no-first-run",
+                    "--no-default-browser-check"
+                ])
             else:
                 # Fallback cuối cùng: mở trình duyệt mặc định bằng webbrowser
                 import webbrowser
