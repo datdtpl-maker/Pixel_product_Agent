@@ -3903,6 +3903,7 @@ def launch_desktop_gui():
         profile_dir = Path(os.environ.get("LOCALAPPDATA", "C:\\Users\\datdt\\AppData\\Local")) / "PixelDriveCapture" / "browser_profile"
         profile_dir.mkdir(parents=True, exist_ok=True)
         
+        start_time = time.time()
         if chrome_path:
             # Chạy trực tiếp chrome.exe ở chế độ app mode với profile riêng biệt
             subprocess.run([
@@ -3931,12 +3932,55 @@ def launch_desktop_gui():
                 webbrowser.open(url)
                 return  # Tránh tắt app khi mở bằng trình duyệt mặc định
                 
-        # Khi người dùng đóng cửa sổ app mode, subprocess.run kết thúc, ta sẽ tắt luôn server Flask ngầm
-        os._exit(0)
+        duration = time.time() - start_time
+        # Chỉ thoát Flask server nếu Chrome chạy đủ lâu (người dùng dùng app bình thường và tự đóng)
+        # Nếu Chrome thoát quá nhanh (< 3.0s), có thể do trùng profile hoặc delegate, ta giữ Flask chạy tiếp
+        if duration > 3.0:
+            os._exit(0)
+        else:
+            print(f"[GUI] Trình duyệt thoát quá nhanh ({duration:.2f}s). Giữ Flask server tiếp tục chạy.")
     except Exception as e:
         print(f"Lỗi khởi chạy GUI App Mode: {e}")
 
 
+def cleanup_old_instances():
+    import os
+    import subprocess
+    import sys
+    import time
+    
+    current_pid = os.getpid()
+    print(f"[Cleanup] Đang dọn dẹp các tiến trình cũ (PID hiện tại: {current_pid})...")
+    
+    # 1. Tắt các tiến trình PixelDriveCapture.exe cũ đang chạy ngầm (trừ chính nó)
+    if getattr(sys, 'frozen', False):
+        try:
+            cmd_app = f'wmic process where "name=\'PixelDriveCapture.exe\' and ProcessID!={current_pid}" call terminate'
+            subprocess.run(cmd_app, shell=True, capture_output=True)
+            print("[Cleanup] Đã dọn dẹp các tiến trình PixelDriveCapture.exe cũ.")
+        except Exception as e:
+            print(f"[Cleanup] Lỗi tắt app cũ: {e}")
+            
+    # 2. Tắt các tiến trình Chrome/Edge sử dụng profile PixelDriveCapture
+    try:
+        cmd_chrome = 'wmic process where "name=\'chrome.exe\' and CommandLine like \'%PixelDriveCapture%\'" call terminate'
+        subprocess.run(cmd_chrome, shell=True, capture_output=True)
+        print("[Cleanup] Đã dọn dẹp các tiến trình Chrome cũ liên quan đến ứng dụng.")
+    except Exception as e:
+        print(f"[Cleanup] Lỗi tắt Chrome cũ: {e}")
+        
+    try:
+        cmd_edge = 'wmic process where "name=\'msedge.exe\' and CommandLine like \'%PixelDriveCapture%\'" call terminate'
+        subprocess.run(cmd_edge, shell=True, capture_output=True)
+        print("[Cleanup] Đã dọn dẹp các tiến trình Edge cũ liên quan đến ứng dụng.")
+    except Exception as e:
+        print(f"[Cleanup] Lỗi tắt Edge cũ: {e}")
+        
+    # Chờ một khoảng thời gian ngắn để hệ điều hành giải phóng hoàn toàn cổng và file lock
+    time.sleep(0.5)
+
+
 if __name__ == "__main__":
+    cleanup_old_instances()
     threading.Thread(target=launch_desktop_gui, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8765")), debug=False, threaded=True)
