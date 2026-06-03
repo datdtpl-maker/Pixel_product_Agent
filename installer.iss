@@ -2,7 +2,7 @@
 ; Đóng gói ứng dụng Flask/PyInstaller Desktop App thành một file Setup .exe cài đặt duy nhất.
 
 #define MyAppName "Pixel Drive Capture"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.1.1"
 #define MyAppPublisher "datdtpl-maker"
 #define MyAppURL "https://github.com/datdtpl-maker/Pixel-Drive-Capture"
 #define MyAppExeName "PixelDriveCapture.exe"
