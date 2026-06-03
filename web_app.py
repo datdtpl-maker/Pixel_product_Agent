@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+import sys
 
 from flask import Flask, jsonify, render_template_string, request
 
@@ -20,8 +21,45 @@ from concurrent.futures import ThreadPoolExecutor
 import photo_pipeline as pipeline
 
 
-ROOT = Path(__file__).resolve().parent
+if getattr(sys, 'frozen', False):
+    ROOT = Path(sys.executable).resolve().parent
+    BUNDLE_DIR = Path(sys._MEIPASS)
+else:
+    ROOT = Path(__file__).resolve().parent
+    BUNDLE_DIR = ROOT
+
 CONFIG_PATH = ROOT / "config.json"
+
+# Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
+if not CONFIG_PATH.exists():
+    example_config = BUNDLE_DIR / "config.example.json"
+    if example_config.exists():
+        try:
+            shutil.copy(example_config, CONFIG_PATH)
+            print(f"Da tu dong tao config.json tu config.example.json tai: {CONFIG_PATH}")
+        except Exception as e:
+            print(f"Loi khi sao chep file config.example.json: {e}")
+
+prompts_path = ROOT / "content_prompts.json"
+if not prompts_path.exists():
+    example_prompts = BUNDLE_DIR / "content_prompts.json"
+    if example_prompts.exists():
+        try:
+            shutil.copy(example_prompts, prompts_path)
+            print(f"Da tu dong khoi tao content_prompts.json tai: {prompts_path}")
+        except Exception as e:
+            print(f"Loi khi sao chep file content_prompts.json: {e}")
+
+chrome_bat_path = ROOT / "run_debug_chrome.bat"
+if not chrome_bat_path.exists():
+    example_bat = BUNDLE_DIR / "run_debug_chrome.bat"
+    if example_bat.exists():
+        try:
+            shutil.copy(example_bat, chrome_bat_path)
+            print(f"Da tu dong khoi tao run_debug_chrome.bat tai: {chrome_bat_path}")
+        except Exception as e:
+            print(f"Loi khi sao chep file run_debug_chrome.bat: {e}")
+
 DEFAULT_DRIVE_ROOT = r"G:\My Drive\Test hình ảnh shopee"
 EVENT_LOCK = threading.Lock()
 EVENTS: list[dict[str, Any]] = []
