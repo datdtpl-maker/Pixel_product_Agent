@@ -3320,14 +3320,17 @@ def api_get_latest_photo():
         for ext in ("*.png", "*.jpg", "*.jpeg"):
             photos.extend(inbox_dir.glob(ext))
             
-        if not photos:
-            # Nếu inbox trống, tìm trong drive_root / selected_drive_folder
+        # Tìm các file ảnh trong drive_root / selected_drive_folder và gộp chung
+        try:
             drive_root_path = Path(config.get("paths", {}).get("drive_root_dir", ""))
             selected_folder = config.get("paths", {}).get("selected_drive_folder", "")
-            target_dir = drive_root_path / selected_folder
-            if target_dir.exists():
-                for ext in ("*.png", "*.jpg", "*.jpeg"):
-                    photos.extend(target_dir.glob(ext))
+            if drive_root_path.exists():
+                target_dir = drive_root_path / selected_folder
+                if target_dir.exists() and target_dir.is_dir():
+                    for ext in ("*.png", "*.jpg", "*.jpeg"):
+                        photos.extend(target_dir.glob(ext))
+        except Exception as e_drive:
+            print(f"[Latest Photo] Lỗi quét thư mục Drive: {e_drive}")
                     
         if not photos:
             raise FileNotFoundError("Không tìm thấy ảnh nào trong thư mục inbox hoặc Google Drive.")
