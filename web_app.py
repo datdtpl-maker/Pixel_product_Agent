@@ -2496,6 +2496,8 @@ def api_open_preview():
         serial = adb_device_serial(cfg)
         stop_existing_scrcpy()
         open_camera(cfg)
+        # Giữ màn hình Pixel luôn sáng khi cắm cáp để tránh tự động tắt làm mất zoom (khẩu độ)
+        pipeline.adb_command(cfg, "shell", "settings", "put", "global", "stay_on_while_plugged_in", "7", check=False)
         time.sleep(0.8)
         args = [str(scrcpy), "--serial", serial, "--stay-awake", "--no-audio", "--window-title", "Pixel Drive Capture - Camera Preview"]
         env = os.environ.copy()
