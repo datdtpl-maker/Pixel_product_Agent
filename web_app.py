@@ -961,7 +961,10 @@ HTML = r"""
           <!-- API Settings -->
           <div>
             <label for="openaiKey">OpenAI API Key</label>
-            <input type="password" id="openaiKey" placeholder="sk-proj-..." style="font-size: 12px; min-height: 38px;">
+            <div class="field-action">
+              <input type="password" id="openaiKey" placeholder="sk-proj-..." style="font-size: 12px; min-height: 38px;">
+              <button type="button" class="secondary" id="btnCheckAPI" onclick="checkAPIKey()" style="min-height: 38px; padding: 0 12px;">Kiểm tra</button>
+            </div>
           </div>
 
           <!-- Export Folder -->
@@ -1238,6 +1241,47 @@ HTML = r"""
     currentTemplateIdx = (currentTemplateIdx + 1) % promptTemplates.length;
   }
   
+  async function checkAPIKey() {
+    const key = document.getElementById("openaiKey").value.trim();
+    if (!key) {
+      alert("Vui lòng nhập API Key trước khi kiểm tra.");
+      return;
+    }
+    
+    const btn = document.getElementById("btnCheckAPI");
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Đang check...";
+    
+    try {
+      const r = await fetch("/api/openai/check", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({api_key: key})
+      });
+      const d = await r.json();
+      
+      if (d.valid) {
+        let msg = "Kết nối API Key thành công!\n\n";
+        msg += `1. GPT-4o / GPT-4o-mini: ${d.has_gpt4o ? "Sẵn sàng ✅" : "Không có quyền ❌"}\n`;
+        msg += `2. DALL-E 3: ${d.has_dalle3 ? "Sẵn sàng ✅" : "Không có quyền ❌"}\n\n`;
+        if (!d.has_dalle3) {
+          msg += "⚠️ CẢNH BÁO: Tài khoản của bạn gọi được GPT-4o nhưng DALL-E 3 bị OpenAI báo không tồn tại. Vui lòng kiểm tra xem bạn đã nạp đủ $5 (lên Tier 1) chưa hoặc xem trong mục Settings -> Projects -> Limits/Models trên trang OpenAI xem model dall-e-3 có bị tắt (disabled) không.";
+        } else {
+          msg += "🎉 Tài khoản của bạn đã đầy đủ quyền và sẵn sàng hoạt động!";
+        }
+        alert(msg);
+      } else {
+        alert("Lỗi kết nối API: " + d.message);
+      }
+    } catch(e) {
+      alert("Lỗi kiểm tra API: " + (e.message || JSON.stringify(e)));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  }
+
   async function loadOpenAIConfig() {
     try {
       const r = await fetch("/api/openai/config");
@@ -1988,6 +2032,58 @@ def api_select_directory():
             return jsonify({"directory": ""})
     except Exception as exc:
         return error_response(exc, 500)
+
+
+@app.post("/api/openai/check")
+def api_openai_check():
+    try:
+        payload = request.json or {}
+        api_key = str(payload.get("api_key", "")).strip()
+        if not api_key:
+            raise ValueError("Vui lòng cung cấp API Key để kiểm tra.")
+            
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        
+        has_gpt4o = False
+        try:
+            models_data = client.models.list()
+            model_ids = [m.id for m in models_data.data]
+            has_gpt4o = "gpt-4o" in model_ids or "gpt-4o-mini" in model_ids
+        except Exception as e:
+            return jsonify({
+                "valid": False,
+                "message": f"API Key không hợp lệ hoặc tài khoản hết tiền: {e}"
+            })
+            
+        has_dalle3 = False
+        dalle3_error_msg = ""
+        try:
+            client.images.generate(
+                model="dall-e-3",
+                prompt="",
+                n=1,
+                size="1024x1024"
+            )
+        except Exception as e:
+            err_str = str(e)
+            if "does not exist" in err_str:
+                has_dalle3 = False
+                dalle3_error_msg = "Mô hình DALL-E 3 bị khóa hoặc chưa được cấp quyền (tài khoản Tier 0 hoặc bị tắt trong Project)."
+            else:
+                has_dalle3 = True
+                
+        return jsonify({
+            "valid": True,
+            "has_gpt4o": has_gpt4o,
+            "has_dalle3": has_dalle3,
+            "dalle3_msg": dalle3_error_msg or "Sẵn sàng hoạt động ✅"
+        })
+    except Exception as exc:
+        return jsonify({
+            "valid": False,
+            "message": str(exc)
+        })
 
 
 @app.get("/api/openai/config")
