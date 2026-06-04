@@ -2511,12 +2511,12 @@ def api_pixel_paths():
             os.environ["ADB_PATH"] = adb_path
             p = Path(adb_path)
             adb_dir = str(p if p.is_dir() else p.parent)
-            os.environ["PATH"] = adb_dir + os.pathsep + os.environ.get("PATH", "")
+            pipeline.add_to_path_env(adb_dir)
         if scrcpy_path:
             os.environ["SCRCPY_PATH"] = scrcpy_path
             p = Path(scrcpy_path)
             scrcpy_dir = str(p if p.is_dir() else p.parent)
-            os.environ["PATH"] = scrcpy_dir + os.pathsep + os.environ.get("PATH", "")
+            pipeline.add_to_path_env(scrcpy_dir)
             
         return jsonify({"status": "Đã lưu cấu hình đường dẫn công cụ thành công."})
     except Exception as exc:

@@ -60,6 +60,19 @@ def ensure_dirs(settings: Settings) -> None:
     settings.processed_dir.mkdir(parents=True, exist_ok=True)
 
 
+def add_to_path_env(dir_path: str | Path | None) -> None:
+    if not dir_path:
+        return
+    try:
+        dir_str = str(Path(dir_path).resolve())
+        current_path = os.environ.get("PATH", "")
+        paths = [str(Path(p).resolve()) for p in current_path.split(os.pathsep) if p.strip()]
+        if dir_str not in paths:
+            os.environ["PATH"] = dir_str + os.pathsep + current_path
+    except Exception:
+        pass
+
+
 def get_adb_executable(settings: Settings | None = None) -> str:
     # 0. Kiem tra trong settings (tu config.json) truoc
     if settings and settings.adb_path:
@@ -68,10 +81,10 @@ def get_adb_executable(settings: Settings | None = None) -> str:
             adb_exe = adb_path / "adb.exe" if os.name == "nt" else adb_path / "adb"
             if adb_exe.exists():
                 # Nạp cha của adb.exe vào PATH để scrcpy cũng tìm thấy
-                os.environ["PATH"] = str(adb_path) + os.pathsep + os.environ.get("PATH", "")
+                add_to_path_env(adb_path)
                 return str(adb_exe)
         elif adb_path.exists():
-            os.environ["PATH"] = str(adb_path.parent) + os.pathsep + os.environ.get("PATH", "")
+            add_to_path_env(adb_path.parent)
             return str(adb_path)
 
     # 1. Kiem tra trong bien moi truong (tu .env hoac he thong)
@@ -81,10 +94,10 @@ def get_adb_executable(settings: Settings | None = None) -> str:
         if adb_path.is_dir():
             adb_exe = adb_path / "adb.exe" if os.name == "nt" else adb_path / "adb"
             if adb_exe.exists():
-                os.environ["PATH"] = str(adb_path) + os.pathsep + os.environ.get("PATH", "")
+                add_to_path_env(adb_path)
                 return str(adb_exe)
         elif adb_path.exists():
-            os.environ["PATH"] = str(adb_path.parent) + os.pathsep + os.environ.get("PATH", "")
+            add_to_path_env(adb_path.parent)
             return str(adb_path)
 
     # 2. Kiem tra trong PATH he thong hien tai
@@ -106,7 +119,7 @@ def get_adb_executable(settings: Settings | None = None) -> str:
         for path in possible_paths:
             if path.exists():
                 # Them vao PATH tam thoi cua tien trinh de scrcpy cung tim thay adb
-                os.environ["PATH"] = str(path.parent) + os.pathsep + os.environ.get("PATH", "")
+                add_to_path_env(path.parent)
                 return str(path)
                 
     return "adb" # fallback
