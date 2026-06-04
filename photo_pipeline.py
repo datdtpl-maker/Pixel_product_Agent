@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import time
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -55,13 +56,51 @@ def ensure_dirs(settings: Settings) -> None:
     settings.processed_dir.mkdir(parents=True, exist_ok=True)
 
 
+def get_adb_executable() -> str:
+    # 1. Kiem tra trong bien moi truong (tu .env hoac he thong)
+    adb_env = os.environ.get("ADB_PATH")
+    if adb_env:
+        adb_path = Path(adb_env)
+        if adb_path.is_dir():
+            adb_exe = adb_path / "adb.exe" if os.name == "nt" else adb_path / "adb"
+            if adb_exe.exists():
+                return str(adb_exe)
+        elif adb_path.exists():
+            return str(adb_path)
+
+    # 2. Kiem tra trong PATH he thong hien tai
+    system_adb = shutil.which("adb")
+    if system_adb:
+        return system_adb
+
+    # 3. Tu dong do tim trong cac thu muc pho bien tren Windows
+    if os.name == "nt":
+        possible_paths = [
+            Path(os.getcwd()) / "platform-tools" / "adb.exe",
+            Path(os.getcwd()) / "adb.exe",
+            Path(Path.home()) / "Downloads" / "platform-tools" / "adb.exe",
+            Path("C:\\platform-tools\\adb.exe"),
+            Path("C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools\\adb.exe"),
+            Path("C:\\Program Files\\Android\\android-sdk\\platform-tools\\adb.exe"),
+            Path(os.environ.get("LOCALAPPDATA", "")) / "Android" / "Sdk" / "platform-tools" / "adb.exe",
+        ]
+        for path in possible_paths:
+            if path.exists():
+                # Them vao PATH tam thoi cua tien trinh de scrcpy cung tim thay adb
+                os.environ["PATH"] = str(path.parent) + os.pathsep + os.environ.get("PATH", "")
+                return str(path)
+                
+    return "adb" # fallback
+
+
 def adb_command(settings: Settings, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    command = ["adb"]
+    adb_exe = get_adb_executable()
+    command = [adb_exe]
     if settings.adb_serial:
         command += ["-s", settings.adb_serial]
     command += list(args)
     
-    # Ẩn cửa sổ console đen của adb trên Windows
+    # An cua so console den cua adb tren Windows
     startupinfo = None
     creationflags = 0
     if os.name == "nt":
