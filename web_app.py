@@ -248,6 +248,14 @@ HTML = r"""
       background: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
       box-shadow: 0 6px 20px rgba(225, 29, 72, 0.4);
     }
+    button.btn-stop {
+      background: linear-gradient(135deg, #7c2d12 0%, #b91c1c 100%);
+      box-shadow: 0 4px 14px rgba(185, 28, 28, 0.3);
+    }
+    button.btn-stop:hover {
+      background: linear-gradient(135deg, #991b1b 0%, #dc2626 100%);
+      box-shadow: 0 6px 20px rgba(185, 28, 28, 0.4);
+    }
     input, select, textarea {
       width: 100%;
       min-height: 44px;
@@ -851,6 +859,10 @@ HTML = r"""
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
             Quay video
           </button>
+          <button id="btnStop" class="btn-stop" onclick="stopOperation()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect></svg>
+            Dừng
+          </button>
         </div>
       </header>
       <div class="content">
@@ -1219,7 +1231,8 @@ HTML = r"""
   async function stopPoll(){if(poller){clearInterval(poller);poller=null}await pull().catch(()=>{})}
   function selected(){return document.getElementById("folderSelect").value}
   function requireFolder(){if(!selected()){log({error:"Hãy chọn hoặc tạo thư mục sản phẩm trước khi chụp/quay."});return false}return true}
-  function setBusy(v){busy=v;document.querySelectorAll("button").forEach(b=>b.disabled=v);document.getElementById("themeToggleBtn").disabled=false;if(document.querySelector("#wifiIpGroup button")) document.querySelectorAll("#wifiIpGroup button").forEach(b=>b.disabled=v);}
+  function setBusy(v){busy=v;document.querySelectorAll("button").forEach(b=>{if(b.id!=="btnStop"&&!b.classList.contains("btn-stop"))b.disabled=v});document.getElementById("themeToggleBtn").disabled=false;if(document.querySelector("#wifiIpGroup button")) document.querySelectorAll("#wifiIpGroup button").forEach(b=>b.disabled=v);}
+  async function stopOperation(){try{log({status:"Đang dừng tất cả tiến trình..."});const d=await api("/api/operation/stop",{});log(d);setBusy(false);await refresh()}catch(e){log(e);setBusy(false);await refresh()}}
   function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
   function render(d){document.getElementById("adbMetric").innerHTML=d.adb_device?`<span class="badge ok">${d.adb_device}</span>`:`<span class="badge warn">Chưa thấy Pixel</span>`;document.getElementById("driveMetric").innerHTML=d.drive_ready?`<span class="badge ok">Đã kết nối</span>`:`<span class="badge warn">Không tìm thấy</span>`;document.getElementById("selectedMetric").textContent=d.selected_folder||"Chưa chọn";document.getElementById("folderMetric").textContent=(d.folders||[]).length;document.getElementById("busyMetric").innerHTML=d.operation_busy?`<span class="badge warn">Đang xử lý</span>`:`<span class="badge ok">Sẵn sàng</span>`;document.getElementById("navFolders").textContent=(d.folders||[]).length;document.getElementById("navDrive").textContent=d.drive_ready?"OK":"Lỗi";document.getElementById("navAdb").textContent=d.adb_device?"OK":"Offline";document.getElementById("driveRoot").value=d.drive_root;document.getElementById("connMode").value=d.connection_mode||"usb";document.getElementById("wifiIp").value=d.wifi_ip||"";document.getElementById("adbPathInput").value=d.adb_path||"";document.getElementById("scrcpyPathInput").value=d.scrcpy_path||"";changeConnMode();const s=document.getElementById("folderSelect"),current=d.selected_folder||s.value;s.innerHTML='<option value="">-- Chưa chọn thư mục --</option>'+d.folders.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("");s.value=current;const pb=document.getElementById("previewBtn"),pt=document.getElementById("previewBtnText");if(pb&&pt){if(d.scrcpy_running){pb.classList.add("pulse-warn");pt.textContent="Đóng xem Pixel"}else{pb.classList.remove("pulse-warn");pt.textContent="Xem Pixel"}}}
   async function refresh(){try{render(await api("/api/status"))}catch(e){log(e)}}
@@ -2635,6 +2648,39 @@ def api_toggle_screen():
         return error_response(exc, 400)
 
 
+def stop_all_processes() -> None:
+    if os.name == "nt":
+        creationflags = 0x08000000
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0
+        # Kill scrcpy
+        subprocess.run(["taskkill", "/IM", "scrcpy.exe", "/F"], text=True, capture_output=True, check=False, startupinfo=startupinfo, creationflags=creationflags)
+        # Kill adb.exe
+        subprocess.run(["taskkill", "/IM", "adb.exe", "/F"], text=True, capture_output=True, check=False, startupinfo=startupinfo, creationflags=creationflags)
+
+
+@app.post("/api/operation/stop")
+def api_operation_stop():
+    try:
+        add_event({"step": "stop_operation", "message": "Yêu cầu dừng khẩn cấp tất cả tiến trình đang chạy..."})
+        
+        # Kill adb.exe và scrcpy.exe cưỡng bức
+        stop_all_processes()
+        
+        # Giải phóng khóa tác vụ
+        if OPERATION_LOCK.locked():
+            try:
+                OPERATION_LOCK.release()
+            except RuntimeError:
+                pass
+                
+        add_event({"step": "stop_operation", "message": "Đã dừng tất cả tiến trình và giải phóng trạng thái tác vụ."})
+        return jsonify({"status": "Đã dừng tất cả tiến trình và giải phóng thiết bị."})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
 @app.post("/api/capture")
 def api_capture():
     if not OPERATION_LOCK.acquire(blocking=False):
@@ -3389,10 +3435,22 @@ echo   DANG CAP NHAT PHAN MEM - VUI LONG CHO...
 echo ==================================================
 echo.
 
-timeout /t 2 /nobreak > nul
+:wait_close
+if exist "{exe_path}" (
+    rename "{exe_path}" "PixelDriveCapture.exe.old" 2>nul
+    if errorlevel 1 (
+        echo Dang cho Pixel Drive Capture tat hoan toan...
+        timeout /t 1 /nobreak > nul
+        goto wait_close
+    )
+)
 
+echo Dang sao chep cac tep tin moi...
 :: Thuc hien di chuyen file de de len thu muc cu, loai tru config.json va config.example.json
 robocopy "{extract_source}" "{ROOT}" /E /MOVE /Y /XF config.json config.example.json /R:3 /W:1 > nul
+
+:: Xoa file .old neu ton tai
+if exist "{ROOT}\\PixelDriveCapture.exe.old" del /f /q "{ROOT}\\PixelDriveCapture.exe.old"
 
 :: Xoa sach thu muc tam
 if exist "{extract_dir}" rd /s /q "{extract_dir}"
