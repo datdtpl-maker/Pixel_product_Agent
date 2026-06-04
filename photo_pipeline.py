@@ -17,6 +17,8 @@ class Settings:
     processed_dir: Path
     adb_serial: str
     camera_dir: str
+    adb_path: str = ""
+    scrcpy_path: str = ""
 
 
 def load_settings(config_path: Path) -> Settings:
@@ -36,6 +38,8 @@ def load_settings(config_path: Path) -> Settings:
         processed_dir=resolve(config["paths"].get("processed_dir", "processed")),
         adb_serial=config["pixel"].get("adb_serial", ""),
         camera_dir=config["pixel"].get("camera_dir", "/sdcard/DCIM/Camera"),
+        adb_path=config.get("pixel", {}).get("adb_path", ""),
+        scrcpy_path=config.get("pixel", {}).get("scrcpy_path", ""),
     )
 
 
@@ -56,7 +60,20 @@ def ensure_dirs(settings: Settings) -> None:
     settings.processed_dir.mkdir(parents=True, exist_ok=True)
 
 
-def get_adb_executable() -> str:
+def get_adb_executable(settings: Settings | None = None) -> str:
+    # 0. Kiem tra trong settings (tu config.json) truoc
+    if settings and settings.adb_path:
+        adb_path = Path(settings.adb_path)
+        if adb_path.is_dir():
+            adb_exe = adb_path / "adb.exe" if os.name == "nt" else adb_path / "adb"
+            if adb_exe.exists():
+                # Nạp cha của adb.exe vào PATH để scrcpy cũng tìm thấy
+                os.environ["PATH"] = str(adb_path) + os.pathsep + os.environ.get("PATH", "")
+                return str(adb_exe)
+        elif adb_path.exists():
+            os.environ["PATH"] = str(adb_path.parent) + os.pathsep + os.environ.get("PATH", "")
+            return str(adb_path)
+
     # 1. Kiem tra trong bien moi truong (tu .env hoac he thong)
     adb_env = os.environ.get("ADB_PATH")
     if adb_env:
@@ -64,8 +81,10 @@ def get_adb_executable() -> str:
         if adb_path.is_dir():
             adb_exe = adb_path / "adb.exe" if os.name == "nt" else adb_path / "adb"
             if adb_exe.exists():
+                os.environ["PATH"] = str(adb_path) + os.pathsep + os.environ.get("PATH", "")
                 return str(adb_exe)
         elif adb_path.exists():
+            os.environ["PATH"] = str(adb_path.parent) + os.pathsep + os.environ.get("PATH", "")
             return str(adb_path)
 
     # 2. Kiem tra trong PATH he thong hien tai
@@ -94,7 +113,7 @@ def get_adb_executable() -> str:
 
 
 def adb_command(settings: Settings, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    adb_exe = get_adb_executable()
+    adb_exe = get_adb_executable(settings)
     command = [adb_exe]
     if settings.adb_serial:
         command += ["-s", settings.adb_serial]

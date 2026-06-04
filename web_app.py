@@ -905,7 +905,7 @@ HTML = r"""
         <section class="panel">
           <div class="panel-head"><h3>Cấu hình hệ thống & kết nối</h3><p>Thiết lập thời lượng quay video và phương thức kết nối điều khiển Pixel.</p></div>
           <div class="panel-body">
-            <div class="two">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px;">
               <div>
                 <label for="duration">Thời lượng video (giây)</label>
                 <input id="duration" type="number" min="1" max="300" value="10">
@@ -930,6 +930,19 @@ HTML = r"""
                   </div>
                   <div class="hint" style="margin-top: 6px;">Cắm cáp USB rồi bấm "Quét IP (USB)" để tự động dò IP, sau đó bấm "Kết nối Wifi" và rút cáp ra.</div>
                 </div>
+              </div>
+              <div>
+                <label for="adbPathInput">Đường dẫn thư mục ADB (platform-tools)</label>
+                <div class="field-action" style="margin-bottom: 12px;">
+                  <input id="adbPathInput" placeholder="Ví dụ: E:\platform-tools" style="width: 100%;">
+                </div>
+                
+                <label for="scrcpyPathInput" style="display: block;">Đường dẫn thư mục Scrcpy</label>
+                <div class="field-action">
+                  <input id="scrcpyPathInput" placeholder="Ví dụ: E:\scrcpy-win64-v4.0" style="width: 100%;">
+                  <button onclick="saveToolPaths()">Lưu</button>
+                </div>
+                <div class="hint" style="margin-top: 6px;">Điền thư mục chứa file adb.exe và scrcpy.exe rồi bấm "Lưu".</div>
               </div>
             </div>
           </div>
@@ -1208,11 +1221,12 @@ HTML = r"""
   function requireFolder(){if(!selected()){log({error:"Hãy chọn hoặc tạo thư mục sản phẩm trước khi chụp/quay."});return false}return true}
   function setBusy(v){busy=v;document.querySelectorAll("button").forEach(b=>b.disabled=v);document.getElementById("themeToggleBtn").disabled=false;if(document.querySelector("#wifiIpGroup button")) document.querySelectorAll("#wifiIpGroup button").forEach(b=>b.disabled=v);}
   function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-  function render(d){document.getElementById("adbMetric").innerHTML=d.adb_device?`<span class="badge ok">${d.adb_device}</span>`:`<span class="badge warn">Chưa thấy Pixel</span>`;document.getElementById("driveMetric").innerHTML=d.drive_ready?`<span class="badge ok">Đã kết nối</span>`:`<span class="badge warn">Không tìm thấy</span>`;document.getElementById("selectedMetric").textContent=d.selected_folder||"Chưa chọn";document.getElementById("folderMetric").textContent=(d.folders||[]).length;document.getElementById("busyMetric").innerHTML=d.operation_busy?`<span class="badge warn">Đang xử lý</span>`:`<span class="badge ok">Sẵn sàng</span>`;document.getElementById("navFolders").textContent=(d.folders||[]).length;document.getElementById("navDrive").textContent=d.drive_ready?"OK":"Lỗi";document.getElementById("navAdb").textContent=d.adb_device?"OK":"Offline";document.getElementById("driveRoot").value=d.drive_root;document.getElementById("connMode").value=d.connection_mode||"usb";document.getElementById("wifiIp").value=d.wifi_ip||"";changeConnMode();const s=document.getElementById("folderSelect"),current=d.selected_folder||s.value;s.innerHTML='<option value="">-- Chưa chọn thư mục --</option>'+d.folders.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("");s.value=current;const pb=document.getElementById("previewBtn"),pt=document.getElementById("previewBtnText");if(pb&&pt){if(d.scrcpy_running){pb.classList.add("pulse-warn");pt.textContent="Đóng xem Pixel"}else{pb.classList.remove("pulse-warn");pt.textContent="Xem Pixel"}}}
+  function render(d){document.getElementById("adbMetric").innerHTML=d.adb_device?`<span class="badge ok">${d.adb_device}</span>`:`<span class="badge warn">Chưa thấy Pixel</span>`;document.getElementById("driveMetric").innerHTML=d.drive_ready?`<span class="badge ok">Đã kết nối</span>`:`<span class="badge warn">Không tìm thấy</span>`;document.getElementById("selectedMetric").textContent=d.selected_folder||"Chưa chọn";document.getElementById("folderMetric").textContent=(d.folders||[]).length;document.getElementById("busyMetric").innerHTML=d.operation_busy?`<span class="badge warn">Đang xử lý</span>`:`<span class="badge ok">Sẵn sàng</span>`;document.getElementById("navFolders").textContent=(d.folders||[]).length;document.getElementById("navDrive").textContent=d.drive_ready?"OK":"Lỗi";document.getElementById("navAdb").textContent=d.adb_device?"OK":"Offline";document.getElementById("driveRoot").value=d.drive_root;document.getElementById("connMode").value=d.connection_mode||"usb";document.getElementById("wifiIp").value=d.wifi_ip||"";document.getElementById("adbPathInput").value=d.adb_path||"";document.getElementById("scrcpyPathInput").value=d.scrcpy_path||"";changeConnMode();const s=document.getElementById("folderSelect"),current=d.selected_folder||s.value;s.innerHTML='<option value="">-- Chưa chọn thư mục --</option>'+d.folders.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("");s.value=current;const pb=document.getElementById("previewBtn"),pt=document.getElementById("previewBtnText");if(pb&&pt){if(d.scrcpy_running){pb.classList.add("pulse-warn");pt.textContent="Đóng xem Pixel"}else{pb.classList.remove("pulse-warn");pt.textContent="Xem Pixel"}}}
   async function refresh(){try{render(await api("/api/status"))}catch(e){log(e)}}
   async function scanFolders(){try{render(await api("/api/status"));log({status:"Đã quét lại danh sách thư mục."})}catch(e){log(e)}}
   async function togglePreview(){try{const txt=document.getElementById("previewBtnText").textContent;if(txt==="Đóng xem Pixel"){log(await api("/api/close-preview",{}))}else{log(await api("/api/open-preview",{}))}refresh()}catch(e){log(e)}}
   async function saveDriveRoot(){try{log(await api("/api/drive-root",{drive_root:document.getElementById("driveRoot").value}));await refresh()}catch(e){log(e)}}
+  async function saveToolPaths(){try{const adb=document.getElementById("adbPathInput").value.trim();const scrcpy=document.getElementById("scrcpyPathInput").value.trim();log(await api("/api/pixel/paths",{adb_path:adb,scrcpy_path:scrcpy}));await refresh()}catch(e){log(e)}}
   async function createFolder(){try{const d=await api("/api/folders",{name:document.getElementById("newFolder").value});document.getElementById("newFolder").value="";log(d);await refresh()}catch(e){log(e)}}
   async function deleteFolder(){const name=selected();if(!name){log({error:"Hãy chọn thư mục cần xóa."});return}if(!confirm(`Xóa thư mục rỗng "${name}"?`))return;try{log(await api("/api/folders/delete",{name}));await refresh()}catch(e){log(e)}}
   async function selectFolder(){try{const d=await api("/api/select-folder",{name:selected()});log(d);await refresh()}catch(e){log(e)}}
@@ -2236,18 +2250,30 @@ def adb_device_serial(cfg: pipeline.Settings) -> str:
 
 
 def find_scrcpy_exe() -> Path:
-    configured = os.environ.get("SCRCPY_PATH", "").strip()
-    candidates = [
-        Path(configured) if configured else None,
-        Path(r"C:\FastbootFirmwareFlasher\ExtraTools\scrcpy\scrcpy.exe"),
-    ]
+    config = load_config()
+    configured_scrcpy = config.get("pixel", {}).get("scrcpy_path", "").strip()
+    
+    candidates = []
+    if configured_scrcpy:
+        path = Path(configured_scrcpy)
+        if path.is_dir():
+            exe_file = path / "scrcpy.exe" if os.name == "nt" else path / "scrcpy"
+            candidates.append(exe_file)
+        else:
+            candidates.append(path)
+            
+    configured_env = os.environ.get("SCRCPY_PATH", "").strip()
+    if configured_env:
+        candidates.append(Path(configured_env))
+    candidates.append(Path(r"C:\FastbootFirmwareFlasher\ExtraTools\scrcpy\scrcpy.exe"))
+    
     found = shutil.which("scrcpy")
     if found:
         candidates.append(Path(found))
     for candidate in candidates:
         if candidate and candidate.exists():
             return candidate
-    raise FileNotFoundError("Không tìm thấy scrcpy.exe. Cài scrcpy hoặc set SCRCPY_PATH trong .env.")
+    raise FileNotFoundError("Không tìm thấy scrcpy.exe. Vui lòng cấu hình đường dẫn scrcpy trên giao diện cài đặt.")
 
 
 def open_camera(cfg: pipeline.Settings) -> None:
@@ -2363,7 +2389,9 @@ def api_status():
         "operation_busy": OPERATION_LOCK.locked(),
         "connection_mode": connection_mode,
         "wifi_ip": wifi_ip,
-        "scrcpy_running": scrcpy_running
+        "scrcpy_running": scrcpy_running,
+        "adb_path": pixel_cfg.get("adb_path", ""),
+        "scrcpy_path": pixel_cfg.get("scrcpy_path", "")
     })
 
 
@@ -2461,6 +2489,36 @@ def api_pixel_connection():
             add_event({"step": "usb_mode", "message": "Đã chuyển sang chế độ cắm dây USB."})
 
         return jsonify({"status": status_msg, "connection_mode": connection_mode, "wifi_ip": wifi_ip})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.post("/api/pixel/paths")
+def api_pixel_paths():
+    try:
+        data = request.json or {}
+        adb_path = str(data.get("adb_path", "")).strip()
+        scrcpy_path = str(data.get("scrcpy_path", "")).strip()
+        
+        with CONFIG_LOCK:
+            config = load_config()
+            config.setdefault("pixel", {})["adb_path"] = adb_path
+            config.setdefault("pixel", {})["scrcpy_path"] = scrcpy_path
+            save_config(config)
+            
+        # Cập nhật tạm thời cho session hiện tại trong os.environ
+        if adb_path:
+            os.environ["ADB_PATH"] = adb_path
+            p = Path(adb_path)
+            adb_dir = str(p if p.is_dir() else p.parent)
+            os.environ["PATH"] = adb_dir + os.pathsep + os.environ.get("PATH", "")
+        if scrcpy_path:
+            os.environ["SCRCPY_PATH"] = scrcpy_path
+            p = Path(scrcpy_path)
+            scrcpy_dir = str(p if p.is_dir() else p.parent)
+            os.environ["PATH"] = scrcpy_dir + os.pathsep + os.environ.get("PATH", "")
+            
+        return jsonify({"status": "Đã lưu cấu hình đường dẫn công cụ thành công."})
     except Exception as exc:
         return error_response(exc, 400)
 
