@@ -3578,13 +3578,43 @@ def run_chatgpt_automation_thread(image_path: str | None, prompt_text: str, expo
                 add_event({"step": "error", "message": "Không tìm thấy ô nhập liệu '#prompt-textarea'. Vui lòng kiểm tra lại trang web ChatGPT."})
                 return
                 
+            # Các selectors của nút gửi
+            send_selectors = [
+                'button[data-testid="send-button"]',
+                'button[data-testid="fruitjuice-send-button"]',
+                'button[aria-label="Send prompt"]',
+                'button[aria-label="Gửi phản hồi"]',
+                'button.mb-1.mr-1',
+                'button:has(svg)',
+                'button:has(path[d*="M12"])',
+                '#prompt-textarea ~ button',
+                'div[contenteditable="true"] ~ button'
+            ]
+
             # Upload ảnh nếu có
             if image_path and os.path.exists(image_path):
                 add_event({"step": "chatgpt_automation", "message": f"Đang upload ảnh sản phẩm: {os.path.basename(image_path)}..."})
                 file_input = page.query_selector('input[type="file"]')
                 if file_input:
                     file_input.set_input_files(image_path)
-                    time.sleep(6.0) # Đợi 6 giây cho quá trình tải lên hoàn tất
+                    # Chờ tối đa 40 giây cho ảnh tải lên xong (đợi nút Send sẵn sàng/enabled)
+                    add_event({"step": "chatgpt_automation", "message": "Đang chờ ảnh tải lên hoàn tất (đợi nút Gửi sẵn sàng)..."})
+                    upload_success = False
+                    for i in range(40):
+                        time.sleep(1.0)
+                        for sel in send_selectors:
+                            try:
+                                btn = page.query_selector(sel)
+                                if btn and btn.is_enabled():
+                                    upload_success = True
+                                    break
+                            except Exception:
+                                pass
+                        if upload_success:
+                            add_event({"step": "chatgpt_automation", "message": f"Ảnh đã tải lên hoàn tất sau {i+1} giây."})
+                            break
+                    if not upload_success:
+                        add_event({"step": "chatgpt_automation", "message": "Cảnh báo: Quá thời gian chờ ảnh tải lên, vẫn tiến hành nhập prompt..."})
                 else:
                     add_event({"step": "chatgpt_automation", "message": "Cảnh báo: Không tìm thấy input tải file của ChatGPT."})
             
@@ -3629,47 +3659,60 @@ def run_chatgpt_automation_thread(image_path: str | None, prompt_text: str, expo
             except Exception as e_count:
                 print(f"[ChatGPT Auto] Loi dem anh ban dau: {e_count}")
             
-            # Thử click nút gửi (mũi tên đi lên màu đen)
-            # Cập nhật thêm các selectors mới của ChatGPT
-            send_selectors = [
-                'button[data-testid="send-button"]',
-                'button[data-testid="fruitjuice-send-button"]',
-                'button[aria-label="Send prompt"]',
-                'button[aria-label="Gửi phản hồi"]',
-                'button.mb-1.mr-1',
-                'button:has(svg)',
-                'button:has(path[d*="M12"])',
-                '#prompt-textarea ~ button',
-                'div[contenteditable="true"] ~ button'
-            ]
-            
-            clicked = False
-            for sel in send_selectors:
-                try:
-                    btn = page.query_selector(sel)
-                    if btn and btn.is_enabled():
-                        btn.click(timeout=2000)
-                        clicked = True
-                        add_event({"step": "chatgpt_automation", "message": "Đã click nút gửi ChatGPT thành công."})
-                        break
-                except Exception:
-                    continue
-            
-            if not clicked:
-                add_event({"step": "chatgpt_automation", "message": "Không click được nút gửi. Thử nhấn phím Enter..."})
-                try:
-                    page.focus("#prompt-textarea")
-                    page.click("#prompt-textarea")
-                    page.keyboard.press("Enter")
-                    add_event({"step": "chatgpt_automation", "message": "Đã gửi lệnh phím Enter qua keyboard."})
-                    clicked = True
-                except Exception as press_ex:
-                    print(f"[ChatGPT Auto] Lỗi phím Enter (bỏ qua): {press_ex}")
-                    try:
-                        page.press("#prompt-textarea", "Enter", timeout=2000)
-                    except Exception:
-                        pass
+            # Vòng lặp thử gửi tin nhắn (Tối đa 5 lần thử, mỗi lần cách nhau 2 giây)
+            sent_successfully = False
+            for attempt in range(1, 6):
+                if attempt > 1:
+                    add_event({"step": "chatgpt_automation", "message": f"Thử gửi lại lần {attempt} do tin nhắn chưa được gửi đi..."})
                 
+                # Thử click nút gửi
+                clicked = False
+                for sel in send_selectors:
+                    try:
+                        btn = page.query_selector(sel)
+                        if btn and btn.is_enabled():
+                            btn.click(timeout=1500)
+                            clicked = True
+                            add_event({"step": "chatgpt_automation", "message": f"[Lần {attempt}] Đã click nút gửi ChatGPT."})
+                            break
+                    except Exception:
+                        continue
+                
+                # Nếu không click được, thử nhấn Enter
+                if not clicked:
+                    try:
+                        page.focus("#prompt-textarea")
+                        page.click("#prompt-textarea")
+                        page.keyboard.press("Enter")
+                        add_event({"step": "chatgpt_automation", "message": f"[Lần {attempt}] Đã gửi lệnh phím Enter."})
+                        clicked = True
+                    except Exception as press_ex:
+                        print(f"[ChatGPT Auto] Lỗi phím Enter: {press_ex}")
+                        try:
+                            page.press("#prompt-textarea", "Enter", timeout=1500)
+                            clicked = True
+                        except Exception:
+                            pass
+                
+                # Đợi 2 giây để kiểm tra xem tin nhắn đã gửi đi chưa (ô chat trống)
+                time.sleep(2.0)
+                
+                # Kiểm tra xem ô chat có trống rỗng không
+                try:
+                    textarea_val = page.evaluate('document.getElementById("prompt-textarea") ? document.getElementById("prompt-textarea").innerText.trim() : ""')
+                    # Nếu ô chat trống trơn, tức là đã gửi đi thành công!
+                    if not textarea_val:
+                        sent_successfully = True
+                        add_event({"step": "chatgpt_automation", "message": "Gửi prompt thành công! Ô chat đã trống."})
+                        break
+                except Exception as e_check:
+                    print(f"[ChatGPT Auto] Lỗi kiểm tra ô chat: {e_check}")
+                    sent_successfully = True
+                    break
+            
+            if not sent_successfully:
+                add_event({"step": "chatgpt_automation", "message": "Cảnh báo: Đã thử gửi 5 lần nhưng ô nhập liệu vẫn còn nội dung. Tiếp tục chờ sinh ảnh..."})
+            
             time.sleep(1.0)
             add_event({"step": "chatgpt_automation", "message": "Đã gửi prompt thành công. Đang chờ ChatGPT / DALL-E sinh ảnh mới..."})
             
