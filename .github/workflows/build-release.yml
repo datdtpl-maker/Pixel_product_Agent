@@ -28,6 +28,7 @@ jobs:
           pip install pyinstaller
 
       - name: Update version in web_app.py
+        shell: bash
         run: |
           python -c "import re; f=open('web_app.py', encoding='utf-8'); c=f.read(); f.close(); c_new=re.sub(r'(?m)^CURRENT_VERSION = \".*\"', 'CURRENT_VERSION = \"${{ github.ref_name }}\"', c); f=open('web_app.py', 'w', encoding='utf-8'); f.write(c_new); f.close(); print('Updated version to ${{ github.ref_name }}')"
 
