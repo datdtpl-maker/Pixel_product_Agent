@@ -2322,6 +2322,23 @@ def pixel_screen_is_on(cfg: pipeline.Settings) -> bool:
     raise RuntimeError("Không đọc được trạng thái màn hình Pixel từ dumpsys power.")
 
 
+def ensure_pixel_awake_and_unlocked(cfg: pipeline.Settings) -> None:
+    try:
+        # 1. Kiểm tra màn hình, nếu tắt thì đánh thức
+        if not pixel_screen_is_on(cfg):
+            add_event({"step": "wake_pixel", "message": "Màn hình Pixel đang tắt. Đang tự động đánh thức..."})
+            pipeline.adb_command(cfg, "shell", "input", "keyevent", "224", check=False)
+            time.sleep(0.5)
+            
+        # 2. Gửi lệnh mở khóa (Menu keyevent 82 và vuốt màn hình lên)
+        pipeline.adb_command(cfg, "shell", "input", "keyevent", "82", check=False)
+        time.sleep(0.3)
+        pipeline.adb_command(cfg, "shell", "input", "swipe", "500", "1500", "500", "500", "250", check=False)
+        time.sleep(0.5)
+    except Exception as exc:
+        add_event({"step": "warning", "message": f"Không thể tự động mở khóa màn hình: {exc}"})
+
+
 def stop_existing_scrcpy() -> None:
     if os.name == "nt":
         creationflags = 0x08000000
@@ -2687,6 +2704,7 @@ def api_capture():
         return error_response(RuntimeError("Pixel đang xử lý một tác vụ khác. Hãy đợi hoàn tất rồi thử lại."), 409)
     try:
         cfg = settings()
+        ensure_pixel_awake_and_unlocked(cfg)
         folder = selected_drive_folder(str((request.json or {}).get("folder", "")).strip())
         add_event({"step": "capture", "message": "Đang mở camera Pixel và chụp ảnh.", "folder": folder.name})
         media = pipeline.capture_from_pixel(cfg)
@@ -2711,6 +2729,7 @@ def api_record():
         return error_response(RuntimeError("Pixel đang xử lý một tác vụ khác. Hãy đợi hoàn tất rồi thử lại."), 409)
     try:
         cfg = settings()
+        ensure_pixel_awake_and_unlocked(cfg)
         payload = request.json or {}
         folder = selected_drive_folder(str(payload.get("folder", "")).strip())
         duration = max(1, min(int(payload.get("duration") or 10), 300))
