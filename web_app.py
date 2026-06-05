@@ -3455,10 +3455,21 @@ echo ==================================================
 echo.
 
 :wait_close
+tasklist /FI "IMAGENAME eq PixelDriveCapture.exe" 2>nul | find /I /N "PixelDriveCapture.exe" >nul
+if "%ERRORLEVEL%"=="0" (
+    echo Dang cho Pixel Drive Capture tat hoan toan...
+    timeout /t 1 /nobreak > nul
+    goto wait_close
+)
+
+:: Cho them 1 giay de he thong giai phong hoan toan cac file DLL trong _internal
+timeout /t 1 /nobreak > nul
+
+:: Doi ten file cu de phong ho
 if exist "{exe_path}" (
     rename "{exe_path}" "PixelDriveCapture.exe.old" 2>nul
     if errorlevel 1 (
-        echo Dang cho Pixel Drive Capture tat hoan toan...
+        echo Dang cho giai phong file PixelDriveCapture.exe...
         timeout /t 1 /nobreak > nul
         goto wait_close
     )
