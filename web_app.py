@@ -29,7 +29,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v1.1.21"
+CURRENT_VERSION = "v1.1.22"
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
 if not CONFIG_PATH.exists():
@@ -4377,25 +4377,40 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                 # Cố gắng click nút dấu cộng (+) để hiển thị menu đính kèm
                 try:
                     attach_btn = page.evaluate_handle("""() => {
-                        const labels = ["đính kèm", "thêm tệp", "tải tệp", "attach", "add file", "upload file", "upload media", "attach files", "add_circle"];
-                        for (const btn of document.querySelectorAll('button')) {
-                            const label = (btn.getAttribute('aria-label') || '').toLowerCase();
-                            if (labels.some(l => label.includes(l))) {
-                                return btn;
-                            }
-                        }
-                        // Thử tìm trong cùng container với ô contenteditable
                         const editor = document.querySelector('div[contenteditable="true"]');
-                        if (editor) {
-                            const container = editor.closest('div');
-                            if (container) {
-                                const btns = container.querySelectorAll('button');
-                                if (btns.length > 0) return btns[0];
+                        if (!editor) return null;
+                        
+                        // Duyệt ngược lên các thẻ cha để tìm cụm công cụ đính kèm
+                        let parent = editor.parentElement;
+                        for (let i = 0; i < 6 && parent; i++) {
+                            // Ưu tiên tìm các icon hoặc class hoặc thuộc tính có chứa add/plus/attach
+                            const clickables = parent.querySelectorAll('button, [role="button"], g-icon, svg, [class*="plus"], [class*="add"], [class*="attach"]');
+                            for (const el of clickables) {
+                                const btn = el.closest('button') || el.closest('[role="button"]') || el;
+                                const label = (btn.getAttribute('aria-label') || btn.getAttribute('title') || '').toLowerCase();
+                                const txt = (btn.textContent || '').trim().toLowerCase();
+                                const hasKeywords = ["đính kèm", "thêm tệp", "tải tệp", "attach", "add", "upload", "plus"].some(kw => label.includes(kw) || txt.includes(kw));
+                                if (hasKeywords) {
+                                    return btn;
+                                }
                             }
+                            parent = parent.parentElement;
                         }
-                        for (const btn of document.querySelectorAll('button')) {
-                            if (btn.innerText.trim() === '+' || btn.textContent.trim() === '+') {
-                                return btn;
+                        
+                        // Sibling fallback: lấy button đầu tiên nằm cùng cấp hoặc ngay trước editor
+                        parent = editor.parentElement;
+                        if (parent) {
+                            const btns = parent.querySelectorAll('button, [role="button"]');
+                            if (btns.length > 0) return btns[0];
+                        }
+                        
+                        // Fallback toàn trang bằng text hoặc label
+                        const labels = ["đính kèm", "thêm tệp", "tải tệp", "attach", "add file", "upload file", "upload media", "attach files", "add_circle"];
+                        for (const el of document.querySelectorAll('button, [role="button"], g-icon, div, span')) {
+                            const label = (el.getAttribute('aria-label') || el.getAttribute('title') || '').toLowerCase();
+                            const txt = (el.textContent || '').trim();
+                            if (labels.some(l => label.includes(l)) || txt === '+' || txt === 'add') {
+                                return el.closest('button') || el.closest('[role="button"]') || el;
                             }
                         }
                         return null;
@@ -4404,25 +4419,18 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                     if attach_btn and attach_btn.as_element():
                         add_event({"step": "gemini_automation", "message": "Đã tìm thấy nút dấu cộng đính kèm (+). Đang mở menu..."})
                         attach_btn.as_element().click()
-                        time.sleep(1.0) # Chờ menu hiển thị
+                        time.sleep(1.2) # Chờ menu hiển thị hoàn toàn
                         
                         # Tìm nút Tệp hoặc Video trong menu vừa hiển thị
                         menu_item = page.evaluate_handle("""(mType) => {
-                            // Nếu là video, ưu tiên tìm text "Video"
-                            if (mType === "video") {
-                                for (const el of document.querySelectorAll('span, div, button')) {
-                                    if (el.innerText && el.innerText.trim() === 'Video') {
-                                        return el.closest('button') || el;
-                                    }
-                                }
-                            }
-                            // Với hình ảnh hoặc fallback, tìm text "Hình ảnh", "Tệp", hoặc "Ảnh"
-                            const targets = mType === "video" ? ['Video', 'Tệp'] : ['Hình ảnh', 'Tệp', 'Ảnh'];
-                            for (const text of targets) {
-                                for (const el of document.querySelectorAll('span, div, button')) {
-                                    if (el.innerText && el.innerText.trim() === text) {
-                                        return el.closest('button') || el;
-                                    }
+                            const isVid = mType === "video";
+                            // Hỗ trợ đa ngôn ngữ Anh / Việt
+                            const targets = isVid ? ['video', 'tệp', 'file'] : ['hình ảnh', 'images', 'tệp', 'file', 'ảnh', 'photos'];
+                            
+                            for (const el of document.querySelectorAll('span, div, button, p, a')) {
+                                const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+                                if (targets.some(t => text === t)) {
+                                    return el.closest('button') || el.closest('[role="button"]') || el;
                                 }
                             }
                             return null;
@@ -4439,13 +4447,15 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                                 upload_triggered = True
                             except Exception as e_fc:
                                 print(f"[Gemini Auto] Lỗi trigger file chooser: {e_fc}")
-                                # Click fallback để đóng menu
+                                # Click lại editor để đóng menu nếu bị kẹt
                                 try:
                                     page.click('div[contenteditable="true"]')
                                 except Exception:
                                     pass
                         else:
-                            add_event({"step": "gemini_automation", "message": "Không tìm thấy nút Tệp/Video trên menu, chuyển sang chế độ upload tự động..."})
+                            add_event({"step": "gemini_automation", "message": "Không tìm thấy nút tương ứng trên menu đính kèm, đang chuyển sang fallback..."})
+                    else:
+                        add_event({"step": "gemini_automation", "message": "Không phát hiện nút đính kèm (+) trên giao diện, đang chuyển sang fallback..."})
                 except Exception as e_attach:
                     print(f"[Gemini Auto] Lỗi tương tác nút đính kèm (+): {e_attach}")
                 
@@ -4455,8 +4465,11 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                     file_inputs = page.query_selector_all('input[type="file"]')
                     file_input = file_inputs[-1] if file_inputs else None
                     if file_input:
-                        file_input.set_input_files(media_path)
-                        upload_triggered = True
+                        try:
+                            file_input.set_input_files(media_path)
+                            upload_triggered = True
+                        except Exception as e_input:
+                            print(f"[Gemini Auto] Lỗi set_input_files trực tiếp: {e_input}")
                     else:
                         add_event({"step": "gemini_automation", "message": "Cảnh báo: Không tìm thấy bất kỳ input file nào."})
                 
