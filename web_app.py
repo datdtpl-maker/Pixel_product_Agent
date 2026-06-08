@@ -53,13 +53,86 @@ if not prompts_path.exists():
 
 chrome_bat_path = ROOT / "run_debug_chrome.bat"
 if not chrome_bat_path.exists():
-    example_bat = BUNDLE_DIR / "run_debug_chrome.bat"
-    if example_bat.exists():
-        try:
+    try:
+        example_bat = BUNDLE_DIR / "run_debug_chrome.bat"
+        if example_bat.exists():
             shutil.copy(example_bat, chrome_bat_path)
             print(f"Da tu dong khoi tao run_debug_chrome.bat tai: {chrome_bat_path}")
-        except Exception as e:
-            print(f"Loi khi sao chep file run_debug_chrome.bat: {e}")
+        else:
+            bat_content = """@echo off
+title Khoi dong Chrome Debug Port 9222
+echo Dang tim kiem duong dan Google Chrome...
+
+set "CHROME_PATH="
+if exist "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" (
+    set "CHROME_PATH=C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+) else if exist "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" (
+    set "CHROME_PATH=C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+) else if exist "%%LocalAppData%%\\Google\\Chrome\\Application\\chrome.exe" (
+    set "CHROME_PATH=%%LocalAppData%%\\Google\\Chrome\\Application\\chrome.exe"
+)
+
+if "%CHROME_PATH%"=="" (
+    echo Khong tim thay Google Chrome tren cac thu muc mac dinh!
+    echo Vui long mo Chrome bang tay voi cac tham sau:
+    echo chrome.exe --remote-debugging-port=9222 --user-data-dir="%%%%LOCALAPPDATA%%%%\\Google\\Chrome\\User Data Debug"
+    pause
+    exit /b
+)
+
+echo Da tim thay Chrome tai: %%CHROME_PATH%%
+echo Dang khoi dong Chrome o che do Cua so Doc lap (App Mode) voi debug port 9222...
+echo (Dieu nay giup an thanh URL, tao trai nghiem gop chung sang trong giong Widget ung dung)
+
+start "" "%%CHROME_PATH%%" --app="https://chatgpt.com" --remote-debugging-port=9222 --user-data-dir="%%LOCALAPPDATA%%\\Google\\Chrome\\User Data Debug"
+echo Chrome Debug App da duoc khoi dong!
+exit
+"""
+            chrome_bat_path.write_text(bat_content, encoding="utf-8")
+            print(f"Da tu dong tao moi run_debug_chrome.bat tai: {chrome_bat_path}")
+    except Exception as e:
+        print(f"Loi khi khoi tao run_debug_chrome.bat: {e}")
+
+gemini_bat_path = ROOT / "run_debug_chrome_gemini.bat"
+if not gemini_bat_path.exists():
+    try:
+        example_bat = BUNDLE_DIR / "run_debug_chrome_gemini.bat"
+        if example_bat.exists():
+            shutil.copy(example_bat, gemini_bat_path)
+            print(f"Da tu dong khoi tao run_debug_chrome_gemini.bat tai: {gemini_bat_path}")
+        else:
+            bat_content = """@echo off
+title Khoi dong Chrome Debug Port 9223
+echo Dang tim kiem duong dan Google Chrome cho Gemini...
+
+set "CHROME_PATH="
+if exist "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" (
+    set "CHROME_PATH=C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+) else if exist "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" (
+    set "CHROME_PATH=C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+) else if exist "%%LocalAppData%%\\Google\\Chrome\\Application\\chrome.exe" (
+    set "CHROME_PATH=%%LocalAppData%%\\Google\\Chrome\\Application\\chrome.exe"
+)
+
+if "%CHROME_PATH%"=="" (
+    echo Khong tim thay Google Chrome tren cac thu muc mac dinh!
+    echo Vui long mo Chrome bang tay voi cac tham sau:
+    echo chrome.exe --remote-debugging-port=9223 --user-data-dir="%%%%LOCALAPPDATA%%%%\\Google\\Chrome\\User Data Debug Gemini"
+    pause
+    exit /b
+)
+
+echo Da tim thay Chrome tai: %%CHROME_PATH%%
+echo Dang khoi dong Chrome Gemini o che do Cua so Doc lap (App Mode) voi debug port 9223...
+
+start "" "%%CHROME_PATH%%" --app="https://gemini.google.com" --remote-debugging-port=9223 --user-data-dir="%%LOCALAPPDATA%%\\Google\\Chrome\\User Data Debug Gemini"
+echo Chrome Gemini Debug App da duoc khoi dong!
+exit
+"""
+            gemini_bat_path.write_text(bat_content, encoding="utf-8")
+            print(f"Da tu dong tao moi run_debug_chrome_gemini.bat tai: {gemini_bat_path}")
+    except Exception as e:
+        print(f"Loi khi khoi tao run_debug_chrome_gemini.bat: {e}")
 
 DEFAULT_DRIVE_ROOT = r"G:\My Drive\Test hình ảnh shopee"
 EVENT_LOCK = threading.Lock()
