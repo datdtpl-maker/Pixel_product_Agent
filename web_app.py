@@ -2093,10 +2093,18 @@ HTML = r"""
   }
 
   async function startAppUpdate(downloadUrl) {
-    if (typeof appendAutomationLog === 'function') {
-      appendAutomationLog("Bắt đầu tải bản cập nhật mới từ GitHub Releases...");
+    const updateBtn = document.getElementById("updateAppBtn");
+    const updateText = document.getElementById("updateAppText");
+
+    if (updateBtn) {
+      updateBtn.disabled = true;
+      updateBtn.classList.remove("pulse-warn");
     }
-    
+
+    if (typeof appendAutomationLog === 'function') {
+      appendAutomationLog("Khởi chạy tiến trình cập nhật ngầm...");
+    }
+
     try {
       const response = await fetch('/api/app/perform-update', {
         method: 'POST',
@@ -2105,13 +2113,41 @@ HTML = r"""
       });
       const data = await response.json();
       if (!response.ok) throw data;
-      
-      if (typeof appendAutomationLog === 'function') {
-        appendAutomationLog("Tải bản cập nhật thành công! Đang kích hoạt updater và khởi động lại ứng dụng...");
-      }
-      alert("Đã chuẩn bị xong! Ứng dụng sẽ tự động đóng và khởi động lại phiên bản mới sau vài giây. Vui lòng chờ.");
-      window.close();
+
+      let lastMsg = "";
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await fetch('/api/app/update-status');
+          const statusData = await statusRes.json();
+
+          if (statusData.status === "downloading" || statusData.status === "extracting") {
+            if (updateText) {
+              updateText.innerText = statusData.message;
+            }
+            if (typeof appendAutomationLog === 'function' && lastMsg !== statusData.message) {
+              appendAutomationLog(statusData.message);
+              lastMsg = statusData.message;
+            }
+          } else if (statusData.status === "ready") {
+            clearInterval(pollInterval);
+            if (typeof appendAutomationLog === 'function') {
+              appendAutomationLog("Chuẩn bị xong! Đang kích hoạt updater...");
+            }
+            alert("Đã chuẩn bị xong! Ứng dụng sẽ tự động đóng và khởi động lại phiên bản mới sau vài giây. Vui lòng chờ.");
+            window.close();
+          } else if (statusData.status === "error") {
+            clearInterval(pollInterval);
+            if (updateBtn) updateBtn.disabled = false;
+            if (updateText) updateText.innerText = "Cập nhật lỗi";
+            alert("Lỗi cập nhật: " + statusData.error);
+          }
+        } catch (err) {
+          console.error("Lỗi poll status update:", err);
+        }
+      }, 1000);
+
     } catch (e) {
+      if (updateBtn) updateBtn.disabled = false;
       alert("Lỗi cập nhật: " + (e.error || e.message || JSON.stringify(e)));
     }
   }
@@ -3489,12 +3525,153 @@ def parse_version(v_str):
         parts.append(0)
     return tuple(parts[:3])
 
+UPDATE_STATUS = {
+    "status": "idle",
+    "progress": 0,
+    "message": "",
+    "error": None
+}
+UPDATE_STATUS_LOCK = threading.Lock()
+
+def set_update_status(status, progress=0, message="", error=None):
+    global UPDATE_STATUS
+    with UPDATE_STATUS_LOCK:
+        UPDATE_STATUS = {
+            "status": status,
+            "progress": progress,
+            "message": message,
+            "error": error
+        }
+
+def run_update_in_background(download_url):
+    try:
+        set_update_status("downloading", 0, "Bắt đầu tải bản cập nhật...")
+        add_event({"step": "app_update", "message": "Bắt đầu tải tệp tin cập nhật từ GitHub..."})
+
+        zip_path = ROOT / "update_tmp.zip"
+        headers = {"User-Agent": "PixelDriveCapture-Updater"}
+        r = requests.get(download_url, headers=headers, stream=True, timeout=60)
+        r.raise_for_status()
+
+        total_length = r.headers.get('content-length')
+        if total_length is None:
+            with open(zip_path, "wb") as f:
+                f.write(r.content)
+            set_update_status("downloading", 50, "Đã tải xong tệp zip.")
+        else:
+            dl = 0
+            total_length = int(total_length)
+            with open(zip_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=65536):
+                    if chunk:
+                        f.write(chunk)
+                        dl += len(chunk)
+                        percent = int(100 * dl / total_length)
+                        set_update_status("downloading", percent, f"Đang tải: {percent}%...")
+                        if percent % 10 == 0:
+                            add_event({"step": "app_update", "message": f"Đang tải bản cập nhật: {percent}%..."})
+
+        set_update_status("extracting", 90, "Đang giải nén dữ liệu cập nhật...")
+        add_event({"step": "app_update", "message": "Đang giải nén dữ liệu cập nhật..."})
+
+        import zipfile
+        extract_dir = ROOT / "update_tmp_extract"
+        if extract_dir.exists():
+            shutil.rmtree(extract_dir, ignore_errors=True)
+        extract_dir.mkdir(exist_ok=True)
+
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(extract_dir)
+
+        extract_source = extract_dir
+        sub_dir = extract_dir / "PixelDriveCapture"
+        if sub_dir.exists() and sub_dir.is_dir():
+            extract_source = sub_dir
+
+        exe_path = ROOT / "PixelDriveCapture.exe"
+        bat_path = ROOT / "updater.bat"
+
+        # Định nghĩa các đường dẫn dạng chuỗi không chứa dấu gạch chéo ngược trong f-string
+        root_str = str(ROOT).replace('/', '\\')
+        root_internal = str(ROOT / "_internal").replace('/', '\\')
+        exe_path_str = str(exe_path).replace('/', '\\')
+        extract_source_str = str(extract_source).replace('/', '\\')
+        extract_dir_str = str(extract_dir).replace('/', '\\')
+        zip_path_str = str(zip_path).replace('/', '\\')
+
+        bat_content = f"""@echo off
+chcp 65001 > nul
+title Pixel Drive Capture - Updater
+echo ==================================================
+echo   DANG CAP NHAT PHAN MEM - VUI LONG CHO...
+echo ==================================================
+echo.
+
+:: Kiểm tra quyền Admin
+:check_privileges
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Dang yeu cau quyen Administrator de cap nhat...
+    powershell -Command "Start-Process -FilePath '%0' -ArgumentList 'am_admin' -Verb RunAs"
+    exit /b
+)
+
+:wait_close
+tasklist /FI "IMAGENAME eq PixelDriveCapture.exe" 2>nul | find /I /N "PixelDriveCapture.exe" >nul
+if "%ERRORLEVEL%"=="0" (
+    echo Dang cho Pixel Drive Capture tat hoan toan...
+    ping 127.0.0.1 -n 2 > nul
+    goto wait_close
+)
+
+:: Cho them 1 giay de he thong giai phong hoan toan file handle
+ping 127.0.0.1 -n 2 > nul
+
+:: Force kill them lan nua cho chac chan
+taskkill /F /IM PixelDriveCapture.exe >nul 2>&1
+
+echo Dang don dep phien ban cu...
+if exist "{root_internal}" (
+    rd /s /q "{root_internal}" >nul 2>&1
+)
+if exist "{exe_path_str}" (
+    del /f /q "{exe_path_str}" >nul 2>&1
+)
+
+echo Dang sao chep cac tep tin moi...
+robocopy "{extract_source_str}" "{root_str}" /E /MOVE /Y /XF config.json config.example.json /R:5 /W:1 > nul
+
+if exist "{extract_dir_str}" rd /s /q "{extract_dir_str}" >nul 2>&1
+if exist "{zip_path_str}" del /f /q "{zip_path_str}" >nul 2>&1
+
+echo.
+echo Cap nhat thanh cong! Dang khoi dong lai Pixel Drive Capture...
+start "" "{exe_path_str}"
+
+(goto) 2>nul & del "%~f0"
+"""
+        bat_path.write_text(bat_content, encoding="utf-8")
+
+        set_update_status("ready", 100, "Đang khởi chạy updater...")
+        add_event({"step": "app_update", "message": "Đã tải xong bản cập nhật. Đang khởi chạy updater..."})
+
+        subprocess.Popen(f'"{bat_path}"', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+
+        time.sleep(1.0)
+        os._exit(0)
+
+    except Exception as exc:
+        set_update_status("error", 0, f"Lỗi cập nhật: {exc}", error=str(exc))
+        add_event({"step": "error", "message": f"Lỗi trong quá trình cập nhật: {exc}"})
+        print(f"[Update Thread] Error: {exc}")
+
+
 @app.get("/api/app/check-update")
 def api_check_update():
     try:
         url = "https://api.github.com/repos/datdtpl-maker/Pixel-Drive-Capture/releases/latest"
         headers = {"User-Agent": "PixelDriveCapture-Updater"}
-        
+
         r = requests.get(url, headers=headers, timeout=5)
         if r.status_code == 404:
             return jsonify({
@@ -3504,13 +3681,13 @@ def api_check_update():
                 "download_url": "",
                 "release_notes": "Chưa có bản cập nhật nào được phát hành trên GitHub."
             })
-            
+
         r.raise_for_status()
         release_data = r.json()
-        
+
         latest_version = release_data.get("tag_name", "").strip()
         release_notes = release_data.get("body", "").strip()
-        
+
         download_url = ""
         assets = release_data.get("assets", [])
         for asset in assets:
@@ -3518,16 +3695,15 @@ def api_check_update():
             if name.endswith(".zip"):
                 download_url = asset.get("browser_download_url", "")
                 break
-                
+
         if not download_url:
             download_url = release_data.get("zipball_url", "")
-            
+
         has_update = False
         if latest_version:
-            # So sánh phiên bản chuyên nghiệp Semantic Versioning (chỉ báo update nếu bản trên git cao hơn bản hiện tại)
             if parse_version(latest_version) > parse_version(CURRENT_VERSION):
                 has_update = True
-            
+
         return jsonify({
             "has_update": has_update,
             "current_version": CURRENT_VERSION,
@@ -3546,100 +3722,18 @@ def api_perform_update():
         download_url = data.get("download_url", "").strip()
         if not download_url:
             raise ValueError("Thiếu link tải bản cập nhật.")
-            
-        add_event({"step": "app_update", "message": "Bắt đầu tải tệp tin cập nhật từ GitHub..."})
-        
-        zip_path = ROOT / "update_tmp.zip"
-        headers = {"User-Agent": "PixelDriveCapture-Updater"}
-        r = requests.get(download_url, headers=headers, stream=True)
-        r.raise_for_status()
-        with open(zip_path, "wb") as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                f.write(chunk)
-                
-        extract_dir = ROOT / "update_tmp_extract"
-        if extract_dir.exists():
-            shutil.rmtree(extract_dir, ignore_errors=True)
-        extract_dir.mkdir(exist_ok=True)
-        
-        add_event({"step": "app_update", "message": "Đang giải nén dữ liệu cập nhật..."})
-        import zipfile
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_dir)
-            
-        extract_source = extract_dir
-        sub_dir = extract_dir / "PixelDriveCapture"
-        if sub_dir.exists() and sub_dir.is_dir():
-            extract_source = sub_dir
-            
-        exe_path = ROOT / "PixelDriveCapture.exe"
-        bat_path = ROOT / "updater.bat"
-        
-        bat_content = f"""@echo off
-chcp 65001 > nul
-title Pixel Drive Capture - Updater
-echo ==================================================
-echo   DANG CAP NHAT PHAN MEM - VUI LONG CHO...
-echo ==================================================
-echo.
 
-:wait_close
-tasklist /FI "IMAGENAME eq PixelDriveCapture.exe" 2>nul | find /I /N "PixelDriveCapture.exe" >nul
-if "%ERRORLEVEL%"=="0" (
-    echo Dang cho Pixel Drive Capture tat hoan toan...
-    ping 127.0.0.1 -n 2 > nul
-    goto wait_close
-)
-
-:: Cho them 1 giay de he thong giai phong hoan toan cac file DLL trong _internal
-ping 127.0.0.1 -n 2 > nul
-
-:: Doi ten file cu de phong ho
-if exist "{exe_path}" (
-    rename "{exe_path}" "PixelDriveCapture.exe.old" 2>nul
-    if errorlevel 1 (
-        echo Dang cho giai phong file PixelDriveCapture.exe...
-        ping 127.0.0.1 -n 2 > nul
-        goto wait_close
-    )
-)
-
-echo Dang sao chep cac tep tin moi...
-:: Thuc hien di chuyen file de de len thu muc cu, loai tru config.json va config.example.json
-robocopy "{extract_source}" "{ROOT}" /E /MOVE /Y /XF config.json config.example.json /R:3 /W:1 > nul
-
-:: Xoa file .old neu ton tai
-if exist "{ROOT}\\PixelDriveCapture.exe.old" del /f /q "{ROOT}\\PixelDriveCapture.exe.old"
-
-:: Xoa sach thu muc tam
-if exist "{extract_dir}" rd /s /q "{extract_dir}"
-if exist "{zip_path}" del /f /q "{zip_path}"
-
-echo.
-echo Cap nhat thanh cong! Dang khoi dong lai Pixel Drive Capture...
-start "" "{exe_path}"
-
-(goto) 2>nul & del "%~f0"
-"""
-        bat_path.write_text(bat_content, encoding="utf-8")
-        
-        add_event({"step": "app_update", "message": "Đã tạo tập lệnh cập nhật. Đang khởi động tiến trình updater..."})
-        
-        # Khởi chạy batch updater độc lập
-        subprocess.Popen(f'"{bat_path}"', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
-        
-        # Tắt ứng dụng hiện tại để giải phóng file
-        def shutdown():
-            time.sleep(1.0)
-            os._exit(0)
-            
-        threading.Thread(target=shutdown).start()
-        
-        return jsonify({"success": True, "message": "Đang tiến hành cập nhật và khởi động lại..."})
-        
+        threading.Thread(target=run_update_in_background, args=(download_url,)).start()
+        return jsonify({"success": True, "message": "Tiến trình cập nhật đã bắt đầu chạy ngầm."})
     except Exception as exc:
-        add_event({"step": "error", "message": f"Lỗi trong quá trình cập nhật: {exc}"})
         return error_response(exc, 400)
+
+
+@app.get("/api/app/update-status")
+def api_get_update_status():
+    global UPDATE_STATUS
+    with UPDATE_STATUS_LOCK:
+        return jsonify(UPDATE_STATUS)
 
 
 @app.get("/api/content/categories")
