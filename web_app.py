@@ -3464,19 +3464,19 @@ echo.
 tasklist /FI "IMAGENAME eq PixelDriveCapture.exe" 2>nul | find /I /N "PixelDriveCapture.exe" >nul
 if "%ERRORLEVEL%"=="0" (
     echo Dang cho Pixel Drive Capture tat hoan toan...
-    timeout /t 1 /nobreak > nul
+    ping 127.0.0.1 -n 2 > nul
     goto wait_close
 )
 
 :: Cho them 1 giay de he thong giai phong hoan toan cac file DLL trong _internal
-timeout /t 1 /nobreak > nul
+ping 127.0.0.1 -n 2 > nul
 
 :: Doi ten file cu de phong ho
 if exist "{exe_path}" (
     rename "{exe_path}" "PixelDriveCapture.exe.old" 2>nul
     if errorlevel 1 (
         echo Dang cho giai phong file PixelDriveCapture.exe...
-        timeout /t 1 /nobreak > nul
+        ping 127.0.0.1 -n 2 > nul
         goto wait_close
     )
 )
@@ -3503,11 +3503,11 @@ start "" "{exe_path}"
         add_event({"step": "app_update", "message": "Đã tạo tập lệnh cập nhật. Đang khởi động tiến trình updater..."})
         
         # Khởi chạy batch updater độc lập
-        subprocess.Popen([str(bat_path)], shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+        subprocess.Popen(f'"{bat_path}"', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
         
         # Tắt ứng dụng hiện tại để giải phóng file
         def shutdown():
-            time.sleep(0.5)
+            time.sleep(1.0)
             os._exit(0)
             
         threading.Thread(target=shutdown).start()
