@@ -2226,7 +2226,10 @@ def adb_device_serial(cfg: pipeline.Settings) -> str:
     if connection_mode == "wifi":
         if not wifi_ip:
             raise ValueError("Chưa cấu hình địa chỉ IP của Pixel để kết nối không dây.")
-        target_serial = f"{wifi_ip}:5555"
+        if ":" in wifi_ip:
+            target_serial = wifi_ip
+        else:
+            target_serial = f"{wifi_ip}:5555"
         
         # Nếu có các kết nối mạng khác đang tồn tại không khớp với IP mục tiêu, ngắt kết nối chúng
         network_devices = [d for d in devices if ":" in d and d != target_serial]
@@ -2507,7 +2510,10 @@ def api_pixel_connection():
         if connection_mode == "wifi":
             if not wifi_ip:
                 raise ValueError("Vui lòng nhập địa chỉ IP của Pixel.")
-            target = f"{wifi_ip}:5555"
+            if ":" in wifi_ip:
+                target = wifi_ip
+            else:
+                target = f"{wifi_ip}:5555"
             add_event({"step": "wifi_connect_attempt", "message": f"Đang thử kết nối Wi-Fi đến {target}...", "ip": wifi_ip})
             res = pipeline.adb_command(cfg, "connect", target, check=False).stdout
             if "connected" in res.lower() or "already connected" in res.lower():
