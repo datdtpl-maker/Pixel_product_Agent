@@ -3618,10 +3618,16 @@ def set_update_status(status, progress=0, message="", error=None):
 
 def run_update_in_background(download_url):
     try:
+        import tempfile
+        temp_update_dir = Path(tempfile.gettempdir()) / "PixelDriveCaptureUpdate"
+        if temp_update_dir.exists():
+            shutil.rmtree(temp_update_dir, ignore_errors=True)
+        temp_update_dir.mkdir(parents=True, exist_ok=True)
+
         set_update_status("downloading", 0, "Bắt đầu tải bản cập nhật...")
         add_event({"step": "app_update", "message": "Bắt đầu tải tệp tin cập nhật từ GitHub..."})
 
-        zip_path = ROOT / "update_tmp.zip"
+        zip_path = temp_update_dir / "update_tmp.zip"
         headers = {"User-Agent": "PixelDriveCapture-Updater"}
         r = requests.get(download_url, headers=headers, stream=True, timeout=60)
         r.raise_for_status()
@@ -3648,9 +3654,7 @@ def run_update_in_background(download_url):
         add_event({"step": "app_update", "message": "Đang giải nén dữ liệu cập nhật..."})
 
         import zipfile
-        extract_dir = ROOT / "update_tmp_extract"
-        if extract_dir.exists():
-            shutil.rmtree(extract_dir, ignore_errors=True)
+        extract_dir = temp_update_dir / "extract"
         extract_dir.mkdir(exist_ok=True)
 
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
@@ -3669,8 +3673,7 @@ def run_update_in_background(download_url):
         root_internal = str(ROOT / "_internal").replace('/', '\\')
         exe_path_str = str(exe_path).replace('/', '\\')
         extract_source_str = str(extract_source).replace('/', '\\')
-        extract_dir_str = str(extract_dir).replace('/', '\\')
-        zip_path_str = str(zip_path).replace('/', '\\')
+        temp_update_dir_str = str(temp_update_dir).replace('/', '\\')
 
         bat_content = f"""@echo off
 chcp 65001 > nul
@@ -3714,8 +3717,8 @@ if exist "{exe_path_str}" (
 echo Dang sao chep cac tep tin moi...
 robocopy "{extract_source_str}" "{root_str}" /E /MOVE /Y /XF config.json config.example.json /R:5 /W:1 > nul
 
-if exist "{extract_dir_str}" rd /s /q "{extract_dir_str}" >nul 2>&1
-if exist "{zip_path_str}" del /f /q "{zip_path_str}" >nul 2>&1
+:: Xoa sạch thu muc tam o TEMP
+if exist "{temp_update_dir_str}" rd /s /q "{temp_update_dir_str}" >nul 2>&1
 
 echo.
 echo Cap nhat thanh cong! Dang khoi dong lai Pixel Drive Capture...
