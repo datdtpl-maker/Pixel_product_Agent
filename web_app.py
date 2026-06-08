@@ -29,7 +29,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v1.1.1"
+CURRENT_VERSION = "v1.1.21"
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
 if not CONFIG_PATH.exists():
@@ -1282,11 +1282,11 @@ HTML = r"""
       text = JSON.stringify(v, null, 2);
       const step = v.step || "";
       if (step === "error" || v.error) isError = true;
-      if (step === "done" || step === "drive_saved" || step === "pulled" || step === "capture" || step === "record" || step === "wifi_connected" || step === "usb_mode" || step === "ip_detected" || step === "chatgpt_done") isSuccess = true;
+      if (step === "done" || step === "drive_saved" || step === "pulled" || step === "capture" || step === "record" || step === "wifi_connected" || step === "usb_mode" || step === "ip_detected" || step === "chatgpt_done" || step === "gemini_done") isSuccess = true;
       if (step === "cleanup" && v.cleanup_warning) isWarning = true;
       
       // Tích hợp Realtime Log cho Content Helper Tool
-      if (step === "chatgpt_automation" || step === "chatgpt_done" || step === "error") {
+      if (step === "chatgpt_automation" || step === "chatgpt_done" || step === "gemini_automation" || step === "gemini_done" || step === "error") {
         const autoLogBox = document.getElementById("automationLogBox");
         if (autoLogBox) {
           const timeStr = new Date().toLocaleTimeString();
@@ -4325,35 +4325,28 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                 'button:has(svg path[d*="M2 "])'
             ]
 
-            # Upload ảnh/video nếu có
-            if media_path and os.path.exists(media_path):
-                add_event({"step": "gemini_automation", "message": f"Đang upload tệp sản phẩm: {os.path.basename(media_path)}..."})
-                file_input = page.query_selector('input[type="file"]')
-                if file_input:
-                    file_input.set_input_files(media_path)
-                    # Chờ cho tệp tải lên xong
-                    add_event({"step": "gemini_automation", "message": "Đang chờ tệp tải lên hoàn tất (đợi nút Gửi sẵn sàng)..."})
-                    
-                    upload_success = False
-                    for i in range(90): # tăng timeout lên 90s cho video
-                        time.sleep(1.0)
-                        for sel in send_selectors:
-                            try:
-                                btn = page.query_selector(sel)
-                                if btn and btn.is_enabled():
-                                    upload_success = True
-                                    break
-                            except Exception:
-                                pass
-                        if upload_success:
-                            add_event({"step": "gemini_automation", "message": f"Tệp đã tải lên hoàn tất sau {i+1} giây."})
-                            break
-                    if not upload_success:
-                        add_event({"step": "gemini_automation", "message": "Cảnh báo: Hết thời gian chờ tệp tải lên, vẫn tiến hành điền prompt..."})
-                else:
-                    add_event({"step": "gemini_automation", "message": "Cảnh báo: Không tìm thấy nút đính kèm tệp trên Gemini."})
-            
-            # Điền prompt
+            # Đếm số lượng ảnh lớn và video hiện tại trên toàn trang trước khi thao tác
+            initial_imgs = 0
+            initial_vids = 0
+            try:
+                media_info = page.evaluate("""() => {
+                    const imgs = Array.from(document.querySelectorAll('img')).filter(img => {
+                        const w = img.naturalWidth || img.width;
+                        const h = img.naturalHeight || img.height;
+                        if (w < 200 || h < 200) return false;
+                        if (img.src.startsWith('data:image/svg')) return false;
+                        return true;
+                    });
+                    const vids = Array.from(document.querySelectorAll('video'));
+                    return { imgs: imgs.length, vids: vids.length };
+                }""")
+                initial_imgs = media_info["imgs"]
+                initial_vids = media_info["vids"]
+                print(f"[Gemini Auto] Media ban dau: Imgs={initial_imgs}, Vids={initial_vids}")
+            except Exception as e_count:
+                print(f"[Gemini Auto] Loi dem media ban dau: {e_count}")
+
+            # 1. Điền prompt trước
             add_event({"step": "gemini_automation", "message": "Đang nhập prompt..."})
             try:
                 page.focus('div[contenteditable="true"]')
@@ -4374,27 +4367,122 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                 print(f"[Gemini Auto] Lỗi điền prompt bằng evaluate: {e_fill}")
                 page.fill('div[contenteditable="true"]', prompt_text)
                 time.sleep(1.5)
-            
-            # Đếm số lượng ảnh lớn và video hiện tại trên toàn trang trước khi gửi
-            initial_imgs = 0
-            initial_vids = 0
-            try:
-                media_info = page.evaluate("""() => {
-                    const imgs = Array.from(document.querySelectorAll('img')).filter(img => {
-                        const w = img.naturalWidth || img.width;
-                        const h = img.naturalHeight || img.height;
-                        if (w < 200 || h < 200) return false;
-                        if (img.src.startsWith('data:image/svg')) return false;
-                        return true;
-                    });
-                    const vids = Array.from(document.querySelectorAll('video'));
-                    return { imgs: imgs.length, vids: vids.length };
-                }""")
-                initial_imgs = media_info["imgs"]
-                initial_vids = media_info["vids"]
-                print(f"[Gemini Auto] Media ban dau: Imgs={initial_imgs}, Vids={initial_vids}")
-            except Exception as e_count:
-                print(f"[Gemini Auto] Loi dem media ban dau: {e_count}")
+
+            # 2. Upload ảnh/video nếu có
+            if media_path and os.path.exists(media_path):
+                add_event({"step": "gemini_automation", "message": f"Đang upload tệp sản phẩm: {os.path.basename(media_path)}..."})
+                
+                upload_triggered = False
+                
+                # Cố gắng click nút dấu cộng (+) để hiển thị menu đính kèm
+                try:
+                    attach_btn = page.evaluate_handle("""() => {
+                        const labels = ["đính kèm", "thêm tệp", "tải tệp", "attach", "add file", "upload file", "upload media", "attach files", "add_circle"];
+                        for (const btn of document.querySelectorAll('button')) {
+                            const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+                            if (labels.some(l => label.includes(l))) {
+                                return btn;
+                            }
+                        }
+                        // Thử tìm trong cùng container với ô contenteditable
+                        const editor = document.querySelector('div[contenteditable="true"]');
+                        if (editor) {
+                            const container = editor.closest('div');
+                            if (container) {
+                                const btns = container.querySelectorAll('button');
+                                if (btns.length > 0) return btns[0];
+                            }
+                        }
+                        for (const btn of document.querySelectorAll('button')) {
+                            if (btn.innerText.trim() === '+' || btn.textContent.trim() === '+') {
+                                return btn;
+                            }
+                        }
+                        return null;
+                    }""")
+                    
+                    if attach_btn and attach_btn.as_element():
+                        add_event({"step": "gemini_automation", "message": "Đã tìm thấy nút dấu cộng đính kèm (+). Đang mở menu..."})
+                        attach_btn.as_element().click()
+                        time.sleep(1.0) # Chờ menu hiển thị
+                        
+                        # Tìm nút Tệp hoặc Video trong menu vừa hiển thị
+                        menu_item = page.evaluate_handle("""(mType) => {
+                            // Nếu là video, ưu tiên tìm text "Video"
+                            if (mType === "video") {
+                                for (const el of document.querySelectorAll('span, div, button')) {
+                                    if (el.innerText && el.innerText.trim() === 'Video') {
+                                        return el.closest('button') || el;
+                                    }
+                                }
+                            }
+                            // Với hình ảnh hoặc fallback, tìm text "Hình ảnh", "Tệp", hoặc "Ảnh"
+                            const targets = mType === "video" ? ['Video', 'Tệp'] : ['Hình ảnh', 'Tệp', 'Ảnh'];
+                            for (const text of targets) {
+                                for (const el of document.querySelectorAll('span, div, button')) {
+                                    if (el.innerText && el.innerText.trim() === text) {
+                                        return el.closest('button') || el;
+                                    }
+                                }
+                            }
+                            return null;
+                        }""", media_type)
+                        
+                        if menu_item and menu_item.as_element():
+                            target_name = "Video" if media_type == "video" else "Tệp/Hình ảnh"
+                            add_event({"step": "gemini_automation", "message": f"Đã tìm thấy nút chọn {target_name} trên menu. Đang tải lên..."})
+                            try:
+                                with page.expect_file_chooser(timeout=5000) as fc_info:
+                                    menu_item.as_element().click()
+                                file_chooser = fc_info.value
+                                file_chooser.set_files(media_path)
+                                upload_triggered = True
+                            except Exception as e_fc:
+                                print(f"[Gemini Auto] Lỗi trigger file chooser: {e_fc}")
+                                # Click fallback để đóng menu
+                                try:
+                                    page.click('div[contenteditable="true"]')
+                                except Exception:
+                                    pass
+                        else:
+                            add_event({"step": "gemini_automation", "message": "Không tìm thấy nút Tệp/Video trên menu, chuyển sang chế độ upload tự động..."})
+                except Exception as e_attach:
+                    print(f"[Gemini Auto] Lỗi tương tác nút đính kèm (+): {e_attach}")
+                
+                # Chế độ Fallback: Set file trực tiếp vào input file cuối cùng nếu việc click menu thất bại
+                if not upload_triggered:
+                    add_event({"step": "gemini_automation", "message": "Đang tìm kiếm tệp input ẩn để đính kèm trực tiếp..."})
+                    file_inputs = page.query_selector_all('input[type="file"]')
+                    file_input = file_inputs[-1] if file_inputs else None
+                    if file_input:
+                        file_input.set_input_files(media_path)
+                        upload_triggered = True
+                    else:
+                        add_event({"step": "gemini_automation", "message": "Cảnh báo: Không tìm thấy bất kỳ input file nào."})
+                
+                if upload_triggered:
+                    # Chờ cho tệp tải lên xong
+                    add_event({"step": "gemini_automation", "message": "Đang chờ tệp tải lên hoàn tất (đợi nút Gửi sẵn sàng)..."})
+                    
+                    upload_success = False
+                    for i in range(90): # tăng timeout lên 90s cho video
+                        time.sleep(1.0)
+                        for sel in send_selectors:
+                            try:
+                                btn = page.query_selector(sel)
+                                if btn and btn.is_enabled():
+                                    upload_success = True
+                                    break
+                            except Exception:
+                                pass
+                        if upload_success:
+                            time.sleep(2.0) # Chờ thêm 2 giây để tệp được render hoàn tất trên giao diện
+                            add_event({"step": "gemini_automation", "message": f"Tệp đã tải lên hoàn tất sau {i+1} giây."})
+                            break
+                    if not upload_success:
+                        add_event({"step": "gemini_automation", "message": "Cảnh báo: Hết thời gian chờ tệp tải lên, vẫn tiến hành gửi..."})
+                else:
+                    add_event({"step": "gemini_automation", "message": "Cảnh báo: Không thể kích hoạt tải tệp lên Gemini."})
             
             # Gửi tin nhắn
             sent_successfully = False
@@ -4454,18 +4542,83 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                 time.sleep(3.0)
                 try:
                     res = page.evaluate("""async (prevImgs, prevVids) => {
-                        const imgs = Array.from(document.querySelectorAll('img')).filter(img => {
+                        // 1. Uu tien quet trong phan hoi model-response moi nhat
+                        const modelResponses = document.querySelectorAll('model-response');
+                        if (modelResponses.length > 0) {
+                            const lastResponse = modelResponses[modelResponses.length - 1];
+                            
+                            // Kiem tra video trong phan hoi nay
+                            const vids = Array.from(lastResponse.querySelectorAll('video'));
+                            if (vids.length > 0) {
+                                const lastVid = vids[vids.length - 1];
+                                if (lastVid.src) {
+                                    try {
+                                        const response = await fetch(lastVid.src);
+                                        const blob = await response.blob();
+                                        const b64 = await new Promise((resolve, reject) => {
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => resolve(reader.result);
+                                            reader.onerror = () => reject(new Error('FileReader error'));
+                                            reader.readAsDataURL(blob);
+                                        });
+                                        return { type: "video", data: b64 };
+                                    } catch (err) {
+                                        return { type: "video_url", data: lastVid.src };
+                                    }
+                                }
+                            }
+                            
+                            // Kiem tra anh trong phan hoi nay
+                            const imgs = Array.from(lastResponse.querySelectorAll('img')).filter(img => {
+                                const w = img.naturalWidth || img.width;
+                                const h = img.naturalHeight || img.height;
+                                if (w < 200 || h < 200) return false;
+                                if (img.src.startsWith('data:image/svg')) return false;
+                                return true;
+                            });
+                            if (imgs.length > 0) {
+                                const lastImg = imgs[imgs.length - 1];
+                                if (!lastImg.complete || lastImg.naturalWidth === 0) {
+                                    return "loading";
+                                }
+                                try {
+                                    const response = await fetch(lastImg.src);
+                                    const blob = await response.blob();
+                                    const b64 = await new Promise((resolve, reject) => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => resolve(reader.result);
+                                        reader.onerror = () => reject(new Error('FileReader error'));
+                                        reader.readAsDataURL(blob);
+                                    });
+                                    return { type: "image", data: b64 };
+                                } catch (err) {
+                                    try {
+                                        const canvas = document.createElement('canvas');
+                                        canvas.width = lastImg.naturalWidth || lastImg.width;
+                                        canvas.height = lastImg.naturalHeight || lastImg.height;
+                                        const ctx = canvas.getContext('2d');
+                                        ctx.drawImage(lastImg, 0, 0);
+                                        return { type: "image", data: canvas.toDataURL('image/png') };
+                                    } catch (canvasErr) {
+                                        return "waiting";
+                                    }
+                                }
+                            }
+                        }
+
+                        // 2. Fallback neu khong tim thay model-response (vi du giao dien Gemini thay doi)
+                        const allImgs = Array.from(document.querySelectorAll('img')).filter(img => {
                             const w = img.naturalWidth || img.width;
                             const h = img.naturalHeight || img.height;
                             if (w < 200 || h < 200) return false;
                             if (img.src.startsWith('data:image/svg')) return false;
                             return true;
                         });
-                        const vids = Array.from(document.querySelectorAll('video'));
+                        const allVids = Array.from(document.querySelectorAll('video'));
                         
                         // Kiem tra xem co video moi khong
-                        if (vids.length > prevVids) {
-                            const lastVid = vids[vids.length - 1];
+                        if (allVids.length > prevVids) {
+                            const lastVid = allVids[allVids.length - 1];
                             if (lastVid.src) {
                                 try {
                                     const response = await fetch(lastVid.src);
@@ -4484,8 +4637,8 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                         }
                         
                         // Kiem tra xem co anh moi khong
-                        if (imgs.length > prevImgs) {
-                            const lastImg = imgs[imgs.length - 1];
+                        if (allImgs.length > prevImgs) {
+                            const lastImg = allImgs[allImgs.length - 1];
                             if (!lastImg.complete || lastImg.naturalWidth === 0) {
                                 return "loading";
                             }
