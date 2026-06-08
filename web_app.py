@@ -849,7 +849,7 @@ HTML = r"""
           </button>
           <button class="secondary" onclick="showPosterDashboard()" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%); border-color: rgba(168, 85, 247, 0.3);">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a855f7;"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-            Tạo Poster AI
+            AI Edit Image / Video
           </button>
           <button class="btn-capture" onclick="capture()">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
@@ -982,16 +982,29 @@ HTML = r"""
           <button class="ghost" onclick="showCaptureDashboard()" style="min-height: 38px; padding: 8px 12px;" title="Quay lại Bảng điều khiển">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
           </button>
-          <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 22px;">Tạo ảnh đa năng (Content Helper)</h2>
+          <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 22px;">AI Edit Image / Video</h2>
         </div>
-        <div class="actions" style="display: flex; gap: 12px; align-items: center;">
-          <div id="chromeStatusBadge" class="badge danger" style="padding: 8px 16px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; border-radius: 99px;">
-            <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;" id="chromeStatusDot"></span>
-            <span id="chromeStatusText">Chrome Debug: Offline</span>
+        <div class="actions" style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+          <!-- ChatGPT Chrome Debug Status -->
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div id="chromeStatusBadge" class="badge danger" style="padding: 8px 16px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; border-radius: 99px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;" id="chromeStatusDot"></span>
+              <span id="chromeStatusText">ChatGPT Chrome: Offline</span>
+            </div>
+            <button type="button" class="btn-capture" onclick="startChromeDebug()" style="min-height: 36px; padding: 0 16px; font-size: 12px; background: var(--brand); border-radius: 8px; font-weight: 700;">
+              Mở Chrome ChatGPT
+            </button>
           </div>
-          <button type="button" class="btn-capture" onclick="startChromeDebug()" style="min-height: 36px; padding: 0 16px; font-size: 12px; background: var(--brand); border-radius: 8px; font-weight: 700;">
-            Khởi động Chrome
-          </button>
+          <!-- Gemini Chrome Debug Status -->
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div id="geminiStatusBadge" class="badge danger" style="padding: 8px 16px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; border-radius: 99px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;" id="geminiStatusDot"></span>
+              <span id="geminiStatusText">Gemini Chrome: Offline</span>
+            </div>
+            <button type="button" class="btn-capture" onclick="startChromeGemini()" style="min-height: 36px; padding: 0 16px; font-size: 12px; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); border-radius: 8px; font-weight: 700; border: none; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);">
+              Mở Chrome Gemini
+            </button>
+          </div>
         </div>
       </header>
       
@@ -1038,24 +1051,25 @@ HTML = r"""
             </div>
           </div>
           
-          <!-- Ảnh sản phẩm được chọn -->
+          <!-- File sản phẩm được chọn -->
           <div>
-            <label style="margin-bottom: 6px; display: block; font-weight: 600; font-size: 13px;">Ảnh sản phẩm thô (Gửi kèm)</label>
+            <label style="margin-bottom: 6px; display: block; font-weight: 600; font-size: 13px;">File sản phẩm thô (Ảnh/Video)</label>
             <div style="display: grid; grid-template-columns: 1fr auto; gap: 12px;">
               <div id="contentImgDropzone" onclick="document.getElementById('contentImgFile').click()" style="border: 2px dashed var(--panel-border); border-radius: 12px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: rgba(0,0,0,0.12); flex: 1;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); margin-bottom: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span id="contentImgLabel" style="font-size: 11px; color: var(--muted); text-align: center; padding: 0 10px; font-weight: 500;">Bấm hoặc Kéo thả ảnh sản phẩm</span>
-                <input type="file" id="contentImgFile" accept="image/*" style="display: none;" onchange="handleContentImageSelect(this.files)">
+                <span id="contentImgLabel" style="font-size: 11px; color: var(--muted); text-align: center; padding: 0 10px; font-weight: 500;">Bấm hoặc Kéo thả ảnh/video sản phẩm</span>
+                <input type="file" id="contentImgFile" accept="image/*,video/*" style="display: none;" onchange="handleContentImageSelect(this.files)">
               </div>
               <div id="contentImgPreviewContainer" style="width: 70px; height: 70px; border-radius: 12px; border: 1px solid var(--panel-border); display: none; overflow: hidden; position: relative; background: var(--bg);">
-                <img id="contentImgPreview" src="" style="width: 100%; height: 100%; object-fit: contain;">
-                <button type="button" onclick="clearContentImage()" style="position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); border: none; border-radius: 50%; width: 20px; height: 20px; display: grid; place-items: center; color: #fff; cursor: pointer; font-size: 11px;">×</button>
+                <img id="contentImgPreview" src="" style="width: 100%; height: 100%; object-fit: contain; display: none;">
+                <video id="contentVideoPreview" src="" style="width: 100%; height: 100%; object-fit: contain; display: none;" autoplay loop muted playsinline></video>
+                <button type="button" onclick="clearContentImage()" style="position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); border: none; border-radius: 50%; width: 20px; height: 20px; display: grid; place-items: center; color: #fff; cursor: pointer; font-size: 11px; z-index: 10;">×</button>
               </div>
             </div>
-            <!-- Nút lấy ảnh chụp Pixel mới nhất -->
+            <!-- Nút lấy file Pixel mới nhất -->
             <button type="button" class="secondary" onclick="useLatestPixelPhoto()" style="width: 100%; min-height: 32px; font-size: 11px; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; border-radius: 6px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-              Lấy ảnh Pixel vừa chụp mới nhất
+              Lấy ảnh/video Pixel vừa chụp mới nhất
             </button>
           </div>
           
@@ -1065,11 +1079,17 @@ HTML = r"""
             <textarea id="contentEditorPrompt" placeholder="Nhập yêu cầu bối cảnh ở đây hoặc click chọn từ thư viện bên trái..." style="flex: 1; width: 100%; min-height: 100px; resize: none; font-size: 13px; line-height: 1.4; border-radius: 8px; padding: 10px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); color: var(--text);"></textarea>
           </div>
           
-          <!-- Nút bấm Gửi -->
-          <button class="btn-capture" id="btnSendToChatGPT" onclick="sendToChatGPT()" style="width: 100%; font-size: 14px; padding: 12px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-            Gửi Lên ChatGPT
-          </button>
+          <!-- Khung gửi tin nhắn -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <button class="btn-capture" id="btnSendToChatGPT" onclick="sendToChatGPT()" style="font-size: 14px; padding: 12px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              Gửi Lên ChatGPT
+            </button>
+            <button class="btn-capture" id="btnSendToGemini" onclick="sendToGemini()" style="font-size: 14px; padding: 12px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3); border: none;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              Gửi Lên Gemini
+            </button>
+          </div>
           
           <!-- Nhật ký tiến trình (Live Log) -->
           <div style="display: flex; flex-direction: column; height: 200px; min-height: 200px;">
@@ -1763,24 +1783,63 @@ HTML = r"""
       if (d.online) {
         badge.className = "badge success";
         dot.style.background = "#22c55e";
-        text.innerText = "Chrome Debug: Online";
+        text.innerText = "ChatGPT Chrome: Online";
       } else {
         badge.className = "badge danger";
         dot.style.background = "#ef4444";
-        text.innerText = "Chrome Debug: Offline";
+        text.innerText = "ChatGPT Chrome: Offline";
       }
     } catch(e) {
-      console.error("Lỗi kiểm tra trạng thái Chrome Debug:", e);
+      console.error("Lỗi kiểm tra trạng thái Chrome Debug 9222:", e);
+    }
+    
+    try {
+      const response = await fetch("/api/automation/chrome-gemini/status");
+      const d = await response.json();
+      const badge = document.getElementById("geminiStatusBadge");
+      const dot = document.getElementById("geminiStatusDot");
+      const text = document.getElementById("geminiStatusText");
+      
+      if (d.online) {
+        badge.className = "badge success";
+        dot.style.background = "#22c55e";
+        text.innerText = "Gemini Chrome: Online";
+      } else {
+        badge.className = "badge danger";
+        dot.style.background = "#ef4444";
+        text.innerText = "Gemini Chrome: Offline";
+      }
+    } catch(e) {
+      console.error("Lỗi kiểm tra trạng thái Chrome Debug 9223:", e);
     }
   }
+
+  let contentSelectedMediaType = 'image'; // 'image' or 'video'
 
   function handleContentImageSelect(files) {
     if (!files || files.length === 0) return;
     const file = files[0];
     const reader = new FileReader();
+    
+    const isVideo = file.type.startsWith('video/');
+    contentSelectedMediaType = isVideo ? 'video' : 'image';
+    
     reader.onload = function(e) {
       contentSelectedImageBase64 = e.target.result;
-      document.getElementById("contentImgPreview").src = contentSelectedImageBase64;
+      
+      const imgPreview = document.getElementById("contentImgPreview");
+      const videoPreview = document.getElementById("contentVideoPreview");
+      
+      if (isVideo) {
+        imgPreview.style.display = "none";
+        videoPreview.src = contentSelectedImageBase64;
+        videoPreview.style.display = "block";
+      } else {
+        videoPreview.style.display = "none";
+        imgPreview.src = contentSelectedImageBase64;
+        imgPreview.style.display = "block";
+      }
+      
       document.getElementById("contentImgPreviewContainer").style.display = "block";
       document.getElementById("contentImgDropzone").style.display = "none";
     };
@@ -1789,7 +1848,11 @@ HTML = r"""
 
   function clearContentImage() {
     contentSelectedImageBase64 = null;
+    contentSelectedMediaType = 'image';
     document.getElementById("contentImgPreview").src = "";
+    document.getElementById("contentImgPreview").style.display = "none";
+    document.getElementById("contentVideoPreview").src = "";
+    document.getElementById("contentVideoPreview").style.display = "none";
     document.getElementById("contentImgPreviewContainer").style.display = "none";
     document.getElementById("contentImgDropzone").style.display = "flex";
     document.getElementById("contentImgFile").value = "";
@@ -1802,13 +1865,28 @@ HTML = r"""
       if (!response.ok) throw d;
       
       contentSelectedImageBase64 = d.base64;
-      document.getElementById("contentImgPreview").src = contentSelectedImageBase64;
+      const isVideo = d.type === 'video' || d.name.endsWith('.mp4');
+      contentSelectedMediaType = isVideo ? 'video' : 'image';
+      
+      const imgPreview = document.getElementById("contentImgPreview");
+      const videoPreview = document.getElementById("contentVideoPreview");
+      
+      if (isVideo) {
+        imgPreview.style.display = "none";
+        videoPreview.src = contentSelectedImageBase64;
+        videoPreview.style.display = "block";
+      } else {
+        videoPreview.style.display = "none";
+        imgPreview.src = contentSelectedImageBase64;
+        imgPreview.style.display = "block";
+      }
+      
       document.getElementById("contentImgPreviewContainer").style.display = "block";
       document.getElementById("contentImgDropzone").style.display = "none";
       
-      appendAutomationLog(`Đã tải thành công ảnh thô mới nhất từ Pixel: ${d.name}`);
+      appendAutomationLog(`Đã tải thành công file mới nhất từ Pixel: ${d.name}`);
     } catch(e) {
-      alert("Lỗi lấy ảnh Pixel: " + (e.error || e.message || JSON.stringify(e)));
+      alert("Lỗi lấy ảnh/video Pixel: " + (e.error || e.message || JSON.stringify(e)));
     }
   }
 
@@ -1827,7 +1905,7 @@ HTML = r"""
     }
     
     document.getElementById("automationLogBox").innerHTML = "";
-    appendAutomationLog("Bắt đầu tiến trình gửi yêu cầu...");
+    appendAutomationLog("Bắt đầu tiến trình gửi yêu cầu lên ChatGPT...");
     
     startPoll();
     
@@ -1843,33 +1921,72 @@ HTML = r"""
       const d = await response.json();
       if (!response.ok) throw d;
       
-      appendAutomationLog("Backend đã nhận lệnh. Tiến trình Playwright đang chạy ngầm...");
+      appendAutomationLog("Backend đã nhận lệnh. Tiến trình Playwright ChatGPT đang chạy ngầm...");
     } catch(e) {
       appendAutomationLog("Lỗi: " + (e.error || e.message || JSON.stringify(e)));
-      alert("Lỗi gửi yêu cầu: " + (e.error || e.message || JSON.stringify(e)));
+      alert("Lỗi gửi yêu cầu ChatGPT: " + (e.error || e.message || JSON.stringify(e)));
+    }
+  }
+
+  async function sendToGemini() {
+    const prompt = document.getElementById("contentEditorPrompt").value.trim();
+    if (!prompt) {
+      alert("Vui lòng nhập nội dung prompt.");
+      return;
+    }
+    
+    document.getElementById("automationLogBox").innerHTML = "";
+    appendAutomationLog("Bắt đầu tiến trình gửi yêu cầu lên Gemini...");
+    
+    startPoll();
+    
+    try {
+      const response = await fetch("/api/automation/gemini/send", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          prompt: prompt,
+          media: contentSelectedImageBase64,
+          media_type: contentSelectedMediaType
+        })
+      });
+      const d = await response.json();
+      if (!response.ok) throw d;
+      
+      appendAutomationLog("Backend đã nhận lệnh. Tiến trình Playwright Gemini đang chạy ngầm...");
+    } catch(e) {
+      appendAutomationLog("Lỗi: " + (e.error || e.message || JSON.stringify(e)));
+      alert("Lỗi gửi yêu cầu Gemini: " + (e.error || e.message || JSON.stringify(e)));
+    }
+  }
+
+  async function startChromeGemini() {
+    try {
+      const response = await fetch("/api/automation/chrome-gemini/start", { method: "POST" });
+      const d = await response.json();
+      if (!response.ok) throw d;
+      alert("Đã kích hoạt tệp mở Chrome Gemini Debug. Cửa sổ Chrome thật sẽ tự động hiển thị.");
+      setTimeout(checkChromeStatus, 1500);
+    } catch(e) {
+      alert("Không thể chạy lệnh Chrome Gemini: " + (e.message || JSON.stringify(e)));
     }
   }
 
   async function clearToolCache() {
-    if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ ảnh tạm trong inbox và các ảnh kết quả 'chatgpt_*' cũ không?")) {
+    if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ ảnh/video tạm trong inbox và các file kết quả cũ không?")) {
       return;
     }
     try {
       const response = await fetch("/api/automation/clear-cache", { method: "POST" });
       const data = await response.json();
       if (response.ok && data.success) {
-        // Xóa preview ảnh thô
-        if (typeof clearContentImage === "function") {
-          clearContentImage();
-        }
-        // Làm mới danh sách ảnh kết quả
+        clearContentImage();
         await loadDownloadedImages();
-        // Clear log box
         const logBox = document.getElementById("automationLogBox");
         if (logBox) {
           logBox.innerHTML = "Đã xóa sạch cache. Sẵn sàng cho tác vụ mới.";
         }
-        alert("Đã xóa sạch bộ nhớ tạm và các ảnh kết quả cũ thành công!");
+        alert("Đã xóa sạch bộ nhớ tạm và các file kết quả cũ thành công!");
       } else {
         alert("Lỗi xóa cache: " + (data.error || data.message));
       }
@@ -1884,7 +2001,7 @@ HTML = r"""
       const images = await response.json();
       renderDownloadedImages(images);
     } catch(e) {
-      console.error("Lỗi lấy danh sách ảnh đã tải:", e);
+      console.error("Lỗi lấy danh sách kết quả đã tải:", e);
     }
   }
 
@@ -1893,15 +2010,21 @@ HTML = r"""
     container.innerHTML = "";
     
     if (images.length === 0) {
-      container.innerHTML = `<div style="grid-column: span 2; text-align:center; color:var(--muted); font-size:12px; margin-top:40px;">Chưa có ảnh nào tải về.</div>`;
+      container.innerHTML = `<div style="grid-column: span 2; text-align:center; color:var(--muted); font-size:12px; margin-top:40px;">Chưa có ảnh/video nào tải về.</div>`;
       return;
     }
     
     images.forEach(img => {
       const card = document.createElement("div");
       card.className = "poster-card";
+      
+      const isVideo = img.name.endsWith('.mp4');
+      const mediaElement = isVideo 
+        ? `<video src="${img.url}" style="width: 100%; height: auto; display: block; object-fit: contain; background: #000;" autoplay loop muted playsinline></video>`
+        : `<img src="${img.url}" alt="${img.name}">`;
+        
       card.innerHTML = `
-        <img src="${img.url}" alt="${img.name}">
+        ${mediaElement}
         <div class="card-actions" style="flex-direction: column; gap: 6px; align-items: stretch; justify-content: flex-end; padding: 12px; background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.5) 60%, transparent 100%);">
           <div style="font-size: 10px; color: #fff; font-weight: 600; text-align: center; text-shadow: 0 1px 2px rgba(0,0,0,0.8); margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; word-break: break-all;">
             ${img.name}
@@ -3632,6 +3755,48 @@ def api_chrome_status():
         return jsonify({"online": False, "message": "Chrome Debug Port 9222 chưa hoạt động."})
 
 
+@app.post("/api/automation/chrome-gemini/start")
+def api_chrome_gemini_start():
+    try:
+        bat_path = ROOT / "run_debug_chrome_gemini.bat"
+        if not bat_path.exists():
+            raise FileNotFoundError("Không tìm thấy file run_debug_chrome_gemini.bat")
+        
+        import subprocess
+        creationflags = 0x08000000 if os.name == "nt" else 0
+        startupinfo = None
+        if os.name == "nt":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
+        # Khởi chạy bất đồng bộ để tránh treo app Flask và ẩn cửa sổ console đen
+        subprocess.Popen(
+            [str(bat_path)], 
+            shell=True, 
+            cwd=str(bat_path.parent),
+            startupinfo=startupinfo,
+            creationflags=creationflags
+        )
+        
+        add_event({"step": "gemini_automation", "message": "Đã phát lệnh kích hoạt Chrome Debugging Port 9223 cho Gemini."})
+        return jsonify({"status": "Đã kích hoạt Chrome Gemini Debug."})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
+@app.get("/api/automation/chrome-gemini/status")
+def api_chrome_gemini_status():
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(0.5)
+    try:
+        s.connect(("127.0.0.1", 9223))
+        s.close()
+        return jsonify({"online": True, "message": "Chrome Debug Port 9223 đang online."})
+    except Exception:
+        return jsonify({"online": False, "message": "Chrome Debug Port 9223 chưa hoạt động."})
+
+
 def run_chatgpt_automation_thread(image_path: str | None, prompt_text: str, export_dir: str):
     from playwright.sync_api import sync_playwright
     import os
@@ -3941,6 +4106,338 @@ def api_chatgpt_send():
         return error_response(exc, 400)
 
 
+def run_gemini_automation_thread(media_path: str | None, prompt_text: str, export_dir: str, media_type: str):
+    from playwright.sync_api import sync_playwright
+    import os
+    import base64
+    from datetime import datetime
+    import time
+    
+    add_event({"step": "gemini_automation", "message": "Bắt đầu tiến trình tự động hóa Gemini..."})
+    
+    try:
+        with sync_playwright() as p:
+            add_event({"step": "gemini_automation", "message": "Đang kết nối tới Chrome Debug qua cổng 9223..."})
+            try:
+                browser = p.chromium.connect_over_cdp("http://localhost:9223")
+            except Exception as e:
+                add_event({"step": "error", "message": f"Không kết nối được Chrome Gemini Debug. Vui lòng bấm 'Mở Chrome Gemini' và đăng nhập. Chi tiết: {e}"})
+                return
+                
+            context = browser.contexts[0]
+            
+            # Tìm tab Gemini
+            page = None
+            for p_page in context.pages:
+                if "gemini.google.com" in p_page.url:
+                    page = p_page
+                    break
+            
+            if not page:
+                add_event({"step": "gemini_automation", "message": "Không tìm thấy tab Gemini đang mở. Đang mở tab mới..."})
+                page = context.new_page()
+                page.goto("https://gemini.google.com")
+                page.wait_for_load_state("load")
+                
+            # Đợi ô nhập text sẵn sàng
+            try:
+                page.wait_for_selector('div[contenteditable="true"]', timeout=15000)
+            except Exception:
+                add_event({"step": "error", "message": "Không tìm thấy ô nhập liệu của Gemini. Vui lòng kiểm tra lại trang web."})
+                return
+                
+            # Các selectors của nút gửi Gemini
+            send_selectors = [
+                'button.send-button',
+                'button[aria-label="Gửi tin nhắn"]',
+                'button[aria-label="Send message"]',
+                'div.send-button-container button',
+                'button:has(svg path[d*="M2 "])'
+            ]
+
+            # Upload ảnh/video nếu có
+            if media_path and os.path.exists(media_path):
+                add_event({"step": "gemini_automation", "message": f"Đang upload tệp sản phẩm: {os.path.basename(media_path)}..."})
+                file_input = page.query_selector('input[type="file"]')
+                if file_input:
+                    file_input.set_input_files(media_path)
+                    # Chờ cho tệp tải lên xong
+                    add_event({"step": "gemini_automation", "message": "Đang chờ tệp tải lên hoàn tất (đợi nút Gửi sẵn sàng)..."})
+                    
+                    upload_success = False
+                    for i in range(90): # tăng timeout lên 90s cho video
+                        time.sleep(1.0)
+                        for sel in send_selectors:
+                            try:
+                                btn = page.query_selector(sel)
+                                if btn and btn.is_enabled():
+                                    upload_success = True
+                                    break
+                            except Exception:
+                                pass
+                        if upload_success:
+                            add_event({"step": "gemini_automation", "message": f"Tệp đã tải lên hoàn tất sau {i+1} giây."})
+                            break
+                    if not upload_success:
+                        add_event({"step": "gemini_automation", "message": "Cảnh báo: Hết thời gian chờ tệp tải lên, vẫn tiến hành điền prompt..."})
+                else:
+                    add_event({"step": "gemini_automation", "message": "Cảnh báo: Không tìm thấy nút đính kèm tệp trên Gemini."})
+            
+            # Điền prompt
+            add_event({"step": "gemini_automation", "message": "Đang nhập prompt..."})
+            try:
+                page.focus('div[contenteditable="true"]')
+                page.click('div[contenteditable="true"]')
+                page.evaluate("""(text) => {
+                    const el = document.querySelector('div[contenteditable="true"]');
+                    if (el) {
+                        el.innerText = text;
+                        el.dispatchEvent(new Event("input", { bubbles: true }));
+                    }
+                }""", prompt_text)
+                time.sleep(0.5)
+                # Nhấn Space và Backspace để kích hoạt state
+                page.keyboard.press("Space")
+                page.keyboard.press("Backspace")
+                time.sleep(1.5)
+            except Exception as e_fill:
+                print(f"[Gemini Auto] Lỗi điền prompt bằng evaluate: {e_fill}")
+                page.fill('div[contenteditable="true"]', prompt_text)
+                time.sleep(1.5)
+            
+            # Đếm số lượng ảnh lớn và video hiện tại trên toàn trang trước khi gửi
+            initial_imgs = 0
+            initial_vids = 0
+            try:
+                media_info = page.evaluate("""() => {
+                    const imgs = Array.from(document.querySelectorAll('img')).filter(img => {
+                        const w = img.naturalWidth || img.width;
+                        const h = img.naturalHeight || img.height;
+                        if (w < 200 || h < 200) return false;
+                        if (img.src.startsWith('data:image/svg')) return false;
+                        return true;
+                    });
+                    const vids = Array.from(document.querySelectorAll('video'));
+                    return { imgs: imgs.length, vids: vids.length };
+                }""")
+                initial_imgs = media_info["imgs"]
+                initial_vids = media_info["vids"]
+                print(f"[Gemini Auto] Media ban dau: Imgs={initial_imgs}, Vids={initial_vids}")
+            except Exception as e_count:
+                print(f"[Gemini Auto] Loi dem media ban dau: {e_count}")
+            
+            # Gửi tin nhắn
+            sent_successfully = False
+            for attempt in range(1, 6):
+                if attempt > 1:
+                    add_event({"step": "gemini_automation", "message": f"Thử gửi lại lần {attempt}..."})
+                
+                clicked = False
+                for sel in send_selectors:
+                    try:
+                        btn = page.query_selector(sel)
+                        if btn and btn.is_enabled():
+                            btn.click(timeout=1500)
+                            clicked = True
+                            add_event({"step": "gemini_automation", "message": f"[Lần {attempt}] Đã click nút gửi Gemini."})
+                            break
+                    except Exception:
+                        continue
+                
+                if not clicked:
+                    try:
+                        page.focus('div[contenteditable="true"]')
+                        page.click('div[contenteditable="true"]')
+                        page.keyboard.press("Enter")
+                        add_event({"step": "gemini_automation", "message": f"[Lần {attempt}] Đã gửi lệnh phím Enter."})
+                        clicked = True
+                    except Exception as press_ex:
+                        print(f"[Gemini Auto] Lỗi phím Enter: {press_ex}")
+                
+                time.sleep(2.0)
+                
+                # Kiểm tra xem ô chat có trống rỗng không
+                try:
+                    textarea_val = page.evaluate('document.querySelector(\'div[contenteditable="true"]\') ? document.querySelector(\'div[contenteditable="true"]\').innerText.trim() : ""')
+                    if not textarea_val:
+                        sent_successfully = True
+                        add_event({"step": "gemini_automation", "message": "Gửi prompt thành công! Ô chat đã trống."})
+                        break
+                except Exception as e_check:
+                    print(f"[Gemini Auto] Lỗi kiểm tra ô chat: {e_check}")
+                    sent_successfully = True
+                    break
+            
+            if not sent_successfully:
+                add_event({"step": "gemini_automation", "message": "Cảnh báo: Đã thử gửi 5 lần nhưng ô nhập liệu vẫn còn nội dung. Tiếp tục chờ sinh kết quả..."})
+            
+            time.sleep(1.0)
+            add_event({"step": "gemini_automation", "message": "Đã gửi prompt thành công. Đang chờ Gemini sinh ảnh/video mới..."})
+            
+            # Quét định kỳ phát hiện kết quả
+            start_time = time.time()
+            found_media = False
+            media_base64_data = None
+            found_type = "image"
+            
+            while time.time() - start_time < 300: # Timeout 5 phút
+                time.sleep(3.0)
+                try:
+                    res = page.evaluate("""async (prevImgs, prevVids) => {
+                        const imgs = Array.from(document.querySelectorAll('img')).filter(img => {
+                            const w = img.naturalWidth || img.width;
+                            const h = img.naturalHeight || img.height;
+                            if (w < 200 || h < 200) return false;
+                            if (img.src.startsWith('data:image/svg')) return false;
+                            return true;
+                        });
+                        const vids = Array.from(document.querySelectorAll('video'));
+                        
+                        // Kiem tra xem co video moi khong
+                        if (vids.length > prevVids) {
+                            const lastVid = vids[vids.length - 1];
+                            if (lastVid.src) {
+                                try {
+                                    const response = await fetch(lastVid.src);
+                                    const blob = await response.blob();
+                                    const b64 = await new Promise((resolve, reject) => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => resolve(reader.result);
+                                        reader.onerror = () => reject(new Error('FileReader error'));
+                                        reader.readAsDataURL(blob);
+                                    });
+                                    return { type: "video", data: b64 };
+                                } catch (err) {
+                                    return { type: "video_url", data: lastVid.src };
+                                }
+                            }
+                        }
+                        
+                        // Kiem tra xem co anh moi khong
+                        if (imgs.length > prevImgs) {
+                            const lastImg = imgs[imgs.length - 1];
+                            if (!lastImg.complete || lastImg.naturalWidth === 0) {
+                                return "loading";
+                            }
+                            
+                            try {
+                                const response = await fetch(lastImg.src);
+                                const blob = await response.blob();
+                                const b64 = await new Promise((resolve, reject) => {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => resolve(reader.result);
+                                    reader.onerror = () => reject(new Error('FileReader error'));
+                                    reader.readAsDataURL(blob);
+                                });
+                                return { type: "image", data: b64 };
+                            } catch (err) {
+                                try {
+                                    const canvas = document.createElement('canvas');
+                                    canvas.width = lastImg.naturalWidth || lastImg.width;
+                                    canvas.height = lastImg.naturalHeight || lastImg.height;
+                                    const ctx = canvas.getContext('2d');
+                                    ctx.drawImage(lastImg, 0, 0);
+                                    return { type: "image", data: canvas.toDataURL('image/png') };
+                                } catch (canvasErr) {
+                                    return "waiting";
+                                }
+                            }
+                        }
+                        
+                        return "waiting";
+                    }""", (initial_imgs, initial_vids))
+                    
+                    if res == "waiting" or res == "loading":
+                        continue
+                    elif isinstance(res, dict) and "data" in res:
+                        media_base64_data = res["data"]
+                        found_type = res["type"]
+                        found_media = True
+                        break
+                except Exception as e_scan:
+                    print(f"[Gemini Auto] Lỗi quét trang: {e_scan}")
+                    continue
+            
+            if found_media and media_base64_data:
+                add_event({"step": "gemini_automation", "message": f"Đã phát hiện {found_type} kết quả mới từ Gemini. Đang tải về..."})
+                
+                # File path
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                ext = "mp4" if found_type.startswith("video") else "png"
+                filename = f"gemini_{timestamp}.{ext}"
+                
+                out_dir = Path(export_dir)
+                if not out_dir.exists():
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                dest_path = out_dir / filename
+                
+                if media_base64_data.startswith("data:"):
+                    header, encoded = media_base64_data.split(",", 1)
+                    bin_data = base64.b64decode(encoded)
+                    dest_path.write_bytes(bin_data)
+                else:
+                    # Nếu là URL thuần (trong trường hợp video_url)
+                    resp = requests.get(media_base64_data, timeout=60)
+                    resp.raise_for_status()
+                    dest_path.write_bytes(resp.content)
+                
+                add_event({
+                    "step": "gemini_done",
+                    "message": f"Tải {found_type} thành công! Đã lưu file: {filename}",
+                    "file_path": str(dest_path),
+                    "filename": filename
+                })
+            else:
+                add_event({"step": "error", "message": "Quá thời gian chờ hoặc không phát hiện ảnh/video mới từ Gemini."})
+                
+    except Exception as exc:
+        add_event({"step": "error", "message": f"Lỗi trong quá trình tự động hóa Gemini: {exc}"})
+
+
+@app.post("/api/automation/gemini/send")
+def api_gemini_send():
+    try:
+        payload = request.json or {}
+        prompt_text = str(payload.get("prompt", "")).strip()
+        media_base64 = payload.get("media", None)
+        media_type = str(payload.get("media_type", "image")).strip().lower()
+        
+        if not prompt_text:
+            raise ValueError("Nội dung prompt không được trống.")
+            
+        config = load_config()
+        export_dir = config.get("openai", {}).get("export_dir", "").strip()
+        if not export_dir:
+            export_dir = str(Path.home() / "Downloads")
+            
+        temp_media_path = None
+        if media_base64:
+            if "," in media_base64:
+                header, encoded = media_base64.split(",", 1)
+            else:
+                encoded = media_base64
+            media_data = base64.b64decode(encoded)
+            
+            inbox_path = ROOT / config.get("paths", {}).get("inbox_dir", "inbox")
+            inbox_path.mkdir(parents=True, exist_ok=True)
+            
+            ext = "mp4" if media_type == "video" else "png"
+            temp_media_path = str(inbox_path / f"temp_gemini_upload.{ext}")
+            with open(temp_media_path, "wb") as f:
+                f.write(media_data)
+                
+        t = threading.Thread(
+            target=run_gemini_automation_thread,
+            args=(temp_media_path, prompt_text, export_dir, media_type)
+        )
+        t.daemon = True
+        t.start()
+        
+        return jsonify({"status": "Tiến trình gửi lên Gemini đã được bắt đầu."})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+
 @app.post("/api/automation/image/reveal")
 def api_image_reveal():
     try:
@@ -3965,7 +4462,7 @@ def api_clear_cache():
         # 1. Xóa file trong inbox
         inbox_dir = ROOT / "inbox"
         if inbox_dir.exists():
-            for ext in ("*.png", "*.jpg", "*.jpeg"):
+            for ext in ("*.png", "*.jpg", "*.jpeg", "*.mp4"):
                 for f in inbox_dir.glob(ext):
                     try:
                         f.unlink()
@@ -3975,29 +4472,29 @@ def api_clear_cache():
         # 2. Xóa file trong processed
         processed_dir = ROOT / "processed"
         if processed_dir.exists():
-            for ext in ("*.png", "*.jpg", "*.jpeg"):
+            for ext in ("*.png", "*.jpg", "*.jpeg", "*.mp4"):
                 for f in processed_dir.glob(ext):
                     try:
                         f.unlink()
                     except Exception:
                         pass
                         
-        # 3. Xóa file chatgpt_* trong export_dir
+        # 3. Xóa file chatgpt_* và gemini_* trong export_dir
         config = load_config()
         export_dir = config.get("openai", {}).get("export_dir", "").strip()
         if not export_dir:
             export_dir = str(Path.home() / "Downloads")
         out_dir = Path(export_dir)
         if out_dir.exists():
-            for ext in ("*.png", "*.jpg", "*.jpeg"):
+            for ext in ("*.png", "*.jpg", "*.jpeg", "*.mp4"):
                 for f in out_dir.glob(ext):
-                    if f.name.startswith("chatgpt_"):
+                    if f.name.startswith("chatgpt_") or f.name.startswith("gemini_"):
                         try:
                             f.unlink()
                         except Exception:
                             pass
                             
-        add_event({"step": "clear_cache", "message": "Đã xóa sạch bộ nhớ tạm và các ảnh kết quả cũ."})
+        add_event({"step": "clear_cache", "message": "Đã xóa sạch bộ nhớ tạm và các ảnh/video kết quả cũ."})
         return jsonify({"success": True, "message": "Đã xóa cache thành công."})
     except Exception as exc:
         return error_response(exc, 400)
