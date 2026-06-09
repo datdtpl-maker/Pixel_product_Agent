@@ -12,6 +12,17 @@ from pathlib import Path
 from typing import Any
 import sys
 
+if sys.stdout is not None:
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='backslashreplace')
+    except Exception:
+        pass
+if sys.stderr is not None:
+    try:
+        sys.stderr.reconfigure(encoding='utf-8', errors='backslashreplace')
+    except Exception:
+        pass
+
 from flask import Flask, jsonify, render_template_string, request
 
 import base64
@@ -29,7 +40,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v1.1.23"
+CURRENT_VERSION = "v1.1.24"
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
 if not CONFIG_PATH.exists():
@@ -4346,63 +4357,98 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
             except Exception as e_count:
                 print(f"[Gemini Auto] Loi dem media ban dau: {e_count}")
 
-            # 1. Điền prompt trước
-            add_event({"step": "gemini_automation", "message": "Đang nhập prompt..."})
-            try:
-                page.focus('div[contenteditable="true"]')
-                page.click('div[contenteditable="true"]')
-                page.evaluate("""(text) => {
-                    const el = document.querySelector('div[contenteditable="true"]');
-                    if (el) {
-                        el.innerText = text;
-                        el.dispatchEvent(new Event("input", { bubbles: true }));
-                    }
-                }""", prompt_text)
-                time.sleep(0.5)
-                # Nhấn Space và Backspace để kích hoạt state
-                page.keyboard.press("Space")
-                page.keyboard.press("Backspace")
-                time.sleep(1.5)
-            except Exception as e_fill:
-                print(f"[Gemini Auto] Lỗi điền prompt bằng evaluate: {e_fill}")
-                page.fill('div[contenteditable="true"]', prompt_text)
-                time.sleep(1.5)
-
-            # 2. Upload ảnh/video nếu có
+            # 1. Upload ảnh/video trước nếu có
             if media_path and os.path.exists(media_path):
                 add_event({"step": "gemini_automation", "message": f"Đang upload tệp sản phẩm: {os.path.basename(media_path)}..."})
                 
                 upload_triggered = False
                 
+                # Quét debug DOM xung quanh ô chat và gửi lên log
+                try:
+                    debug_info = page.evaluate("""() => {
+                        const getEditor = () => {
+                            const editors = Array.from(document.querySelectorAll('div[contenteditable="true"]')).filter(el => {
+                                const rect = el.getBoundingClientRect();
+                                return rect.width > 0 && rect.height > 0;
+                            });
+                            return editors[editors.length - 1] || document.querySelector('div[contenteditable="true"]');
+                        };
+                        const editor = getEditor();
+                        if (!editor) return "Không tìm thấy editor";
+                        
+                        const editorRect = editor.getBoundingClientRect();
+                        let info = [];
+                        
+                        // Quét tất cả phần tử bên trái editor trong cùng container cha (lên 7 cấp)
+                        let parent = editor.parentElement;
+                        for (let i = 0; i < 7 && parent; i++) {
+                            const elements = parent.querySelectorAll('button, [role="button"], g-icon, svg, div, span');
+                            for (const el of elements) {
+                                const r = el.getBoundingClientRect();
+                                if (r.width > 0 && r.height > 0 && r.left < editorRect.left) {
+                                    const yDiff = Math.abs((r.top + r.height/2) - (editorRect.top + editorRect.height/2));
+                                    if (yDiff < 120) {
+                                        const label = el.getAttribute('aria-label') || el.getAttribute('title') || '';
+                                        const txt = (el.textContent || '').trim().substring(0, 15);
+                                        const tag = el.tagName.toLowerCase();
+                                        const hasOnclick = typeof el.onclick === 'function' || el.getAttribute('onclick');
+                                        info.push(`${tag}[lbl='${label}', txt='${txt}', yDiff=${Math.round(yDiff)}, click=${!!hasOnclick}]`);
+                                    }
+                                }
+                            }
+                            parent = parent.parentElement;
+                        }
+                        return info.slice(0, 8).join(' | ');
+                    }""")
+                    add_event({"step": "gemini_automation", "message": f"Debug DOM bên trái ô chat: {debug_info}"})
+                except Exception as e_dbg:
+                    print(f"[Gemini Auto] Lỗi quét debug DOM: {e_dbg}")
+                
                 # Cố gắng click nút dấu cộng (+) để hiển thị menu đính kèm
                 try:
                     attach_btn = page.evaluate_handle("""() => {
-                        // 1. Ưu tiên hàng đầu: Quét theo nhãn (aria-label/title) chính xác của Gemini (tiếng Anh và tiếng Việt)
-                        const labels = ["nội dung tải lên", "tải lên", "công cụ", "uploads", "attach", "add file", "upload file", "thêm hình ảnh", "thêm ảnh"];
-                        for (const el of document.querySelectorAll('button, [role="button"], g-icon, div, span')) {
-                            const label = (el.getAttribute('aria-label') || el.getAttribute('title') || '').toLowerCase();
-                            if (labels.some(l => label.includes(l))) {
-                                return el.closest('button') || el.closest('[role="button"]') || el;
-                            }
-                        }
-
-                        const editor = document.querySelector('div[contenteditable="true"]');
+                        const getEditor = () => {
+                            const editors = Array.from(document.querySelectorAll('div[contenteditable="true"]')).filter(el => {
+                                const rect = el.getBoundingClientRect();
+                                return rect.width > 0 && rect.height > 0;
+                            });
+                            return editors[editors.length - 1] || document.querySelector('div[contenteditable="true"]');
+                        };
+                        const editor = getEditor();
                         if (!editor) return null;
                         
                         const editorRect = editor.getBoundingClientRect();
+                        
+                        // 1. Selector trực tiếp cực kỳ mạnh mẽ cho nút dấu cộng của Gemini
+                        const directSelectors = [
+                            'button[aria-label*="tải lên" i]',
+                            'button[aria-label*="upload" i]',
+                            'button[aria-label*="công cụ" i]',
+                            'gem-icon-button[arialabel*="tải lên" i] button',
+                            'gem-icon-button[arialabel*="upload" i] button',
+                            'button:has(mat-icon[fonticon="plus"])',
+                            'button:has(mat-icon[data-mat-icon-name="plus"])'
+                        ];
+                        for (const sel of directSelectors) {
+                            const btn = document.querySelector(sel);
+                            if (btn) {
+                                const r = btn.getBoundingClientRect();
+                                if (r.width > 0 && r.height > 0) return btn;
+                            }
+                        }
+                        
                         let bestBtn = null;
                         let minDistance = 1000;
                         
-                        // 2. Fallback hình học: Quét các phần tử click phổ biến cùng hàng ngang
-                        const candidates = document.querySelectorAll('button, [role="button"], g-icon, svg, div.uploader, .attach-button');
+                        // 2. Quét các phần tử click phổ biến nằm bên trái ô nhập liệu cùng hàng ngang (nới rộng yDiff lên 120px do prompt dài làm editor rất cao)
+                        const candidates = document.querySelectorAll('button, [role="button"], g-icon, svg, div.uploader, .attach-button, gem-icon-button');
                         for (const el of candidates) {
                             const rect = el.getBoundingClientRect();
-                            if (rect.width > 0 && rect.height > 0) {
+                            if (rect.width > 0 && rect.height > 0 && rect.left < editorRect.left) {
                                 const yDiff = Math.abs((rect.top + rect.height/2) - (editorRect.top + editorRect.height/2));
-                                if (yDiff < 30) { // Cùng hàng ngang
-                                    // Chấp nhận cả trường hợp nút nằm đè lên padding-left của editor (rect.left >= editorRect.left nhưng cách lề trái không quá xa)
-                                    const distance = Math.abs(rect.left - editorRect.left);
-                                    if (distance < minDistance) {
+                                if (yDiff < 120) { // Nới rộng Y lên 120px
+                                    const distance = editorRect.left - rect.right;
+                                    if (distance >= -15 && distance < minDistance) { // Cho phép xê dịch nhẹ
                                         minDistance = distance;
                                         bestBtn = el;
                                     }
@@ -4410,18 +4456,18 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                             }
                         }
                         
-                        // 3. Fallback: Quét các thẻ div/span nhỏ trong cùng container cha của editor
+                        // 3. Fallback: Quét các thẻ div/span nhỏ bên trái ô nhập liệu trong cùng container cha (nới rộng yDiff lên 120px)
                         if (!bestBtn) {
                             let parent = editor.parentElement;
                             for (let i = 0; i < 4 && parent; i++) {
                                 const divs = parent.querySelectorAll('div, span');
                                 for (const el of divs) {
                                     const rect = el.getBoundingClientRect();
-                                    if (rect.width > 10 && rect.width < 80 && rect.height > 10 && rect.height < 80) {
+                                    if (rect.width > 8 && rect.width < 100 && rect.height > 8 && rect.height < 100 && rect.left < editorRect.left) {
                                         const yDiff = Math.abs((rect.top + rect.height/2) - (editorRect.top + editorRect.height/2));
-                                        if (yDiff < 25) {
-                                            const distance = Math.abs(rect.left - editorRect.left);
-                                            if (distance < minDistance) {
+                                        if (yDiff < 120) {
+                                            const distance = editorRect.left - rect.right;
+                                            if (distance >= -15 && distance < minDistance) {
                                                 minDistance = distance;
                                                 bestBtn = el;
                                             }
@@ -4432,11 +4478,17 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                             }
                         }
                         
-                        // 4. Fallback toàn cục theo text '+' hoặc 'add'
+                        // 4. Fallback toàn cục theo nhãn mở rộng rộng rãi
                         if (!bestBtn) {
+                            const labels = [
+                                "đính kèm", "thêm tệp", "tải tệp", "attach", "add file", "upload file", 
+                                "upload media", "attach files", "add_circle", "thêm hình ảnh", "thêm ảnh",
+                                "tải lên", "công cụ", "upload", "content", "plus"
+                            ];
                             for (const el of document.querySelectorAll('button, [role="button"], g-icon, div, span')) {
+                                const label = (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('arialabel') || '').toLowerCase();
                                 const txt = (el.textContent || '').trim();
-                                if (txt === '+' || txt === 'add') {
+                                if (labels.some(l => label.includes(l)) || txt === '+' || txt === 'add') {
                                     return el.closest('button') || el.closest('[role="button"]') || el;
                                 }
                             }
@@ -4448,50 +4500,101 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                     if attach_btn and attach_btn.as_element():
                         add_event({"step": "gemini_automation", "message": "Đã tìm thấy nút dấu cộng đính kèm (+). Đang mở menu..."})
                         attach_btn.as_element().click()
-                        time.sleep(1.5) # Tăng thời gian chờ menu hiển thị lên 1.5s cho chắc chắn
+                        time.sleep(2.5) # Chờ 2.5 giây để menu mở và render
                         
-                        # Tìm nút Tệp hoặc Video trong menu vừa hiển thị
+                        # ƯU TIÊN 1: Tìm nút cụ thể trên menu bằng thuật toán quét DOM thông minh và click bằng expect_file_chooser
                         menu_item = page.evaluate_handle("""(mType) => {
                             const isVid = mType === "video";
-                            const targets = isVid ? ['video', 'tệp', 'file'] : ['hình ảnh', 'images', 'tệp', 'file', 'ảnh', 'photos'];
+                            const targets = isVid 
+                                ? ['video'] 
+                                : ['hình ảnh', 'images', 'tệp', 'file', 'ảnh', 'photos', 'tải tệp', 'tải ảnh'];
+                                
+                            const elements = Array.from(document.querySelectorAll('*'));
+                            let candidates = [];
                             
-                            // Chỉ tìm các phần tử hiển thị trên màn hình
-                            for (const el of document.querySelectorAll('span, div, button, p, a')) {
+                            for (const el of elements) {
                                 const rect = el.getBoundingClientRect();
                                 if (rect.width > 0 && rect.height > 0) {
-                                    const text = (el.innerText || el.textContent || '').trim().toLowerCase();
-                                    if (targets.some(t => text === t)) {
-                                        return el.closest('button') || el.closest('[role="button"]') || el;
+                                    const text = (el.innerText || el.textContent || '').trim();
+                                    const ariaLabel = (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('arialabel') || '').trim();
+                                    
+                                    const textLower = text.toLowerCase();
+                                    const labelLower = ariaLabel.toLowerCase();
+                                    
+                                    let match = false;
+                                    if (isVid) {
+                                        if (textLower === 'video' || labelLower === 'video' || (text.includes('Video') && text.length < 50)) {
+                                            match = true;
+                                        }
+                                    } else {
+                                        if (targets.some(t => textLower === t || labelLower === t || (textLower.includes(t) && text.length < 50))) {
+                                            match = true;
+                                        }
+                                    }
+                                    
+                                    if (match) {
+                                        candidates.push({ el, text, ariaLabel });
                                     }
                                 }
                             }
-                            return null;
-                        }""", media_type)
+                            
+                            if (candidates.length === 0) return null;
+                            
+                            // Ưu tiên text ngắn nhất để chính xác
+                            candidates.sort((a, b) => a.text.length - b.text.length);
+                            const bestCandidate = candidates[0].el;
+                            
+                            // Đi ngược lên các cha để tìm element click được
+                            let cur = bestCandidate;
+                            for (let i = 0; i < 6 && cur; i++) {
+                                const tag = cur.tagName.toLowerCase();
+                                const role = cur.getAttribute('role') || '';
+                                const jsaction = cur.getAttribute('jsaction') || '';
+                                const className = cur.className || '';
+                                
+                                if (tag === 'button' || role === 'button' || role === 'menuitem' || role === 'option' || tag === 'a' || jsaction || className.includes('button') || className.includes('item')) {
+                                    return cur;
+                                }
+                                cur = cur.parentElement;
+                            }
+                            return bestCandidate;
+                        }""", "image")
                         
                         if menu_item and menu_item.as_element():
-                            target_name = "Video" if media_type == "video" else "Tệp/Hình ảnh"
-                            add_event({"step": "gemini_automation", "message": f"Đã tìm thấy nút chọn {target_name} trên menu. Đang tải lên..."})
+                            target_name = "Tệp/Hình ảnh"
+                            add_event({"step": "gemini_automation", "message": f"Đã tìm thấy nút chọn {target_name}. Đang click để mở hộp thoại tệp..."})
                             try:
-                                with page.expect_file_chooser(timeout=5000) as fc_info:
-                                    menu_item.as_element().click()
+                                with page.expect_file_chooser(timeout=8000) as fc_info:
+                                    menu_item.as_element().click(no_wait_after=True, timeout=5000)
                                 file_chooser = fc_info.value
                                 file_chooser.set_files(media_path)
                                 upload_triggered = True
+                                add_event({"step": "gemini_automation", "message": f"Đã chọn tệp {os.path.basename(media_path)} thành công qua menu."})
                             except Exception as e_fc:
-                                print(f"[Gemini Auto] Lỗi trigger file chooser: {e_fc}")
-                                # Click lại editor để đóng menu nếu bị kẹt
-                                try:
-                                    page.click('div[contenteditable="true"]')
-                                except Exception:
-                                    pass
+                                msg = f"Lỗi trigger file chooser qua menu: {e_fc}"
+                                print(f"[Gemini Auto] {msg}")
+                                add_event({"step": "gemini_automation", "message": msg})
                         else:
-                            add_event({"step": "gemini_automation", "message": "Không tìm thấy nút tương ứng trên menu đính kèm, đang chuyển sang fallback..."})
+                            add_event({"step": "gemini_automation", "message": "Không tìm thấy nút tương ứng trên menu đính kèm, chuyển sang chế độ dự phòng..."})
+                            
+                        # FALLBACK 1: Nếu click menu item thất bại hoặc không tìm thấy, thử tìm và set trực tiếp tất cả input file
+                        if not upload_triggered:
+                            file_inputs = page.query_selector_all('input[type="file"]')
+                            if file_inputs:
+                                add_event({"step": "gemini_automation", "message": f"Tìm thấy {len(file_inputs)} tệp input ẩn. Đang đính kèm trực tiếp làm dự phòng..."})
+                                for idx, inp in enumerate(file_inputs):
+                                    try:
+                                        inp.set_input_files(media_path)
+                                        upload_triggered = True
+                                        print(f"[Gemini Auto] Đã set file thành công vào input ẩn index {idx}")
+                                    except Exception as e_set:
+                                        print(f"[Gemini Auto] Lỗi set file vào input ẩn index {idx}: {e_set}")
                     else:
                         add_event({"step": "gemini_automation", "message": "Không phát hiện nút đính kèm (+) trên giao diện, đang chuyển sang fallback..."})
                 except Exception as e_attach:
                     print(f"[Gemini Auto] Lỗi tương tác nút đính kèm (+): {e_attach}")
                 
-                # Chế độ Fallback: Set file trực tiếp vào input file cuối cùng nếu việc click menu thất bại
+                # Chế độ Fallback cuối cùng: Set file trực tiếp vào input file cuối cùng nếu các bước trên thất bại
                 if not upload_triggered:
                     add_event({"step": "gemini_automation", "message": "Đang tìm kiếm tệp input ẩn để đính kèm trực tiếp..."})
                     file_inputs = page.query_selector_all('input[type="file"]')
@@ -4521,13 +4624,158 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                             except Exception:
                                 pass
                         if upload_success:
-                            time.sleep(2.0) # Chờ thêm 2 giây để tệp được render hoàn tất trên giao diện
+                            time.sleep(3.0) # Tăng nhẹ thời gian chờ để tệp được render hoàn tất trên giao diện
                             add_event({"step": "gemini_automation", "message": f"Tệp đã tải lên hoàn tất sau {i+1} giây."})
                             break
                     if not upload_success:
                         add_event({"step": "gemini_automation", "message": "Cảnh báo: Hết thời gian chờ tệp tải lên, vẫn tiến hành gửi..."})
                 else:
                     add_event({"step": "gemini_automation", "message": "Cảnh báo: Không thể kích hoạt tải tệp lên Gemini."})
+            
+            # 2. Nhấn nút dấu cộng (+) lần 2 để chuyển sang chế độ Video nếu có file đính kèm
+            if media_path and os.path.exists(media_path):
+                add_event({"step": "gemini_automation", "message": "Đang kích hoạt chế độ Video (Omni Video mode) của Gemini..."})
+                try:
+                    # Tìm nút cộng (+) lần 2
+                    attach_btn2 = page.evaluate_handle("""() => {
+                        const getEditor = () => {
+                            const editors = Array.from(document.querySelectorAll('div[contenteditable="true"]')).filter(el => {
+                                const rect = el.getBoundingClientRect();
+                                return rect.width > 0 && rect.height > 0;
+                            });
+                            return editors[editors.length - 1] || document.querySelector('div[contenteditable="true"]');
+                        };
+                        const editor = getEditor();
+                        if (!editor) return null;
+                        const editorRect = editor.getBoundingClientRect();
+                        
+                        const directSelectors = [
+                            'button[aria-label*="Nội dung tải lên" i]',
+                            'button[aria-label*="tải lên" i]',
+                            'button[aria-label*="upload" i]',
+                            'button[aria-label*="công cụ" i]',
+                            'button:has(mat-icon[fonticon="plus"])',
+                            'button:has(mat-icon[data-mat-icon-name="plus"])'
+                        ];
+                        for (const sel of directSelectors) {
+                            const btn = document.querySelector(sel);
+                            if (btn) return btn;
+                        }
+                        
+                        const candidates = document.querySelectorAll('button, [role="button"], gem-icon-button');
+                        let best = null;
+                        let minDistance = 1000;
+                        for (const el of candidates) {
+                            const rect = el.getBoundingClientRect();
+                            if (rect.width > 0 && rect.height > 0 && rect.left < editorRect.left) {
+                                const yDiff = Math.abs((rect.top + rect.height/2) - (editorRect.top + editorRect.height/2));
+                                if (yDiff < 120) {
+                                    const distance = editorRect.left - rect.right;
+                                    if (distance >= -15 && distance < minDistance) {
+                                        minDistance = distance;
+                                        best = el;
+                                    }
+                                }
+                            }
+                        }
+                        return best;
+                    }""")
+                    
+                    if attach_btn2 and attach_btn2.as_element():
+                        add_event({"step": "gemini_automation", "message": "Đã bấm nút cộng (+) lần 2. Chờ menu hiển thị..."})
+                        attach_btn2.as_element().click(no_wait_after=True)
+                        time.sleep(2.5) # Chờ 2.5 giây để menu mở
+                        
+                        # Tìm mục Video bằng thuật toán JS
+                        video_item = page.evaluate_handle("""() => {
+                            const targets = ['video'];
+                            const elements = Array.from(document.querySelectorAll('*'));
+                            let candidates = [];
+                            
+                            for (const el of elements) {
+                                const rect = el.getBoundingClientRect();
+                                if (rect.width > 0 && rect.height > 0) {
+                                    const text = (el.innerText || el.textContent || '').trim();
+                                    const ariaLabel = (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('arialabel') || '').trim();
+                                    
+                                    const textLower = text.toLowerCase();
+                                    const labelLower = ariaLabel.toLowerCase();
+                                    
+                                    if (textLower === 'video' || labelLower === 'video' || (text.includes('Video') && text.length < 50)) {
+                                        candidates.push({ el, text, ariaLabel });
+                                    }
+                                }
+                            }
+                            
+                            if (candidates.length === 0) return null;
+                            candidates.sort((a, b) => a.text.length - b.text.length);
+                            const bestCandidate = candidates[0].el;
+                            
+                            let cur = bestCandidate;
+                            for (let i = 0; i < 6 && cur; i++) {
+                                const tag = cur.tagName.toLowerCase();
+                                const role = cur.getAttribute('role') || '';
+                                const jsaction = cur.getAttribute('jsaction') || '';
+                                const className = cur.className || '';
+                                
+                                if (tag === 'button' || role === 'button' || role === 'menuitem' || role === 'option' || tag === 'a' || jsaction || className.includes('button') || className.includes('item')) {
+                                    return cur;
+                                }
+                                cur = cur.parentElement;
+                            }
+                            return bestCandidate;
+                        }""")
+                        
+                        if video_item and video_item.as_element():
+                            add_event({"step": "gemini_automation", "message": "Đang click chọn Video để chuyển sang chế độ Video..."})
+                            try:
+                                with page.expect_file_chooser(timeout=6000) as fc_info:
+                                    video_item.as_element().click(no_wait_after=True, timeout=3000)
+                                file_chooser = fc_info.value
+                                file_chooser.set_files([])
+                                add_event({"step": "gemini_automation", "message": "Đã click chọn mục Video thành công."})
+                            except Exception as e_vid_click:
+                                print(f"[Gemini Auto] Lỗi khi xử lý File Chooser của Video: {e_vid_click}")
+                                pass
+                                
+                            # Chờ giao diện render xong badge Video
+                            time.sleep(3.0)
+                            add_event({"step": "gemini_automation", "message": "Kích hoạt chế độ Video thành công (giao diện đã sẵn sàng)."})
+                        else:
+                            add_event({"step": "error", "message": "Không tìm thấy nút Video trên menu đính kèm để kích hoạt chế độ Video."})
+                    else:
+                        add_event({"step": "error", "message": "Không mở được menu đính kèm để kích hoạt chế độ Video."})
+                except Exception as e_vid_mode:
+                    add_event({"step": "error", "message": f"Lỗi trong quá trình kích hoạt chế độ Video: {e_vid_mode}"})
+
+            # 3. Sau khi đã upload xong và kích hoạt chế độ Video thành công, tiến hành điền prompt
+            add_event({"step": "gemini_automation", "message": "Đang nhập prompt..."})
+            try:
+                page.focus('div[contenteditable="true"]')
+                page.click('div[contenteditable="true"]')
+                page.evaluate("""(text) => {
+                    const getEditor = () => {
+                        const editors = Array.from(document.querySelectorAll('div[contenteditable="true"]')).filter(el => {
+                            const rect = el.getBoundingClientRect();
+                            return rect.width > 0 && rect.height > 0;
+                        });
+                        return editors[editors.length - 1] || document.querySelector('div[contenteditable="true"]');
+                    };
+                    const el = getEditor();
+                    if (el) {
+                        el.innerText = text;
+                        el.dispatchEvent(new Event("input", { bubbles: true }));
+                    }
+                }""", prompt_text)
+                time.sleep(0.5)
+                # Nhấn Space và Backspace để kích hoạt state
+                page.keyboard.press("Space")
+                page.keyboard.press("Backspace")
+                time.sleep(1.5)
+            except Exception as e_fill:
+                print(f"[Gemini Auto] Lỗi điền prompt bằng evaluate: {e_fill}")
+                page.fill('div[contenteditable="true"]', prompt_text)
+                time.sleep(1.5)
             
             # Gửi tin nhắn
             sent_successfully = False
@@ -4974,6 +5222,10 @@ def wait_for_port(port, host="127.0.0.1", timeout=20.0):
 
 
 def launch_desktop_gui():
+    if os.environ.get("NO_GUI") == "1":
+        print("[GUI] Bỏ qua khởi chạy GUI App Mode theo cấu hình NO_GUI=1.")
+        return
+        
     port = int(os.environ.get("PORT", "8765"))
     if not wait_for_port(port, timeout=20.0):
         print(f"Lỗi: Flask server không khởi động kịp trên cổng {port}")
