@@ -40,7 +40,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v1.1.24"
+CURRENT_VERSION = "v1.1.25"
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
 if not CONFIG_PATH.exists():
@@ -424,6 +424,47 @@ HTML = r"""
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
+      align-items: center;
+    }
+    .action-group {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 4px;
+      gap: 4px;
+    }
+    body.theme-light .action-group {
+      background: rgba(0, 0, 0, 0.02);
+    }
+    .action-group-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      padding: 0 10px 0 6px;
+      user-select: none;
+      border-right: 1px solid var(--panel-border);
+      margin-right: 2px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+    }
+    .action-group button.group-btn {
+      min-height: 36px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: none !important;
+    }
+    .action-group button.group-btn:hover {
+      transform: translateY(-1px);
+    }
+    .action-group button.group-btn:active {
+      transform: translateY(0);
     }
     .content {
       padding: 32px;
@@ -798,6 +839,8 @@ HTML = r"""
       .metrics { grid-template-columns: 1fr; }
       .two, .field-action { grid-template-columns: 1fr; }
       .content { padding: 16px; }
+      .action-group { width: 100%; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
+      .action-group-label { border-right: none; border-bottom: 1px solid var(--panel-border); padding: 0 0 8px; margin-right: 0; margin-bottom: 4px; height: auto; justify-content: center; }
       .buttons button, .actions button { width: 100%; }
     }
     /* Poster Editor Styles */
@@ -912,41 +955,55 @@ HTML = r"""
           <p>Chọn thư mục trước, sau đó chụp hoặc quay từ Pixel.</p>
         </div>
         <div class="actions">
-          <button id="updateAppBtn" class="secondary" onclick="checkAppUpdate(false)" style="color: var(--brand); font-weight: 700; display: flex; align-items: center; gap: 6px; font-size: 13px;" title="Kiểm tra cập nhật phần mềm">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-            <span id="updateAppText">v1.1.0</span>
-          </button>
-          <button id="themeToggleBtn" class="secondary" onclick="toggleTheme()">
-            <!-- Chèn icon SVG tự động bằng Javascript -->
-          </button>
-          <button class="ghost" onclick="refresh()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-            Làm mới
-          </button>
-          <button id="previewBtn" class="secondary" onclick="togglePreview()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-            <span id="previewBtnText">Xem Pixel</span>
-          </button>
-          <button class="secondary" onclick="togglePixelScreen()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
-            Bật / tắt Pixel
-          </button>
-          <button class="secondary" onclick="showPosterDashboard()" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%); border-color: rgba(168, 85, 247, 0.3);">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a855f7;"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-            AI Edit Image / Video
-          </button>
-          <button class="btn-capture" onclick="capture()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-            Chụp ảnh
-          </button>
-          <button class="btn-record" onclick="record()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
-            Quay video
-          </button>
-          <button id="btnStop" class="btn-stop" onclick="stopOperation()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect></svg>
-            Dừng
-          </button>
+          <!-- Nhóm 1: Hệ thống & Giao diện -->
+          <div class="action-group">
+            <span class="action-group-label">Hệ thống</span>
+            <button id="updateAppBtn" class="secondary group-btn" onclick="checkAppUpdate(false)" style="color: var(--brand); font-weight: 700; display: flex; align-items: center; gap: 6px; font-size: 13px;" title="Kiểm tra cập nhật phần mềm">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              <span id="updateAppText">v1.1.0</span>
+            </button>
+            <button id="themeToggleBtn" class="secondary group-btn" onclick="toggleTheme()" title="Chuyển đổi giao diện Sáng/Tối">
+              <!-- Chèn icon SVG tự động bằng Javascript -->
+            </button>
+            <button class="ghost group-btn" onclick="refresh()" title="Làm mới trang">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              Làm mới
+            </button>
+          </div>
+
+          <!-- Nhóm 2: Điều khiển thiết bị Pixel -->
+          <div class="action-group">
+            <span class="action-group-label">Thiết bị</span>
+            <button class="secondary group-btn" onclick="togglePixelScreen()" title="Bật hoặc tắt màn hình điện thoại Pixel">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+              Màn hình
+            </button>
+            <button id="previewBtn" class="secondary group-btn" onclick="togglePreview()" title="Bật/Tắt xem trực tiếp màn hình Pixel qua Scrcpy">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+              <span id="previewBtnText">Xem Pixel</span>
+            </button>
+          </div>
+
+          <!-- Nhóm 3: Sáng tạo & Chụp/Quay -->
+          <div class="action-group">
+            <span class="action-group-label">Tác vụ</span>
+            <button class="secondary group-btn" onclick="showPosterDashboard()" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%); border-color: rgba(168, 85, 247, 0.3);" title="AI Edit Image/Video">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a855f7;"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+              AI Edit Image/Video
+            </button>
+            <button class="btn-capture group-btn" onclick="capture()" title="Chụp ảnh sản phẩm">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+              Chụp ảnh
+            </button>
+            <button class="btn-record group-btn" onclick="record()" title="Quay video sản phẩm">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+              Quay video
+            </button>
+            <button id="btnStop" class="btn-stop group-btn" onclick="stopOperation()" title="Dừng tác vụ hiện tại">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect></svg>
+              Dừng
+            </button>
+          </div>
         </div>
       </header>
       <div class="content">
