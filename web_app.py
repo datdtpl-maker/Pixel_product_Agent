@@ -40,7 +40,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v1.1.25"
+CURRENT_VERSION = "v1.1.26"
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
 if not CONFIG_PATH.exists():
@@ -3760,6 +3760,9 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+:: Force kill truoc de day nhanh tien trinh
+taskkill /F /IM PixelDriveCapture.exe >nul 2>&1
+
 :wait_close
 tasklist /FI "IMAGENAME eq PixelDriveCapture.exe" 2>nul | find /I /N "PixelDriveCapture.exe" >nul
 if "%ERRORLEVEL%"=="0" (
@@ -3771,26 +3774,47 @@ if "%ERRORLEVEL%"=="0" (
 :: Cho them 1 giay de he thong giai phong hoan toan file handle
 ping 127.0.0.1 -n 2 > nul
 
-:: Force kill them lan nua cho chac chan
-taskkill /F /IM PixelDriveCapture.exe >nul 2>&1
-
 echo Dang don dep phien ban cu...
+:: Ap dung co che doi ten de tranh loi lock file tren Windows
 if exist "{root_internal}" (
+    rd /s /q "{root_internal}.old" >nul 2>&1
+    ren "{root_internal}" "_internal.old" >nul 2>&1
     rd /s /q "{root_internal}" >nul 2>&1
 )
 if exist "{exe_path_str}" (
+    del /f /q "{exe_path_str}.old" >nul 2>&1
+    ren "{exe_path_str}" "PixelDriveCapture.exe.old" >nul 2>&1
     del /f /q "{exe_path_str}" >nul 2>&1
 )
 
 echo Dang sao chep cac tep tin moi...
-robocopy "{extract_source_str}" "{root_str}" /E /MOVE /Y /XF config.json config.example.json /R:5 /W:1 > nul
+:: Dung robocopy khong /MOVE de giu lai nguon, loai tru updater.bat dang chay de tranh loi file locked
+robocopy "{extract_source_str}" "{root_str}" /E /IS /IT /Y /XF config.json config.example.json updater.bat /R:5 /W:1
 
-:: Xoa sạch thu muc tam o TEMP
-if exist "{temp_update_dir_str}" rd /s /q "{temp_update_dir_str}" >nul 2>&1
-
-echo.
-echo Cap nhat thanh cong! Dang khoi dong lai Pixel Drive Capture...
-start "" "{exe_path_str}"
+if %errorlevel% LSS 8 (
+    echo Dang don dep cac tep tin tam...
+    :: Chi xoa khi copy thanh cong
+    if exist "{temp_update_dir_str}" rd /s /q "{temp_update_dir_str}" >nul 2>&1
+    
+    :: Xoa file .old neu he thong da giai phong
+    del /f /q "{exe_path_str}.old" >nul 2>&1
+    rd /s /q "{root_internal}.old" >nul 2>&1
+    
+    echo.
+    echo ==================================================
+    echo   CAP NHAT THANH CONG!
+    echo   Dang khoi dong lai Pixel Drive Capture...
+    echo ==================================================
+    start "" "{exe_path_str}"
+) else (
+    echo.
+    echo ==================================================
+    echo   LOI: KHONG THE SAO CHEP CAC TEP TIN MOI!
+    echo   Ma loi Robocopy: %errorlevel%
+    echo   Vui long dong tat ca cac cua so ung dung va thu lai.
+    echo ==================================================
+    pause
+)
 
 (goto) 2>nul & del "%~f0"
 """
