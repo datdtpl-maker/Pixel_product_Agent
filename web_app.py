@@ -40,7 +40,8 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v1.1.30"
+CURRENT_VERSION = "v2.0.0"
+
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
 if not CONFIG_PATH.exists():
@@ -991,6 +992,9 @@ HTML = r"""
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a855f7;"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
               AI Edit Image/Video
             </button>
+            <button class="secondary group-btn" onclick="showShopeeSyncDashboard()" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%); border-color: rgba(16, 185, 129, 0.3);" title="Đồng bộ Notion -> BigSeller Excel">
+              Đồng bộ Shopee
+            </button>
             <button class="btn-capture group-btn" onclick="capture()" title="Chụp ảnh sản phẩm">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
               Chụp ảnh
@@ -1286,6 +1290,101 @@ HTML = r"""
         </aside>
       </div>
     </div>
+
+    <!-- Shopee Notion to BigSeller Auto Sync Tab -->
+    <div id="shopeeSyncDashboard" style="display: none; flex-direction: column; width: 100%;">
+      <header class="topbar" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); padding-bottom: 16px; margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <button class="ghost" onclick="showCaptureDashboard()" style="min-height: 38px; padding: 8px 12px; background: none; border: none; color: var(--text); cursor: pointer;" title="Quay lại Bảng điều khiển">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          </button>
+          <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 22px; margin: 0;">Đồng bộ Shopee / BigSeller</h2>
+        </div>
+        <div class="actions" style="display: flex; gap: 16px; align-items: center;">
+          <div id="shopeeBotStatusBadge" class="badge danger" style="padding: 8px 16px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; border-radius: 99px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;" id="shopeeBotStatusDot"></span>
+            <span id="shopeeBotStatusText">Bot Telegram: OFFLINE</span>
+          </div>
+          <button type="button" id="btnToggleShopeeBot" class="btn-capture" onclick="toggleShopeeBot()" style="min-height: 36px; padding: 0 16px; font-size: 12px; background: var(--brand); border-radius: 8px; font-weight: 700; border: none; cursor: pointer; color: #fff;">
+            Khởi động Telegram Bot
+          </button>
+        </div>
+      </header>
+      
+      <div class="workspace" style="display: flex; gap: 24px;">
+        <!-- Cột 1: Cấu hình kết nối Notion / Telegram / API -->
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 24px; max-width: 450px; min-width: 320px;">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Cấu hình Notion & Telegram</h3>
+              <p>Thiết lập thông tin kết nối Notion Database và Telegram Bot.</p>
+            </div>
+            <div class="panel-body" style="display: flex; flex-direction: column; gap: 16px;">
+              <div>
+                <label for="shopeeNotionToken" style="font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block;">Notion Integration Token (NOTION_TOKEN)</label>
+                <input id="shopeeNotionToken" type="password" placeholder="ntn_..." style="width: 100%; border-radius: 8px; padding: 10px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); color: var(--text);">
+              </div>
+              <div>
+                <label for="shopeeNotionDbId" style="font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block;">Notion Database ID (NOTION_DATABASE_ID)</label>
+                <input id="shopeeNotionDbId" type="text" placeholder="Ví dụ: ca055a7742824b9598abde7a7686d144" style="width: 100%; border-radius: 8px; padding: 10px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); color: var(--text);">
+              </div>
+              <div>
+                <label for="shopeeTelegramToken" style="font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block;">Telegram Bot Token (TELEGRAM_BOT_TOKEN)</label>
+                <input id="shopeeTelegramToken" type="password" placeholder="Mã token của Bot Telegram..." style="width: 100%; border-radius: 8px; padding: 10px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); color: var(--text);">
+              </div>
+              <div>
+                <label for="shopeeManagerChatId" style="font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block;">Manager Chat ID (MANAGER_CHAT_ID)</label>
+                <input id="shopeeManagerChatId" type="text" placeholder="ID người quản lý nhận thông báo..." style="width: 100%; border-radius: 8px; padding: 10px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); color: var(--text);">
+              </div>
+              <div>
+                <label for="shopeeGeminiApiKey" style="font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block;">Gemini/OpenAI API Key (GEMINI_API_KEY)</label>
+                <input id="shopeeGeminiApiKey" type="password" placeholder="sk-... hoặc API Key của Gemini..." style="width: 100%; border-radius: 8px; padding: 10px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); color: var(--text);">
+              </div>
+              
+              <button onclick="saveShopeeConfig()" style="width: 100%; min-height: 40px; font-weight: 700; background: var(--brand); border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; color: #fff; cursor: pointer;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                Lưu cấu hình
+              </button>
+            </div>
+          </section>
+        </div>
+        
+        <!-- Cột 2: Bảng điều khiển & Realtime Logs -->
+        <div style="flex: 2; display: flex; flex-direction: column; gap: 24px;">
+          <section class="panel" style="flex: 1; display: flex; flex-direction: column; height: 1040px; padding: 20px;">
+            <div class="panel-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); padding-bottom: 12px; margin-bottom: 16px;">
+              <div>
+                <h3 style="margin: 0;">Đồng bộ Notion sang BigSeller</h3>
+                <p style="margin: 4px 0 0; font-size: 12px; color: var(--muted);">Khởi chạy tiến trình đồng bộ dữ liệu Notion và xuất Excel thủ công.</p>
+              </div>
+              <button class="secondary" onclick="runShopeeSync()" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%); border-color: rgba(16, 185, 129, 0.3); font-weight: 700; padding: 10px 20px; border-radius: 8px; cursor: pointer; color: #10b981; display: flex; align-items: center; gap: 8px;" title="Chạy đồng bộ ngay">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                Đồng bộ ngay lập tức
+              </button>
+            </div>
+            <div class="panel-body" style="flex: 1; display: flex; flex-direction: column; gap: 12px; height: calc(100% - 70px);">
+              <label style="font-weight: 600; font-size: 13px;">Nhật ký đồng bộ (Realtime Log)</label>
+              <!-- Ô log tiến trình đồng bộ -->
+              <div id="shopeeSyncLogBox" style="flex: 1; height: 800px; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); border-radius: 8px; padding: 16px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; line-height: 1.6; overflow-y: auto; color: var(--text-muted);">
+                <!-- Log hiển thị thời gian thực -->
+              </div>
+            </div>
+          </section>
+        </div>
+        
+        <!-- Cột 3: Danh sách file Excel xuất bản -->
+        <aside class="panel" style="flex: 1; display: flex; flex-direction: column; gap: 16px; padding: 20px; max-width: 320px; min-width: 250px; height: 1040px;">
+          <div style="border-bottom: 1px solid var(--panel-border); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 15px;">Excel BigSeller đã tạo</h4>
+            <button class="ghost" onclick="loadShopeeExcelList()" style="padding: 4px 8px; font-size: 12px; color: var(--brand); background: none; border: none; cursor: pointer; font-weight: 700;">Làm mới</button>
+          </div>
+          
+          <div id="shopeeExcelList" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; align-content: start; padding-right: 4px;">
+            <!-- Load động từ API -->
+          </div>
+        </aside>
+      </div>
+    </div>
   </main>
 </div>
 <script>
@@ -1394,6 +1493,24 @@ HTML = r"""
           loadDownloadedImages();
         }
       }
+      // Tích hợp log cho Shopee Sync
+      if (step === "shopee_sync") {
+        const shopeeLogBox = document.getElementById("shopeeSyncLogBox");
+        if (shopeeLogBox) {
+          const timeStr = new Date().toLocaleTimeString();
+          const escMsg = escapeHtml(v.message || text);
+          let color = "var(--text-muted)";
+          if (escMsg.toLowerCase().includes("thành công") || escMsg.toLowerCase().includes("thanh cong") || escMsg.toLowerCase().includes("hoàn thành") || escMsg.toLowerCase().includes("success")) color = "#22c55e";
+          else if (escMsg.toLowerCase().includes("lỗi") || escMsg.toLowerCase().includes("error") || escMsg.toLowerCase().includes("failed") || escMsg.toLowerCase().includes("hỏng")) color = "#ef4444";
+          else if (escMsg.toLowerCase().includes("cảnh báo") || escMsg.toLowerCase().includes("warning")) color = "#eab308";
+          
+          shopeeLogBox.innerHTML += `<div style="color: ${color}; margin-bottom: 4px;">[${timeStr}] ${escMsg}</div>`;
+          shopeeLogBox.scrollTop = shopeeLogBox.scrollHeight;
+        }
+        if (v.message && (v.message.includes("thành công") || v.message.includes("thanh cong") || v.message.includes("Sync completed") || v.message.includes("thực tế"))) {
+          loadShopeeExcelList();
+        }
+      }
       if (step === "done") {
         refresh();
       }
@@ -1442,6 +1559,7 @@ HTML = r"""
   
   function showPosterDashboard() {
     document.getElementById("captureDashboard").style.display = "none";
+    document.getElementById("shopeeSyncDashboard").style.display = "none";
     document.getElementById("posterDashboard").style.display = "flex";
     // Tải cấu hình OpenAI từ backend lên UI
     loadOpenAIConfig();
@@ -1449,7 +1567,152 @@ HTML = r"""
   
   function showCaptureDashboard() {
     document.getElementById("posterDashboard").style.display = "none";
+    document.getElementById("shopeeSyncDashboard").style.display = "none";
     document.getElementById("captureDashboard").style.display = "block";
+  }
+
+  function showShopeeSyncDashboard() {
+    document.getElementById("captureDashboard").style.display = "none";
+    document.getElementById("posterDashboard").style.display = "none";
+    document.getElementById("shopeeSyncDashboard").style.display = "flex";
+    loadShopeeConfig();
+    loadShopeeExcelList();
+    checkShopeeBotStatus();
+  }
+
+  async function loadShopeeConfig() {
+    try {
+      const d = await api("/api/shopee/config");
+      document.getElementById("shopeeNotionToken").value = d.NOTION_TOKEN || "";
+      document.getElementById("shopeeNotionDbId").value = d.NOTION_DATABASE_ID || "";
+      document.getElementById("shopeeTelegramToken").value = d.TELEGRAM_BOT_TOKEN || "";
+      document.getElementById("shopeeManagerChatId").value = d.MANAGER_CHAT_ID || "";
+      document.getElementById("shopeeGeminiApiKey").value = d.GEMINI_API_KEY || "";
+    } catch(e) {
+      console.error("Lỗi tải cấu hình Shopee Sync:", e);
+    }
+  }
+
+  async function saveShopeeConfig() {
+    try {
+      const notionToken = document.getElementById("shopeeNotionToken").value.trim();
+      const notionDbId = document.getElementById("shopeeNotionDbId").value.trim();
+      const telegramToken = document.getElementById("shopeeTelegramToken").value.trim();
+      const managerChatId = document.getElementById("shopeeManagerChatId").value.trim();
+      const geminiApiKey = document.getElementById("shopeeGeminiApiKey").value.trim();
+      
+      const payload = {
+        NOTION_TOKEN: notionToken,
+        NOTION_DATABASE_ID: notionDbId,
+        TELEGRAM_BOT_TOKEN: telegramToken,
+        MANAGER_CHAT_ID: managerChatId,
+        GEMINI_API_KEY: geminiApiKey,
+        PARTNER_ID: "0",
+        PARTNER_KEY: "",
+        SHOP_ID: "0",
+        MOCK_MODE: "True"
+      };
+      
+      const d = await api("/api/shopee/config/save", payload);
+      alert("Đã lưu cấu hình thành công!");
+      log({step: "shopee_sync", message: "Đã lưu cấu hình kết nối Notion & Telegram thành công!"});
+    } catch(e) {
+      alert("Lỗi lưu cấu hình: " + (e.error || e.message || JSON.stringify(e)));
+    }
+  }
+
+  async function checkShopeeBotStatus() {
+    try {
+      const d = await api("/api/shopee/bot/status");
+      updateShopeeBotUI(d.running);
+    } catch(e) {
+      console.error("Lỗi kiểm tra trạng thái bot:", e);
+    }
+  }
+
+  function updateShopeeBotUI(running) {
+    const badge = document.getElementById("shopeeBotStatusBadge");
+    const dot = document.getElementById("shopeeBotStatusDot");
+    const text = document.getElementById("shopeeBotStatusText");
+    const btn = document.getElementById("btnToggleShopeeBot");
+    
+    if (running) {
+      badge.className = "badge ok";
+      badge.style.background = "rgba(34, 197, 94, 0.15)";
+      dot.style.background = "#22c55e";
+      text.textContent = "Bot Telegram: ONLINE";
+      btn.textContent = "Dừng Bot Telegram";
+      btn.style.background = "#ef4444";
+    } else {
+      badge.className = "badge danger";
+      badge.style.background = "rgba(239, 68, 68, 0.15)";
+      dot.style.background = "#ef4444";
+      text.textContent = "Bot Telegram: OFFLINE";
+      btn.textContent = "Khởi động Telegram Bot";
+      btn.style.background = "var(--brand)";
+    }
+  }
+
+  async function toggleShopeeBot() {
+    const btn = document.getElementById("btnToggleShopeeBot");
+    const isRunning = btn.textContent.includes("Dừng");
+    
+    try {
+      if (isRunning) {
+        log({step: "shopee_sync", message: "Đang gửi yêu cầu dừng Bot Telegram..."});
+        const d = await api("/api/shopee/bot/stop", {});
+        log({step: "shopee_sync", message: d.message});
+      } else {
+        log({step: "shopee_sync", message: "Đang gửi yêu cầu khởi động Bot Telegram..."});
+        const d = await api("/api/shopee/bot/start", {});
+        log({step: "shopee_sync", message: d.message});
+      }
+      setTimeout(checkShopeeBotStatus, 1500);
+    } catch(e) {
+      log({step: "shopee_sync", message: "Lỗi: " + (e.error || e.message || JSON.stringify(e))});
+      alert("Lỗi điều khiển bot: " + (e.error || e.message || JSON.stringify(e)));
+    }
+  }
+
+  async function runShopeeSync() {
+    document.getElementById("shopeeSyncLogBox").innerHTML = "";
+    log({step: "shopee_sync", message: "Gửi yêu cầu chạy đồng bộ Notion -> BigSeller..."});
+    startPoll();
+    
+    try {
+      const d = await api("/api/shopee/sync/run", {});
+      log({step: "shopee_sync", message: d.message});
+    } catch(e) {
+      log({step: "shopee_sync", message: "Lỗi đồng bộ: " + (e.error || e.message || JSON.stringify(e))});
+      alert("Lỗi kích hoạt đồng bộ: " + (e.error || e.message || JSON.stringify(e)));
+    }
+  }
+
+  async function loadShopeeExcelList() {
+    try {
+      const d = await api("/api/shopee/excel/list");
+      const list = document.getElementById("shopeeExcelList");
+      if (!list) return;
+      
+      if (d.length === 0) {
+        list.innerHTML = `<div style="color: var(--muted); text-align: center; padding: 20px; font-size: 13px;">Chưa tạo file Excel nào.</div>`;
+        return;
+      }
+      
+      list.innerHTML = d.map(f => `
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-weight: 600; font-size: 13px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; color: var(--text);" title="${escapeHtml(f.name)}">
+            📁 ${escapeHtml(f.name)}
+          </div>
+          <div style="font-size: 11px; color: var(--muted); display: flex; justify-content: space-between;">
+            <span>${f.time}</span>
+            <a href="${f.url}" download="${escapeHtml(f.name)}" style="color: var(--brand); text-decoration: none; font-weight: 700;">Tải về</a>
+          </div>
+        </div>
+      `).join("");
+    } catch(e) {
+      console.error("Lỗi tải danh sách file Excel:", e);
+    }
   }
   
   function handlePosterFiles(files) {
@@ -5670,6 +5933,227 @@ def media_watcher_loop():
             print(f"[Watcher] Lỗi vòng lặp: {e}")
             
         time.sleep(1.5)
+
+
+# ==========================================
+# SHOPEE NOTION TO BIGSELLER SYNC API
+# ==========================================
+import sys
+import logging
+
+# Thêm đường dẫn shopee_sync vào sys.path để có thể import
+SHOPEE_SYNC_ROOT = ROOT / "shopee_sync"
+if str(SHOPEE_SYNC_ROOT) not in sys.path:
+    sys.path.append(str(SHOPEE_SYNC_ROOT))
+
+# Custom logging handler để đưa log của Shopee sync và Telegram bot lên web app console
+class FlaskLogHandler(logging.Handler):
+    def __init__(self, add_event_func):
+        super().__init__()
+        self.add_event_func = add_event_func
+        
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            self.add_event_func({"step": "shopee_sync", "message": msg})
+        except Exception:
+            self.handleError(record)
+
+# Cấu hình logging handler để bắt log
+sync_logger = logging.getLogger("notion_sync")
+bot_logger = logging.getLogger("telegram_bot")
+
+shopee_log_handler = FlaskLogHandler(add_event)
+shopee_log_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s', datefmt='%H:%M:%S'))
+sync_logger.addHandler(shopee_log_handler)
+bot_logger.addHandler(shopee_log_handler)
+sync_logger.setLevel(logging.INFO)
+bot_logger.setLevel(logging.INFO)
+
+# Theo dõi luồng của bot và tiến trình sync
+shopee_bot_thread = None
+shopee_sync_thread = None
+shopee_sync_active = False
+
+@app.get("/api/shopee/config")
+def api_get_shopee_config():
+    try:
+        env_file = SHOPEE_SYNC_ROOT / ".env"
+        config_data = {
+            "NOTION_TOKEN": "",
+            "NOTION_DATABASE_ID": "",
+            "TELEGRAM_BOT_TOKEN": "",
+            "MANAGER_CHAT_ID": "",
+            "GEMINI_API_KEY": "",
+            "PARTNER_ID": "0",
+            "PARTNER_KEY": "",
+            "SHOP_ID": "0",
+            "MOCK_MODE": "True"
+        }
+        if env_file.exists():
+            content = env_file.read_text(encoding="utf-8")
+            for line in content.splitlines():
+                if "=" in line and not line.strip().startswith("#"):
+                    k, v = line.split("=", 1)
+                    config_data[k.strip()] = v.strip()
+        return jsonify(config_data)
+    except Exception as exc:
+        return error_response(exc, 400)
+
+@app.post("/api/shopee/config/save")
+def api_save_shopee_config():
+    try:
+        payload = request.json or {}
+        env_file = SHOPEE_SYNC_ROOT / ".env"
+        
+        # Tạo lại nội dung file .env
+        lines = []
+        lines.append("# Cấu hình Shopee Open Platform (BigSeller Sync)")
+        lines.append(f"PARTNER_ID={payload.get('PARTNER_ID', '0')}")
+        lines.append(f"PARTNER_KEY={payload.get('PARTNER_KEY', '')}")
+        lines.append(f"SHOP_ID={payload.get('SHOP_ID', '0')}")
+        lines.append("SHOPEE_API_URL=https://partner.test-stable.shopeemobile.com")
+        lines.append("REDIRECT_URL=https://localhost/callback")
+        lines.append(f"MOCK_MODE={payload.get('MOCK_MODE', 'True')}")
+        lines.append("TOKEN_FILE_PATH=tokens.json")
+        lines.append("")
+        lines.append("# Cấu hình Telegram Bot và Notion")
+        lines.append(f"TELEGRAM_BOT_TOKEN={payload.get('TELEGRAM_BOT_TOKEN', '')}")
+        lines.append(f"NOTION_TOKEN={payload.get('NOTION_TOKEN', '')}")
+        lines.append(f"NOTION_DATABASE_ID={payload.get('NOTION_DATABASE_ID', '')}")
+        lines.append(f"GEMINI_API_KEY={payload.get('GEMINI_API_KEY', '')}")
+        lines.append(f"MANAGER_CHAT_ID={payload.get('MANAGER_CHAT_ID', '')}")
+        
+        env_file.write_text("\n".join(lines), encoding="utf-8")
+        
+        # Nạp lại env cho các luồng hiện tại bằng cách gọi load_dotenv
+        from dotenv import load_dotenv
+        load_dotenv(env_file, override=True)
+        
+        return jsonify({"success": True, "message": "Đã lưu cấu hình Notion & Telegram thành công!"})
+    except Exception as exc:
+        return error_response(exc, 400)
+
+@app.get("/api/shopee/bot/status")
+def api_get_shopee_bot_status():
+    global shopee_bot_thread
+    from shopee_sync.src import telegram_bot
+    is_alive = shopee_bot_thread is not None and shopee_bot_thread.is_alive() and not telegram_bot.should_stop
+    return jsonify({
+        "running": is_alive,
+        "message": "Bot Telegram đang hoạt động." if is_alive else "Bot Telegram đã dừng."
+    })
+
+@app.post("/api/shopee/bot/start")
+def api_start_shopee_bot():
+    global shopee_bot_thread
+    from shopee_sync.src import telegram_bot
+    
+    # Kiểm tra cấu hình trước
+    env_file = SHOPEE_SYNC_ROOT / ".env"
+    if not env_file.exists():
+        return jsonify({"success": False, "error": "Chưa cấu hình các thông số Notion/Telegram. Vui lòng cấu hình trước."}), 400
+        
+    is_alive = shopee_bot_thread is not None and shopee_bot_thread.is_alive() and not telegram_bot.should_stop
+    if is_alive:
+        return jsonify({"success": True, "message": "Bot Telegram đã đang chạy sẵn rồi."})
+        
+    # Thiết lập lại state và khởi chạy
+    telegram_bot.should_stop = False
+    
+    def run_telegram_bot_wrapper():
+        try:
+            telegram_bot.run_bot()
+        except Exception as e:
+            add_event({"step": "shopee_sync", "message": f"Lỗi trong quá trình chạy Bot Telegram: {e}"})
+            
+    shopee_bot_thread = threading.Thread(target=run_telegram_bot_wrapper, daemon=True)
+    shopee_bot_thread.start()
+    
+    add_event({"step": "shopee_sync", "message": "Đã khởi động Bot Telegram thành công!"})
+    return jsonify({"success": True, "message": "Khởi động Bot Telegram thành công!"})
+
+@app.post("/api/shopee/bot/stop")
+def api_stop_shopee_bot():
+    global shopee_bot_thread
+    from shopee_sync.src import telegram_bot
+    
+    telegram_bot.stop_bot_process()
+    add_event({"step": "shopee_sync", "message": "Đang tắt Bot Telegram..."})
+    return jsonify({"success": True, "message": "Đã gửi lệnh dừng Bot Telegram."})
+
+@app.post("/api/shopee/sync/run")
+def api_run_shopee_sync():
+    global shopee_sync_thread, shopee_sync_active
+    from shopee_sync.src import notion_sync
+    
+    if shopee_sync_active:
+        return jsonify({"success": False, "error": "Tiến trình đồng bộ đang chạy ngầm, vui lòng đợi..."}), 400
+        
+    # Thiết lập thư mục export Downloads
+    config = load_config()
+    export_dir = config.get("openai", {}).get("export_dir", "").strip()
+    if not export_dir:
+        export_dir = str(Path.home() / "Downloads")
+        
+    os.environ["BIGSELLER_EXPORT_DIR"] = export_dir
+    
+    shopee_sync_active = True
+    add_event({"step": "shopee_sync", "message": "Bắt đầu tiến trình đồng bộ Notion -> BigSeller thủ công..."})
+    
+    def run_sync_wrapper():
+        global shopee_sync_active
+        try:
+            excel_path, titles = notion_sync.sync_notion_to_bigseller_excel()
+            if not titles:
+                add_event({
+                    "step": "shopee_sync",
+                    "message": "Không tìm thấy sản phẩm mới nào cần đồng bộ (Bài viết = True và Trạng thái shopee = False)."
+                })
+            else:
+                add_event({
+                    "step": "shopee_sync",
+                    "message": f"🎉 Đồng bộ thành công {len(titles)} sản phẩm! File đã xuất: {Path(excel_path).name}"
+                })
+        except Exception as e:
+            add_event({"step": "shopee_sync", "message": f"❌ Lỗi đồng bộ: {str(e)}"})
+        finally:
+            shopee_sync_active = False
+            
+    shopee_sync_thread = threading.Thread(target=run_sync_wrapper, daemon=True)
+    shopee_sync_thread.start()
+    
+    return jsonify({"success": True, "message": "Tiến trình đồng bộ Notion đã bắt đầu chạy ngầm."})
+
+@app.get("/api/shopee/excel/list")
+def api_list_shopee_excel():
+    try:
+        config = load_config()
+        export_dir = config.get("openai", {}).get("export_dir", "").strip()
+        if not export_dir:
+            export_dir = str(Path.home() / "Downloads")
+            
+        out_dir = Path(export_dir)
+        if not out_dir.exists():
+            return jsonify([])
+            
+        excel_files = []
+        for f in out_dir.glob("bigseller_sync_*.xlsx"):
+            excel_files.append(f)
+            
+        excel_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        
+        results = []
+        for f in excel_files[:24]:
+            results.append({
+                "name": f.name,
+                "file_path": str(f),
+                "url": f"/api/automation/images/view?name={f.name}",
+                "time": datetime.fromtimestamp(f.stat().st_mtime).strftime("%d/%m/%Y %H:%M:%S")
+            })
+        return jsonify(results)
+    except Exception as exc:
+        return error_response(exc, 400)
 
 
 def start_media_watcher():

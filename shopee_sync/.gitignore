@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Configuration and secrets
+.env
+tokens.json
+
+# IDEs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Debug, logs and temporary files
+*.json
+*.html
+*.txt
+!requirements.txt
+output/
+scratch/
+
