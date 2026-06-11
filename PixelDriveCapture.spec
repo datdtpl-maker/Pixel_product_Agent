@@ -11,7 +11,7 @@ if sys.platform == 'darwin':
         icon_file = None
 
 
-datas = [('config.example.json', '.'), ('content_prompts.json', '.'), ('run_debug_chrome.bat', '.'), ('run_debug_chrome_gemini.bat', '.'), ('favicon.ico', '.'), ('app_icon.ico', '.')]
+datas = [('config.example.json', '.'), ('content_prompts.json', '.'), ('run_debug_chrome.bat', '.'), ('run_debug_chrome_gemini.bat', '.'), ('favicon.ico', '.'), ('app_icon.ico', '.'), ('shopee_sync', 'shopee_sync')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('playwright')

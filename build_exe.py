@@ -86,6 +86,7 @@ def build():
         "--add-data", "run_debug_chrome.bat;.",
         "--add-data", "favicon.ico;.",
         "--add-data", "app_icon.ico;.",
+        "--add-data", "shopee_sync;shopee_sync",
         str(web_app_py)
     ]
     
