@@ -40,7 +40,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v1.1.28"
+CURRENT_VERSION = "v1.1.29"
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
 if not CONFIG_PATH.exists():
@@ -5334,9 +5334,10 @@ def api_list_downloaded_images():
             return jsonify([])
             
         img_files = []
-        for ext in ("*.png", "*.jpg", "*.jpeg"):
+        for ext in ("*.png", "*.jpg", "*.jpeg", "*.mp4", "*.webm"):
             for f in out_dir.glob(ext):
-                if f.name.startswith("chatgpt_"):
+                name_lower = f.name.lower()
+                if name_lower.startswith("chatgpt_") or name_lower.startswith("gemini_") or name_lower in ("1.png", "1.jpg", "1.jpeg", "1.mp4", "1.webm"):
                     img_files.append(f)
                     
         img_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
