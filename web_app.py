@@ -40,7 +40,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v2.0.0"
+CURRENT_VERSION = "v2.0.1"
 
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
@@ -5942,7 +5942,7 @@ import sys
 import logging
 
 # Thêm đường dẫn shopee_sync vào sys.path để có thể import
-SHOPEE_SYNC_ROOT = ROOT / "shopee_sync"
+SHOPEE_SYNC_ROOT = BUNDLE_DIR / "shopee_sync"
 if str(SHOPEE_SYNC_ROOT) not in sys.path:
     sys.path.append(str(SHOPEE_SYNC_ROOT))
 
