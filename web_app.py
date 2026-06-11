@@ -40,7 +40,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v1.1.27"
+CURRENT_VERSION = "v1.1.28"
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
 if not CONFIG_PATH.exists():
@@ -1629,6 +1629,7 @@ HTML = r"""
   let editingCategories = [];
   let contentSelectedImageBase64 = null;
   let sampleSelectedImageBase64 = null;
+  let selectedPromptTitle = "";
   let chromeStatusInterval = null;
 
   async function loadPromptsLibrary() {
@@ -1687,6 +1688,7 @@ HTML = r"""
     const p = promptsList.find(item => item.id === id);
     if (p) {
       document.getElementById("contentEditorPrompt").value = p.content;
+      selectedPromptTitle = p.title || "";
     }
   }
 
@@ -2120,7 +2122,8 @@ HTML = r"""
           image: contentSelectedImageBase64,
           sample_image: sampleSelectedImageBase64,
           notion_content: notionContent,
-          keywords: keywords
+          keywords: keywords,
+          prompt_title: selectedPromptTitle
         })
       });
       const d = await response.json();
@@ -2158,7 +2161,8 @@ HTML = r"""
           media_type: contentSelectedMediaType,
           sample_image: sampleSelectedImageBase64,
           notion_content: notionContent,
-          keywords: keywords
+          keywords: keywords,
+          prompt_title: selectedPromptTitle
         })
       });
       const d = await response.json();
@@ -4129,7 +4133,7 @@ def api_chrome_gemini_status():
         return jsonify({"online": False, "message": "Chrome Debug Port 9223 chưa hoạt động."})
 
 
-def run_chatgpt_automation_thread(image_path: str | None, prompt_text: str, export_dir: str, sample_path: str | None = None):
+def run_chatgpt_automation_thread(image_path: str | None, prompt_text: str, export_dir: str, sample_path: str | None = None, prompt_title: str | None = None):
     from playwright.sync_api import sync_playwright
     import os
     import base64
@@ -4383,8 +4387,11 @@ def run_chatgpt_automation_thread(image_path: str | None, prompt_text: str, expo
                 header, encoded = image_base64_data.split(",", 1)
                 img_data = base64.b64decode(encoded)
                 
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"chatgpt_{timestamp}.png"
+                if prompt_title and prompt_title.strip() == "Tạo ảnh Cover Shopee":
+                    filename = "1.png"
+                else:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"chatgpt_{timestamp}.png"
                 
                 out_dir = Path(export_dir)
                 if not out_dir.exists():
@@ -4415,6 +4422,7 @@ def api_chatgpt_send():
         sample_base64 = payload.get("sample_image", None)
         notion_content = str(payload.get("notion_content", "")).strip()
         keywords = str(payload.get("keywords", "")).strip()
+        prompt_title = payload.get("prompt_title", None)
         
         if not prompt_text:
             raise ValueError("Nội dung prompt không được trống.")
@@ -4470,7 +4478,7 @@ def api_chatgpt_send():
                  
         t = threading.Thread(
             target=run_chatgpt_automation_thread,
-            args=(temp_img_path, final_prompt, export_dir, temp_sample_path)
+            args=(temp_img_path, final_prompt, export_dir, temp_sample_path, prompt_title)
         )
         t.daemon = True
         t.start()
@@ -4480,7 +4488,7 @@ def api_chatgpt_send():
         return error_response(exc, 400)
 
 
-def run_gemini_automation_thread(media_path: str | None, prompt_text: str, export_dir: str, media_type: str):
+def run_gemini_automation_thread(media_path: str | None, prompt_text: str, export_dir: str, media_type: str, prompt_title: str | None = None):
     from playwright.sync_api import sync_playwright
     import os
     import base64
@@ -5171,9 +5179,12 @@ def run_gemini_automation_thread(media_path: str | None, prompt_text: str, expor
                 add_event({"step": "gemini_automation", "message": f"Đã phát hiện {found_type} kết quả mới từ Gemini. Đang tải về..."})
                 
                 # File path
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 ext = "mp4" if found_type.startswith("video") else "png"
-                filename = f"gemini_{timestamp}.{ext}"
+                if prompt_title and prompt_title.strip() == "Tạo ảnh Cover Shopee":
+                    filename = f"1.{ext}"
+                else:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"gemini_{timestamp}.{ext}"
                 
                 out_dir = Path(export_dir)
                 if not out_dir.exists():
@@ -5210,6 +5221,7 @@ def api_gemini_send():
         prompt_text = str(payload.get("prompt", "")).strip()
         media_base64 = payload.get("media", None)
         media_type = str(payload.get("media_type", "image")).strip().lower()
+        prompt_title = payload.get("prompt_title", None)
         
         if not prompt_text:
             raise ValueError("Nội dung prompt không được trống.")
@@ -5237,7 +5249,7 @@ def api_gemini_send():
                 
         t = threading.Thread(
             target=run_gemini_automation_thread,
-            args=(temp_media_path, prompt_text, export_dir, media_type)
+            args=(temp_media_path, prompt_text, export_dir, media_type, prompt_title)
         )
         t.daemon = True
         t.start()
