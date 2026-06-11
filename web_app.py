@@ -40,7 +40,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v1.1.26"
+CURRENT_VERSION = "v1.1.27"
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
 if not CONFIG_PATH.exists():
@@ -1151,7 +1151,7 @@ HTML = r"""
       
       <div class="content" style="padding: 0; display: grid; grid-template-columns: 340px 1fr 360px; gap: 24px; width: 100%; align-items: start;">
         <!-- Cột 1: Thư viện Prompt (Prompts Library) -->
-        <aside class="panel" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; height: 740px;">
+        <aside class="panel" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; height: 1040px;">
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); padding-bottom: 12px;">
             <h4 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 15px;">Thư viện Prompt</h4>
             <div style="display: flex; gap: 8px;">
@@ -1178,7 +1178,7 @@ HTML = r"""
         </aside>
         
         <!-- Cột 2: Bảng điều khiển và Soạn thảo (Control Panel) -->
-        <main class="panel" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; min-height: 740px; height: 740px;">
+        <main class="panel" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; min-height: 1040px; height: 1040px;">
           <div style="border-bottom: 1px solid var(--panel-border); padding-bottom: 12px;">
             <h4 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 15px;">Bảng Điều Khiển Gửi</h4>
           </div>
@@ -1214,6 +1214,34 @@ HTML = r"""
             </button>
           </div>
           
+          <!-- File ảnh mẫu tham khảo -->
+          <div>
+            <label style="margin-bottom: 6px; display: block; font-weight: 600; font-size: 13px;">Ảnh mẫu tham khảo phong cách (Tùy chọn)</label>
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 12px;">
+              <div id="sampleImgDropzone" onclick="document.getElementById('sampleImgFile').click()" style="border: 2px dashed var(--panel-border); border-radius: 12px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: rgba(0,0,0,0.12); flex: 1;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); margin-bottom: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span id="sampleImgLabel" style="font-size: 11px; color: var(--muted); text-align: center; padding: 0 10px; font-weight: 500;">Bấm hoặc Kéo thả ảnh mẫu tham khảo</span>
+                <input type="file" id="sampleImgFile" accept="image/*" style="display: none;" onchange="handleSampleImageSelect(this.files)">
+              </div>
+              <div id="sampleImgPreviewContainer" style="width: 70px; height: 70px; border-radius: 12px; border: 1px solid var(--panel-border); display: none; overflow: hidden; position: relative; background: var(--bg);">
+                <img id="sampleImgPreview" src="" style="width: 100%; height: 100%; object-fit: contain;">
+                <button type="button" onclick="clearSampleImage()" style="position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); border: none; border-radius: 50%; width: 20px; height: 20px; display: grid; place-items: center; color: #fff; cursor: pointer; font-size: 11px; z-index: 10;">×</button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Thông tin sản phẩm từ Notion -->
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <label for="notionContentInput" style="font-weight: 600; font-size: 13px;">Thông tin sản phẩm từ Notion</label>
+            <textarea id="notionContentInput" placeholder="Dán nội dung thuộc tính từ Notion..." style="width: 100%; height: 60px; min-height: 60px; resize: none; font-size: 12px; line-height: 1.4; border-radius: 8px; padding: 8px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); color: var(--text);"></textarea>
+          </div>
+          
+          <!-- Từ khóa chính của insight -->
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <label for="keywordsInput" style="font-weight: 600; font-size: 13px;">Từ khóa chính của insight</label>
+            <input type="text" id="keywordsInput" placeholder="Ví dụ: trẻ trung, sang trọng, năng động..." style="width: 100%; min-height: 36px; padding: 6px 12px; font-size: 12px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); border-radius: 8px; color: var(--text);">
+          </div>
+          
           <!-- Nội dung Prompt soạn thảo -->
           <div style="display: flex; flex-direction: column; flex: 1; min-height: 140px;">
             <label for="contentEditorPrompt" style="margin-bottom: 8px; display: block; font-weight: 600; font-size: 13px;">Nội dung Prompt</label>
@@ -1233,16 +1261,16 @@ HTML = r"""
           </div>
           
           <!-- Nhật ký tiến trình (Live Log) -->
-          <div style="display: flex; flex-direction: column; height: 200px; min-height: 200px;">
+          <div style="display: flex; flex-direction: column; height: 240px; min-height: 240px;">
             <label style="margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--muted);">Nhật ký tiến trình (Realtime Log)</label>
-            <div id="automationLogBox" style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11px; overflow-y: auto; color: var(--muted); line-height: 1.5; height: 170px;">
+            <div id="automationLogBox" style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11px; overflow-y: auto; color: var(--muted); line-height: 1.5; height: 210px;">
               Chưa có hoạt động nào. Hãy kết nối Chrome và gửi ảnh để bắt đầu.
             </div>
           </div>
         </main>
         
         <!-- Cột 3: Danh sách ảnh kết quả tải về (Results Panel) -->
-        <aside class="panel" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; height: 740px;">
+        <aside class="panel" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; height: 1040px;">
           <div style="border-bottom: 1px solid var(--panel-border); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
             <h4 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 15px;">Ảnh kết quả</h4>
             <div style="display: flex; gap: 8px;">
@@ -1600,6 +1628,7 @@ HTML = r"""
   let categoriesList = ["Shopee", "Facebook", "General"];
   let editingCategories = [];
   let contentSelectedImageBase64 = null;
+  let sampleSelectedImageBase64 = null;
   let chromeStatusInterval = null;
 
   async function loadPromptsLibrary() {
@@ -1999,6 +2028,31 @@ HTML = r"""
     document.getElementById("contentImgFile").value = "";
   }
 
+  function handleSampleImageSelect(files) {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+      sampleSelectedImageBase64 = e.target.result;
+      
+      const imgPreview = document.getElementById("sampleImgPreview");
+      imgPreview.src = sampleSelectedImageBase64;
+      
+      document.getElementById("sampleImgPreviewContainer").style.display = "block";
+      document.getElementById("sampleImgDropzone").style.display = "none";
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearSampleImage() {
+    sampleSelectedImageBase64 = null;
+    document.getElementById("sampleImgPreview").src = "";
+    document.getElementById("sampleImgPreviewContainer").style.display = "none";
+    document.getElementById("sampleImgDropzone").style.display = "flex";
+    document.getElementById("sampleImgFile").value = "";
+  }
+
   async function useLatestPixelPhoto() {
     try {
       const response = await fetch("/api/automation/latest-photo");
@@ -2033,7 +2087,11 @@ HTML = r"""
 
   function appendAutomationLog(msg) {
     const logBox = document.getElementById("automationLogBox");
-    const time = new Date().strftime("%H:%M:%S");
+    const now = new Date();
+    const hrs = String(now.getHours()).padStart(2, "0");
+    const mins = String(now.getMinutes()).padStart(2, "0");
+    const secs = String(now.getSeconds()).padStart(2, "0");
+    const time = `${hrs}:${mins}:${secs}`;
     logBox.innerHTML += `<div>[${time}] ${msg}</div>`;
     logBox.scrollTop = logBox.scrollHeight;
   }
@@ -2044,6 +2102,9 @@ HTML = r"""
       alert("Vui lòng nhập nội dung prompt.");
       return;
     }
+    
+    const notionContent = document.getElementById("notionContentInput").value.trim();
+    const keywords = document.getElementById("keywordsInput").value.trim();
     
     document.getElementById("automationLogBox").innerHTML = "";
     appendAutomationLog("Bắt đầu tiến trình gửi yêu cầu lên ChatGPT...");
@@ -2056,7 +2117,10 @@ HTML = r"""
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
           prompt: prompt,
-          image: contentSelectedImageBase64
+          image: contentSelectedImageBase64,
+          sample_image: sampleSelectedImageBase64,
+          notion_content: notionContent,
+          keywords: keywords
         })
       });
       const d = await response.json();
@@ -2076,6 +2140,9 @@ HTML = r"""
       return;
     }
     
+    const notionContent = document.getElementById("notionContentInput").value.trim();
+    const keywords = document.getElementById("keywordsInput").value.trim();
+    
     document.getElementById("automationLogBox").innerHTML = "";
     appendAutomationLog("Bắt đầu tiến trình gửi yêu cầu lên Gemini...");
     
@@ -2088,7 +2155,10 @@ HTML = r"""
         body: JSON.stringify({
           prompt: prompt,
           media: contentSelectedImageBase64,
-          media_type: contentSelectedMediaType
+          media_type: contentSelectedMediaType,
+          sample_image: sampleSelectedImageBase64,
+          notion_content: notionContent,
+          keywords: keywords
         })
       });
       const d = await response.json();
@@ -4059,11 +4129,12 @@ def api_chrome_gemini_status():
         return jsonify({"online": False, "message": "Chrome Debug Port 9223 chưa hoạt động."})
 
 
-def run_chatgpt_automation_thread(image_path: str | None, prompt_text: str, export_dir: str):
+def run_chatgpt_automation_thread(image_path: str | None, prompt_text: str, export_dir: str, sample_path: str | None = None):
     from playwright.sync_api import sync_playwright
     import os
     import base64
     from datetime import datetime
+    import time
     
     add_event({"step": "chatgpt_automation", "message": "Bắt đầu tiến trình tự động hóa ChatGPT..."})
     
@@ -4112,16 +4183,24 @@ def run_chatgpt_automation_thread(image_path: str | None, prompt_text: str, expo
                 'div[contenteditable="true"] ~ button'
             ]
 
-            # Upload ảnh nếu có
+            # Xây dựng danh sách file cần upload
+            files_to_upload = []
             if image_path and os.path.exists(image_path):
-                add_event({"step": "chatgpt_automation", "message": f"Đang upload ảnh sản phẩm: {os.path.basename(image_path)}..."})
+                files_to_upload.append(image_path)
+            if sample_path and os.path.exists(sample_path):
+                files_to_upload.append(sample_path)
+
+            # Upload ảnh nếu có
+            if files_to_upload:
+                desc = "ảnh sản phẩm" if len(files_to_upload) == 1 else "ảnh sản phẩm và ảnh mẫu"
+                add_event({"step": "chatgpt_automation", "message": f"Đang upload {desc} lên ChatGPT..."})
                 file_input = page.query_selector('input[type="file"]')
                 if file_input:
-                    file_input.set_input_files(image_path)
-                    # Chờ tối đa 40 giây cho ảnh tải lên xong (đợi nút Send sẵn sàng/enabled)
-                    add_event({"step": "chatgpt_automation", "message": "Đang chờ ảnh tải lên hoàn tất (đợi nút Gửi sẵn sàng)..."})
+                    file_input.set_input_files(files_to_upload)
+                    # Chờ tối đa 60 giây cho tệp tải lên xong (đợi nút Send sẵn sàng/enabled)
+                    add_event({"step": "chatgpt_automation", "message": "Đang chờ tải tệp lên hoàn tất (đợi nút Gửi sẵn sàng)..."})
                     upload_success = False
-                    for i in range(40):
+                    for i in range(60):
                         time.sleep(1.0)
                         for sel in send_selectors:
                             try:
@@ -4132,10 +4211,10 @@ def run_chatgpt_automation_thread(image_path: str | None, prompt_text: str, expo
                             except Exception:
                                 pass
                         if upload_success:
-                            add_event({"step": "chatgpt_automation", "message": f"Ảnh đã tải lên hoàn tất sau {i+1} giây."})
+                            add_event({"step": "chatgpt_automation", "message": f"Tệp đã tải lên hoàn tất sau {i+1} giây."})
                             break
                     if not upload_success:
-                        add_event({"step": "chatgpt_automation", "message": "Cảnh báo: Quá thời gian chờ ảnh tải lên, vẫn tiến hành nhập prompt..."})
+                        add_event({"step": "chatgpt_automation", "message": "Cảnh báo: Quá thời gian chờ tải tệp lên, vẫn tiến hành nhập prompt..."})
                 else:
                     add_event({"step": "chatgpt_automation", "message": "Cảnh báo: Không tìm thấy input tải file của ChatGPT."})
             
@@ -4333,6 +4412,9 @@ def api_chatgpt_send():
         payload = request.json or {}
         prompt_text = str(payload.get("prompt", "")).strip()
         image_base64 = payload.get("image", None)
+        sample_base64 = payload.get("sample_image", None)
+        notion_content = str(payload.get("notion_content", "")).strip()
+        keywords = str(payload.get("keywords", "")).strip()
         
         if not prompt_text:
             raise ValueError("Nội dung prompt không được trống.")
@@ -4342,6 +4424,10 @@ def api_chatgpt_send():
         if not export_dir:
             export_dir = str(Path.home() / "Downloads")
             
+        inbox_path = ROOT / config.get("paths", {}).get("inbox_dir", "inbox")
+        inbox_path.mkdir(parents=True, exist_ok=True)
+
+        # 1. Lưu ảnh sản phẩm thô
         temp_img_path = None
         if image_base64:
             if "," in image_base64:
@@ -4349,16 +4435,42 @@ def api_chatgpt_send():
             else:
                 encoded = image_base64
             img_data = base64.b64decode(encoded)
-            
-            inbox_path = ROOT / config.get("paths", {}).get("inbox_dir", "inbox")
-            inbox_path.mkdir(parents=True, exist_ok=True)
             temp_img_path = str(inbox_path / "temp_chatgpt_upload.png")
             with open(temp_img_path, "wb") as f:
                 f.write(img_data)
-                
+
+        # 2. Lưu ảnh mẫu phong cách (nếu có)
+        temp_sample_path = None
+        if sample_base64:
+            if "," in sample_base64:
+                header, encoded = sample_base64.split(",", 1)
+            else:
+                encoded = sample_base64
+            sample_data = base64.b64decode(encoded)
+            temp_sample_path = str(inbox_path / "temp_chatgpt_sample.png")
+            with open(temp_sample_path, "wb") as f:
+                f.write(sample_data)
+
+        # Thay thế động các biến trong prompt
+        final_prompt = prompt_text
+        if notion_content:
+            final_prompt = final_prompt.replace("{{selected_notion_content}}", notion_content)
+        else:
+            final_prompt = final_prompt.replace("{{selected_notion_content}}", "(Không có thông tin Notion)")
+            
+        if keywords:
+            final_prompt = final_prompt.replace("{{selected_keywords}}", keywords)
+        else:
+            final_prompt = final_prompt.replace("{{selected_keywords}}", "(Không có từ khóa insight)")
+
+        if temp_sample_path:
+            final_prompt = final_prompt.replace("{{image_sample}}", "ảnh mẫu tham khảo phong cách được đính kèm")
+        else:
+            final_prompt = final_prompt.replace("{{image_sample}}", "bạn tự design phong cách phù hợp")
+                 
         t = threading.Thread(
             target=run_chatgpt_automation_thread,
-            args=(temp_img_path, prompt_text, export_dir)
+            args=(temp_img_path, final_prompt, export_dir, temp_sample_path)
         )
         t.daemon = True
         t.start()

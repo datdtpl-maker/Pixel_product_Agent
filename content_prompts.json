@@ -2,31 +2,7 @@
   {
     "id": "p1",
     "category": "Shopee",
-    "title": "Bối cảnh Studio Xanh Lá",
-    "content": "Vui lòng vẽ một bối cảnh studio quảng cáo cao cấp cho sản phẩm trong ảnh này. Đặt sản phẩm trên bệ đá cẩm thạch trắng, xung quanh là các lá cây nhiệt đới màu xanh mướt lấp lánh giọt sương, ánh sáng studio softbox rực rỡ, nền màu gradient xanh lá nhạt."
-  },
-  {
-    "id": "p2",
-    "category": "Facebook",
-    "title": "Bối cảnh bãi cát mùa hè",
-    "content": "Vui lòng vẽ một bối cảnh mùa hè năng động cho sản phẩm này. Đặt sản phẩm trên bãi cát mịn màu vàng nhạt, có sóng biển xanh trong vỗ nhẹ ở góc dưới, một vài vỏ sò nhỏ bên cạnh, ánh sáng mặt trời tự nhiên rực rỡ chiếu bóng đổ dài."
-  },
-  {
-    "id": "3a206400-48ef-4a8c-9e96-ee05ffa121ef",
-    "category": "Shopee",
-    "title": "Test Studio Xanh Lá",
-    "content": "Vẽ một bối cảnh studio quảng cáo cao cấp xanh lá\nnhiều dòng ở đây"
-  },
-  {
-    "id": "52c5cebc-0f08-442d-a2df-53fde7a0fa89",
-    "category": "Facebook",
-    "title": "Test Bãi Cát Mùa Hè",
-    "content": "Vẽ một bối cảnh bãi cát mùa hè"
-  },
-  {
-    "id": "5f82cdb0-8017-4aa8-98b0-c1f6e84119e4",
-    "category": "Instagram",
-    "title": "Test Story Sang Trọng",
-    "content": "Vẽ một bối cảnh sang trọng cho story instagram"
+    "title": "Tạo ảnh Cover Shopee",
+    "content": "Tạo ảnh Shopee tỷ lệ 1:1 cho sản phẩm\nẢnh đầu vào:\nẢnh 1 là ảnh sản phẩm gốc. Dùng sản phẩm trong ảnh này làm đối tượng chính.\nẢnh 2 là ảnh mẫu tham khảo phong cách. Chỉ lấy cảm giác thiết kế, ánh sáng, màu nền, bố cục và hiệu ứng hình ảnh từ ảnh mẫu. ( nếu có {{image_sample}} , không có thì bạn tự design)\n\nYêu cầu bắt buộc:\n\nGiữ nguyên bao bì, tên sản phẩm, logo, màu sắc, hình dáng và chữ trên sản phẩm gốc.\nKhông làm méo sản phẩm.\nKhông đổi tên sản phẩm.\nKhông tự tạo thêm chữ sai trên bao bì.\nKhông sao chép y nguyên ảnh mẫu.\nKhông dùng lại logo, watermark, chữ hoặc sản phẩm trong ảnh mẫu.\nKhông thêm chữ trực tiếp lên ảnh.\nChừa khoảng trống sạch để sau này thêm chữ bằng Canva/Photoshop.\n\nThông tin sản phẩm lấy từ Notion:\n{{selected_notion_content}}\n\nTừ khóa chính của insight:\n{{selected_keywords}}\n\nÝ tưởng hình ảnh cần thể hiện:\nDựa trên nội dung Notion và từ khóa chính, tạo bối cảnh phù hợp với insight đã chọn. Hình ảnh cần truyền tải cảm giác chuyên nghiệp, sạch, đáng tin cậy, phù hợp đăng sàn Shopee cho ngành nhà thuốc/dược mỹ phẩm/chăm sóc sức khỏe.\n\nBố cục:\n\nẢnh vuông 1:1.\nSản phẩm đặt ở trung tâm, rõ nét, nổi bật.\nSản phẩm chiếm khoảng 45–60% khung hình.\nCó thể đặt sản phẩm trên bục tròn, nền trong suốt, nền nước, nền studio hoặc bối cảnh phù hợp với ảnh mẫu.\nBố cục sạch, sáng, dễ nhìn trên điện thoại.\nNền có chiều sâu, ánh sáng mềm, tạo cảm giác cao cấp và đáng tin cậy.\n\nPhong cách:\n\nKhông sao chép y nguyên ảnh mẫu.\nTông màu, ánh sáng và hiệu ứng phải phù hợp với sản phẩm và insight.\nPhong cách thương mại điện tử cao cấp, sạch, rõ sản phẩm.\n\nĐiều cấm:\n\nKhông thêm claim điều trị quá mức.\nKhông dùng chữ như: trị khỏi, chữa khỏi, cam kết hết, dứt điểm, khỏi hoàn toàn.\nKhông thêm hình ảnh bệnh da nặng, hình ảnh gây sợ hoặc phản cảm.\nKhông thêm người mẫu, bác sĩ, kim tiêm, bệnh viện nếu không được yêu cầu.\nKhông biến sản phẩm thành thuốc điều trị bệnh quá đà.\nKhông thêm logo lạ hoặc thương hiệu khác.\n\nKết quả mong muốn:\nMột ảnh Shopee sạch, sáng, chuyên nghiệp, sản phẩm nổi bật, đúng tinh thần ảnh mẫu, phù hợp nội dung insight đã chọn và sẵn sàng dùng làm ảnh thương mại điện tử."
   }
 ]
