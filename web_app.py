@@ -40,7 +40,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v1.1.29"
+CURRENT_VERSION = "v1.1.30"
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
 if not CONFIG_PATH.exists():
@@ -3863,7 +3863,7 @@ if exist "{exe_path_str}" (
 
 echo Dang sao chep cac tep tin moi...
 :: Dung robocopy khong /MOVE de giu lai nguon, loai tru updater.bat dang chay de tranh loi file locked
-robocopy "{extract_source_str}" "{root_str}" /E /IS /IT /Y /XF config.json config.example.json updater.bat /R:5 /W:1
+robocopy "{extract_source_str}" "{root_str}" /E /IS /IT /XF config.json config.example.json updater.bat /R:5 /W:1
 
 if %errorlevel% LSS 8 (
     echo Dang don dep cac tep tin tam...
