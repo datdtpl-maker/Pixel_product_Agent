@@ -1,6 +1,6 @@
 # Script tu dong ket noi Pixel qua Wifi
 Write-Host "=============================================" -ForegroundColor Cyan
-Write-Host "   Pixel Drive Capture - Wi-Fi Connect Tool  " -ForegroundColor Cyan
+Write-Host "   MCP Shopee - Wi-Fi Connect Tool  " -ForegroundColor Cyan
 Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host ""
 

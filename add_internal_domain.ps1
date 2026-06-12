@@ -1,9 +1,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$Domain = "pixel-drive-capture"
-$Aliases = @($Domain, "pixel-drive-capture.test")
-$OldDomain = "pixel-agent.test"
+$Domain = "mcp-shopee-khai-hoan"
+$Aliases = @($Domain, "mcp-shopee-khai-hoan.test")
+$OldDomains = @("pixel-agent.test", "pixel-drive-capture", "pixel-drive-capture.test")
 $Ip = "127.0.0.1"
 $HostsPath = "$env:SystemRoot\System32\drivers\etc\hosts"
 
@@ -13,10 +13,16 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 }
 
 $content = @(Get-Content -Path $HostsPath -ErrorAction Stop)
-$updated = @($content | Where-Object { $_ -notmatch "(^|\s)$([regex]::Escape($OldDomain))(\s|$)" })
+$updated = $content
+foreach ($Old in $OldDomains) {
+    $beforeCount = $updated.Count
+    $updated = @($updated | Where-Object { $_ -notmatch "(^|\s)$([regex]::Escape($Old))(\s|$)" })
+    if ($updated.Count -ne $beforeCount) {
+        Write-Host "Removed old domain: $Old"
+    }
+}
 if ($updated.Count -ne $content.Count) {
     Set-Content -Path $HostsPath -Value $updated
-    Write-Host "Removed old domain: $OldDomain"
     $content = $updated
 }
 foreach ($Alias in $Aliases) {

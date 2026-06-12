@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$TaskName = "Pixel Product Agent"
+$TaskName = "MCP Shopee Agent"
 $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Launcher = Join-Path $ProjectDir "start_pixel_agent.ps1"
 
@@ -25,10 +25,10 @@ Register-ScheduledTask `
     -Action $action `
     -Trigger $trigger `
     -Settings $settings `
-    -Description "Starts the local Pixel Product Capture web agent at logon." `
+    -Description "Starts the local MCP Shopee web agent at logon." `
     -Force `
     -ErrorAction Stop | Out-Null
 
 Start-ScheduledTask -TaskName $TaskName
 Write-Host "Installed and started scheduled task: $TaskName"
-Write-Host "Open: http://pixel-drive-capture:8765 or http://127.0.0.1:8765"
+Write-Host "Open: http://mcp-shopee-khai-hoan:8765 or http://127.0.0.1:8765"

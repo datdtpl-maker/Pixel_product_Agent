@@ -4,8 +4,8 @@ $ErrorActionPreference = "Stop"
 $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Port = 8765
 $LogDir = Join-Path $ProjectDir "logs"
-$LogFile = Join-Path $LogDir "pixel-agent.log"
-$ErrorLogFile = Join-Path $LogDir "pixel-agent-error.log"
+$LogFile = Join-Path $LogDir "mcp-shopee.log"
+$ErrorLogFile = Join-Path $LogDir "mcp-shopee-error.log"
 
 New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 Set-Location $ProjectDir
@@ -13,9 +13,9 @@ Set-Location $ProjectDir
 $listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
 if ($listener) {
     try {
-        "[$(Get-Date -Format s)] Pixel Agent already listening on port $Port" | Add-Content -Path $LogFile -ErrorAction Stop
+        "[$(Get-Date -Format s)] MCP Shopee Agent already listening on port $Port" | Add-Content -Path $LogFile -ErrorAction Stop
     } catch {
-        Write-Host "Pixel Agent already listening on port $Port"
+        Write-Host "MCP Shopee Agent already listening on port $Port"
     }
     exit 0
 }
@@ -24,9 +24,9 @@ $python = (Get-Command python -ErrorAction Stop).Source
 $arguments = ".\web_app.py"
 
 try {
-    "[$(Get-Date -Format s)] Starting Pixel Agent on port $Port" | Add-Content -Path $LogFile -ErrorAction Stop
+    "[$(Get-Date -Format s)] Starting MCP Shopee Agent on port $Port" | Add-Content -Path $LogFile -ErrorAction Stop
 } catch {
-    Write-Host "Starting Pixel Agent on port $Port"
+    Write-Host "Starting MCP Shopee Agent on port $Port"
 }
 
 # PowerShell Start-Process fails when the parent environment contains both

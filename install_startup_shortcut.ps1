@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$TaskName = "Pixel Product Agent"
+$TaskName = "MCP Shopee Agent"
 $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Launcher = Join-Path $ProjectDir "start_pixel_agent.ps1"
 $StartupDir = [Environment]::GetFolderPath("Startup")
@@ -17,10 +17,10 @@ $shortcut.TargetPath = "powershell.exe"
 $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$Launcher`""
 $shortcut.WorkingDirectory = $ProjectDir
 $shortcut.WindowStyle = 7
-$shortcut.Description = "Starts the local Pixel Product Capture web agent at Windows logon."
+$shortcut.Description = "Starts the local MCP Shopee web agent at Windows logon."
 $shortcut.Save()
 
 & $Launcher
 
 Write-Host "Created startup shortcut: $ShortcutPath"
-Write-Host "Open: http://pixel-drive-capture:8765 or http://127.0.0.1:8765"
+Write-Host "Open: http://mcp-shopee-khai-hoan:8765 or http://127.0.0.1:8765"
