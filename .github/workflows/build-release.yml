@@ -34,7 +34,7 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
-          pyinstaller --clean PixelDriveCapture.spec
+          pyinstaller --clean MCPShopee.spec
 
       - name: Get clean version from tag
         id: get_version
@@ -54,15 +54,15 @@ jobs:
       - name: Zip portable Windows build
         shell: powershell
         run: |
-          Compress-Archive -Path dist/PixelDriveCapture -DestinationPath dist/PixelDriveCapture_Windows_Portable.zip -Force
+          Compress-Archive -Path dist/MCPShopee -DestinationPath dist/MCPShopee_Windows_Portable.zip -Force
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-binaries
           path: |
-            dist/PixelDriveCaptureSetup.exe
-            dist/PixelDriveCapture_Windows_Portable.zip
+            dist/MCPShopeeSetup.exe
+            dist/MCPShopee_Windows_Portable.zip
 
   publish-release:
     runs-on: ubuntu-latest
@@ -84,8 +84,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ./dist-release/PixelDriveCaptureSetup.exe
-            ./dist-release/PixelDriveCapture_Windows_Portable.zip
+            ./dist-release/MCPShopeeSetup.exe
+            ./dist-release/MCPShopee_Windows_Portable.zip
           draft: false
           prerelease: false
           generate_release_notes: true
