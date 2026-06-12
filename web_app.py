@@ -569,6 +569,20 @@ HTML = r"""
       box-shadow: 0 0 8px var(--warn);
       animation: pulse 1.8s infinite;
     }
+    .badge.danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.15);
+    }
+    .badge.danger::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: #ef4444;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #ef4444;
+    }
     @keyframes pulse {
       0% { transform: scale(0.95); opacity: 0.6; }
       50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 10px currentColor; }
@@ -1217,7 +1231,6 @@ HTML = r"""
           <!-- ChatGPT Chrome Debug Status -->
           <div style="display: flex; align-items: center; gap: 8px;">
             <div id="chromeStatusBadge" class="badge danger" style="padding: 8px 16px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; border-radius: 99px;">
-              <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;" id="chromeStatusDot"></span>
               <span id="chromeStatusText">ChatGPT Chrome: Offline</span>
             </div>
             <button type="button" class="btn-capture" onclick="startChromeDebug()" style="min-height: 36px; padding: 0 16px; font-size: 12px; background: var(--brand); border-radius: 8px; font-weight: 700;">
@@ -1227,7 +1240,6 @@ HTML = r"""
           <!-- Gemini Chrome Debug Status -->
           <div style="display: flex; align-items: center; gap: 8px;">
             <div id="geminiStatusBadge" class="badge danger" style="padding: 8px 16px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; border-radius: 99px;">
-              <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;" id="geminiStatusDot"></span>
               <span id="geminiStatusText">Gemini Chrome: Offline</span>
             </div>
             <button type="button" class="btn-capture" onclick="startChromeGemini()" style="min-height: 36px; padding: 0 16px; font-size: 12px; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); border-radius: 8px; font-weight: 700; border: none; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);">
@@ -1386,7 +1398,6 @@ HTML = r"""
         </div>
         <div class="actions" style="display: flex; gap: 16px; align-items: center;">
           <div id="shopeeBotStatusBadge" class="badge danger" style="padding: 8px 16px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; border-radius: 99px;">
-            <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;" id="shopeeBotStatusDot"></span>
             <span id="shopeeBotStatusText">Bot Telegram: OFFLINE</span>
           </div>
           <button type="button" id="btnToggleShopeeBot" class="btn-capture" onclick="toggleShopeeBot()" style="min-height: 36px; padding: 0 16px; font-size: 12px; background: var(--brand); border-radius: 8px; font-weight: 700; border: none; cursor: pointer; color: #fff;">
@@ -1573,7 +1584,7 @@ HTML = r"""
           autoLogBox.innerHTML += `<div style="color: ${color}; margin-bottom: 4px;">[${timeStr}] ${escapeHtml(v.message || text)}</div>`;
           autoLogBox.scrollTop = autoLogBox.scrollHeight;
         }
-        if (step === "chatgpt_done") {
+        if (step === "chatgpt_done" || step === "gemini_done") {
           loadDownloadedImages();
         }
       }
@@ -1716,21 +1727,18 @@ HTML = r"""
 
   function updateShopeeBotUI(running) {
     const badge = document.getElementById("shopeeBotStatusBadge");
-    const dot = document.getElementById("shopeeBotStatusDot");
     const text = document.getElementById("shopeeBotStatusText");
     const btn = document.getElementById("btnToggleShopeeBot");
     
     if (running) {
       badge.className = "badge ok";
       badge.style.background = "rgba(34, 197, 94, 0.15)";
-      dot.style.background = "#22c55e";
       text.textContent = "Bot Telegram: ONLINE";
       btn.textContent = "Dừng Bot Telegram";
       btn.style.background = "#ef4444";
     } else {
       badge.className = "badge danger";
       badge.style.background = "rgba(239, 68, 68, 0.15)";
-      dot.style.background = "#ef4444";
       text.textContent = "Bot Telegram: OFFLINE";
       btn.textContent = "Khởi động Telegram Bot";
       btn.style.background = "var(--brand)";
@@ -1970,7 +1978,7 @@ HTML = r"""
   // ==========================================
   // CONTENT IMAGE HELPER TOOL JS
   // ==========================================
-  const CURRENT_VERSION = "v1.1.0";
+  const CURRENT_VERSION = "v2.1.0";
   let promptsList = [];
   let categoriesList = ["Shopee", "Facebook", "General"];
   let editingCategories = [];
@@ -2296,16 +2304,13 @@ HTML = r"""
       const response = await fetch("/api/automation/chrome/status");
       const d = await response.json();
       const badge = document.getElementById("chromeStatusBadge");
-      const dot = document.getElementById("chromeStatusDot");
       const text = document.getElementById("chromeStatusText");
       
       if (d.online) {
-        badge.className = "badge success";
-        dot.style.background = "#22c55e";
+        badge.className = "badge ok";
         text.innerText = "ChatGPT Chrome: Online";
       } else {
         badge.className = "badge danger";
-        dot.style.background = "#ef4444";
         text.innerText = "ChatGPT Chrome: Offline";
       }
     } catch(e) {
@@ -2316,16 +2321,13 @@ HTML = r"""
       const response = await fetch("/api/automation/chrome-gemini/status");
       const d = await response.json();
       const badge = document.getElementById("geminiStatusBadge");
-      const dot = document.getElementById("geminiStatusDot");
       const text = document.getElementById("geminiStatusText");
       
       if (d.online) {
-        badge.className = "badge success";
-        dot.style.background = "#22c55e";
+        badge.className = "badge ok";
         text.innerText = "Gemini Chrome: Online";
       } else {
         badge.className = "badge danger";
-        dot.style.background = "#ef4444";
         text.innerText = "Gemini Chrome: Offline";
       }
     } catch(e) {
@@ -2641,7 +2643,7 @@ HTML = r"""
         }
       } else {
         updateBtn.classList.remove("pulse-warn");
-        updateText.innerText = `Phiên bản: ${CURRENT_VERSION}`;
+        updateText.innerText = `Phiên bản: ${data.current_version}`;
         if (!autoAlert) {
           alert("Bạn đang sử dụng phiên bản mới nhất!");
         }
@@ -4396,28 +4398,64 @@ def api_save_categories():
         return error_response(exc, 400)
 
 
+def get_chrome_path():
+    import os
+    paths = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe")
+    ]
+    for p in paths:
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def kill_processes_by_commandline(process_name, cmd_pattern):
+    import subprocess
+    import os
+    if os.name == "nt":
+        ps_cmd = f"Get-CimInstance Win32_Process -Filter \"Name = '{process_name}' and CommandLine like '%{cmd_pattern}%'\" | Invoke-CimMethod -MethodName Terminate"
+        cmd = ["powershell", "-NoProfile", "-Command", ps_cmd]
+        try:
+            subprocess.run(cmd, capture_output=True, text=True, check=False)
+        except Exception as e:
+            print(f"[Kill Process] Lỗi dọn dẹp {process_name} ({cmd_pattern}): {e}")
+
+
+def kill_mcp_shopee_except_current(current_pid):
+    import subprocess
+    import os
+    if os.name == "nt":
+        ps_cmd = f"Get-CimInstance Win32_Process -Filter \"Name = 'MCPShopee.exe' and ProcessID <> {current_pid}\" | Invoke-CimMethod -MethodName Terminate"
+        cmd = ["powershell", "-NoProfile", "-Command", ps_cmd]
+        try:
+            subprocess.run(cmd, capture_output=True, text=True, check=False)
+        except Exception as e:
+            print(f"[Kill Process] Lỗi dọn dẹp MCPShopee.exe cũ: {e}")
+
+
 @app.post("/api/automation/chrome/start")
 def api_chrome_start():
     try:
-        bat_path = ROOT / "run_debug_chrome.bat"
-        if not bat_path.exists():
-            raise FileNotFoundError("Không tìm thấy file run_debug_chrome.bat")
+        chrome_path = get_chrome_path()
+        if not chrome_path:
+            raise FileNotFoundError("Không tìm thấy trình duyệt Google Chrome cài đặt trên hệ thống!")
         
-        import subprocess
-        creationflags = 0x08000000 if os.name == "nt" else 0
-        startupinfo = None
-        if os.name == "nt":
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0
-        # Khởi chạy bất đồng bộ để tránh treo app Flask và ẩn cửa sổ console đen
-        subprocess.Popen(
-            [str(bat_path)], 
-            shell=True, 
-            cwd=str(bat_path.parent),
-            startupinfo=startupinfo,
-            creationflags=creationflags
-        )
+        # Dọn dẹp tiến trình Chrome debug cũ ở port 9222 trước khi mở mới
+        kill_processes_by_commandline("chrome.exe", "remote-debugging-port=9222")
+        import time
+        time.sleep(0.3)
+            
+        # Khởi chạy trực tiếp chrome.exe GUI độc lập, không truyền cờ ẩn để tránh làm ẩn cửa sổ Chrome
+        user_data_dir = os.path.expandvars(r"%LocalAppData%\Google\Chrome\User Data Debug")
+        cmd = [
+            chrome_path,
+            "--app=https://chatgpt.com",
+            "--remote-debugging-port=9222",
+            f"--user-data-dir={user_data_dir}"
+        ]
+        subprocess.Popen(cmd)
         
         add_event({"step": "chrome_automation", "message": "Đã phát lệnh kích hoạt Chrome Debugging Port 9222."})
         return jsonify({"status": "Đã kích hoạt Chrome Debug."})
@@ -4441,25 +4479,24 @@ def api_chrome_status():
 @app.post("/api/automation/chrome-gemini/start")
 def api_chrome_gemini_start():
     try:
-        bat_path = ROOT / "run_debug_chrome_gemini.bat"
-        if not bat_path.exists():
-            raise FileNotFoundError("Không tìm thấy file run_debug_chrome_gemini.bat")
+        chrome_path = get_chrome_path()
+        if not chrome_path:
+            raise FileNotFoundError("Không tìm thấy trình duyệt Google Chrome cài đặt trên hệ thống!")
         
-        import subprocess
-        creationflags = 0x08000000 if os.name == "nt" else 0
-        startupinfo = None
-        if os.name == "nt":
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0
-        # Khởi chạy bất đồng bộ để tránh treo app Flask và ẩn cửa sổ console đen
-        subprocess.Popen(
-            [str(bat_path)], 
-            shell=True, 
-            cwd=str(bat_path.parent),
-            startupinfo=startupinfo,
-            creationflags=creationflags
-        )
+        # Dọn dẹp tiến trình Chrome debug cũ ở port 9223 trước khi mở mới
+        kill_processes_by_commandline("chrome.exe", "remote-debugging-port=9223")
+        import time
+        time.sleep(0.3)
+            
+        # Khởi chạy trực tiếp chrome.exe GUI độc lập cho Gemini
+        user_data_dir = os.path.expandvars(r"%LocalAppData%\Google\Chrome\User Data Debug Gemini")
+        cmd = [
+            chrome_path,
+            "--app=https://gemini.google.com",
+            "--remote-debugging-port=9223",
+            f"--user-data-dir={user_data_dir}"
+        ]
+        subprocess.Popen(cmd)
         
         add_event({"step": "gemini_automation", "message": "Đã phát lệnh kích hoạt Chrome Debugging Port 9223 cho Gemini."})
         return jsonify({"status": "Đã kích hoạt Chrome Gemini Debug."})
@@ -5846,7 +5883,6 @@ def launch_desktop_gui():
 
 def cleanup_old_instances():
     import os
-    import subprocess
     import sys
     import time
     
@@ -5856,23 +5892,25 @@ def cleanup_old_instances():
     # 1. Tắt các tiến trình MCPShopee.exe cũ đang chạy ngầm (trừ chính nó)
     if getattr(sys, 'frozen', False):
         try:
-            cmd_app = f'wmic process where "name=\'MCPShopee.exe\' and ProcessID!={current_pid}" call terminate'
-            subprocess.run(cmd_app, shell=True, capture_output=True)
+            kill_mcp_shopee_except_current(current_pid)
             print("[Cleanup] Đã dọn dẹp các tiến trình MCPShopee.exe cũ.")
         except Exception as e:
             print(f"[Cleanup] Lỗi tắt app cũ: {e}")
             
     # 2. Tắt các tiến trình Chrome/Edge sử dụng profile MCPShopee
     try:
-        cmd_chrome = 'wmic process where "name=\'chrome.exe\' and CommandLine like \'%MCPShopee%\'" call terminate'
-        subprocess.run(cmd_chrome, shell=True, capture_output=True)
+        kill_processes_by_commandline("chrome.exe", "MCPShopee")
+        
+        # Tắt thêm các tiến trình Chrome debug ChatGPT và Gemini bị treo cũ
+        kill_processes_by_commandline("chrome.exe", "remote-debugging-port=9222")
+        kill_processes_by_commandline("chrome.exe", "remote-debugging-port=9223")
+        
         print("[Cleanup] Đã dọn dẹp các tiến trình Chrome cũ liên quan đến ứng dụng.")
     except Exception as e:
         print(f"[Cleanup] Lỗi tắt Chrome cũ: {e}")
         
     try:
-        cmd_edge = 'wmic process where "name=\'msedge.exe\' and CommandLine like \'%MCPShopee%\'" call terminate'
-        subprocess.run(cmd_edge, shell=True, capture_output=True)
+        kill_processes_by_commandline("msedge.exe", "MCPShopee")
         print("[Cleanup] Đã dọn dẹp các tiến trình Edge cũ liên quan đến ứng dụng.")
     except Exception as e:
         print(f"[Cleanup] Lỗi tắt Edge cũ: {e}")
