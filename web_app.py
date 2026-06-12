@@ -40,7 +40,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v2.1.1"
+CURRENT_VERSION = "v2.1.2"
 
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
@@ -162,8 +162,8 @@ HTML = r"""
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2.1.1">
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=2.1.1">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2.1.2">
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=2.1.2">
   <title>MCP Shopee - Khải Hoàn</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1632,7 +1632,7 @@ HTML = r"""
     
     logBox.innerHTML = logItem + logBox.innerHTML;
   }
-  function clearLog(){eventCount=0;lastId=0;logBox.innerHTML="";document.getElementById("logCount").textContent="0 events"}
+  async function clearLog(){try{await fetch("/api/events/clear",{method:"POST"});eventCount=0;lastId=0;logBox.innerHTML="";document.getElementById("logCount").textContent="0 events"}catch(e){console.error(e)}}
   async function api(path,body){const r=await fetch(path,{method:body?"POST":"GET",headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw d;return d}
   async function pull(){const d=await api(`/api/events?after=${lastId}`);for(const e of d.events||[]){lastId=Math.max(lastId,e.id||0);log(e.payload)}}
   function startPoll(){if(!poller){pull().catch(()=>{});poller=setInterval(()=>pull().catch(()=>{}),700)}}
@@ -1985,7 +1985,7 @@ HTML = r"""
   // ==========================================
   // CONTENT IMAGE HELPER TOOL JS
   // ==========================================
-  const CURRENT_VERSION = "v2.1.1";
+  const CURRENT_VERSION = "v2.1.2";
   let promptsList = [];
   let categoriesList = ["Shopee", "Facebook", "General"];
   let editingCategories = [];
@@ -5728,9 +5728,10 @@ def api_clear_cache():
             export_dir = str(Path.home() / "Downloads")
         out_dir = Path(export_dir)
         if out_dir.exists():
-            for ext in ("*.png", "*.jpg", "*.jpeg", "*.mp4"):
+            for ext in ("*.png", "*.jpg", "*.jpeg", "*.mp4", "*.webm"):
                 for f in out_dir.glob(ext):
-                    if f.name.startswith("chatgpt_") or f.name.startswith("gemini_"):
+                    name_lower = f.name.lower()
+                    if name_lower.startswith("chatgpt_") or name_lower.startswith("gemini_") or name_lower in ("1.png", "1.jpg", "1.jpeg", "1.mp4", "1.webm"):
                         try:
                             f.unlink()
                         except Exception:
