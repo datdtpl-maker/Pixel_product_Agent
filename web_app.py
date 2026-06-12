@@ -40,7 +40,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v2.1.2"
+CURRENT_VERSION = "v2.1.3"
 
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
@@ -162,8 +162,8 @@ HTML = r"""
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2.1.2">
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=2.1.2">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2.1.3">
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=2.1.3">
   <title>MCP Shopee - Khải Hoàn</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -213,6 +213,46 @@ HTML = r"""
       --danger-hover: #b91c1c;
       --shadow: 0 10px 30px rgba(238, 77, 45, 0.03);
     }
+    
+    /* Light Mode Form & Input UI Overrides */
+    body.theme-light .panel input,
+    body.theme-light .panel select,
+    body.theme-light .panel textarea {
+      background-color: #ffffff !important;
+      border: 1px solid #000000 !important;
+      color: #000000 !important;
+    }
+    body.theme-light .panel input[readonly],
+    body.theme-light .panel input:disabled,
+    body.theme-light .panel textarea[readonly],
+    body.theme-light .panel textarea:disabled {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      border: 1px solid #000000 !important;
+    }
+    body.theme-light .panel label,
+    body.theme-light .panel h4,
+    body.theme-light .panel h3,
+    body.theme-light .panel-head h3 {
+      color: #000000 !important;
+    }
+    body.theme-light #contentImgDropzone,
+    body.theme-light #sampleImgDropzone {
+      background-color: #ffffff !important;
+      border: 2px dashed #000000 !important;
+    }
+    body.theme-light #contentImgDropzone span,
+    body.theme-light #sampleImgDropzone span,
+    body.theme-light #contentImgDropzone svg,
+    body.theme-light #sampleImgDropzone svg {
+      color: #000000 !important;
+    }
+    body.theme-light #automationLogBox {
+      background-color: #ffffff !important;
+      border: 1px solid #000000 !important;
+      color: #000000 !important;
+    }
+
     
     @keyframes pulseWarn {
       0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
@@ -1278,27 +1318,26 @@ HTML = r"""
         </aside>
         
         <!-- Cột 2: Bảng điều khiển và Soạn thảo (Control Panel) -->
-        <main class="panel" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; min-height: 1040px; height: 1040px;">
+        <main class="panel" style="display: flex; flex-direction: column; gap: 12px; padding: 16px 20px; min-height: 1040px; height: 1040px; box-sizing: border-box;">
           <div style="border-bottom: 1px solid var(--panel-border); padding-bottom: 12px;">
             <h4 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 15px;">Bảng Điều Khiển Gửi</h4>
           </div>
-          
           <!-- Đường dẫn lưu ảnh kết quả -->
           <div style="margin-bottom: 4px;">
-            <label style="margin-bottom: 6px; display: block; font-weight: 600; font-size: 13px;">Thư mục lưu ảnh kết quả</label>
+            <label style="margin-bottom: 6px; display: block; font-weight: 600; font-size: 13px; color: #000000;">Thư mục lưu ảnh kết quả</label>
             <div style="display: flex; gap: 8px;">
-              <input type="text" id="posterExportDir" placeholder="Mặc định: Downloads" style="flex: 1; min-height: 36px; padding: 6px 12px; font-size: 13px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); border-radius: 8px; color: var(--text);" readonly>
+              <input type="text" id="posterExportDir" placeholder="Mặc định: Downloads" style="flex: 1; min-height: 36px; padding: 6px 12px; font-size: 13px; background: #ffffff; border: 1px solid #000000; border-radius: 8px; color: #000000;" readonly>
               <button type="button" class="secondary" onclick="browseExportDirectory()" style="min-height: 36px; padding: 0 14px; font-size: 12px; border-radius: 8px; font-weight: 600; cursor: pointer;">Chọn...</button>
             </div>
           </div>
           
           <!-- File sản phẩm được chọn -->
           <div>
-            <label style="margin-bottom: 6px; display: block; font-weight: 600; font-size: 13px;">File sản phẩm thô (Ảnh/Video)</label>
+            <label style="margin-bottom: 6px; display: block; font-weight: 600; font-size: 13px; color: #000000;">File sản phẩm thô (Ảnh/Video)</label>
             <div style="display: grid; grid-template-columns: 1fr auto; gap: 12px;">
-              <div id="contentImgDropzone" onclick="document.getElementById('contentImgFile').click()" style="border: 2px dashed var(--panel-border); border-radius: 12px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: rgba(0,0,0,0.12); flex: 1;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); margin-bottom: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span id="contentImgLabel" style="font-size: 11px; color: var(--muted); text-align: center; padding: 0 10px; font-weight: 500;">Bấm hoặc Kéo thả ảnh/video sản phẩm</span>
+              <div id="contentImgDropzone" onclick="document.getElementById('contentImgFile').click()" style="border: 2px dashed #000000; border-radius: 12px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: #ffffff; flex: 1;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #333333; margin-bottom: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span id="contentImgLabel" style="font-size: 11px; color: #333333; text-align: center; padding: 0 10px; font-weight: 500;">Bấm hoặc Kéo thả ảnh/video sản phẩm</span>
                 <input type="file" id="contentImgFile" accept="image/*,video/*" style="display: none;" onchange="handleContentImageSelect(this.files)">
               </div>
               <div id="contentImgPreviewContainer" style="width: 70px; height: 70px; border-radius: 12px; border: 1px solid var(--panel-border); display: none; overflow: hidden; position: relative; background: var(--bg);">
@@ -1316,7 +1355,7 @@ HTML = r"""
           
           <!-- File ảnh mẫu tham khảo -->
           <div>
-            <label style="margin-bottom: 6px; display: block; font-weight: 600; font-size: 13px;">Ảnh mẫu tham khảo phong cách (Tùy chọn)</label>
+            <label style="margin-bottom: 6px; display: block; font-weight: 600; font-size: 13px; color: #000000;">Ảnh mẫu tham khảo phong cách (Tùy chọn)</label>
             <!-- Vùng hiển thị ảnh Preview (khi đã chọn/dán thành công) -->
             <div id="sampleImgPreviewContainer" style="width: 100%; height: 120px; border-radius: 12px; border: 1px solid var(--panel-border); display: none; overflow: hidden; position: relative; background: var(--bg); margin-bottom: 8px;">
               <img id="sampleImgPreview" src="" style="width: 100%; height: 100%; object-fit: contain;">
@@ -1326,33 +1365,33 @@ HTML = r"""
             <!-- Vùng chọn ảnh (chỉ hiển thị khi chưa có ảnh) -->
             <div id="sampleImgSelectorContainer" style="display: flex; flex-direction: column; gap: 8px;">
               <!-- Dropzone kéo thả/chọn file -->
-              <div id="sampleImgDropzone" onclick="document.getElementById('sampleImgFile').click()" style="border: 2px dashed var(--panel-border); border-radius: 12px; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: rgba(0,0,0,0.12);">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); margin-bottom: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span id="sampleImgLabel" style="font-size: 11px; color: var(--muted); text-align: center; font-weight: 500;">Bấm hoặc Kéo thả ảnh mẫu tham khảo</span>
+              <div id="sampleImgDropzone" onclick="document.getElementById('sampleImgFile').click()" style="border: 2px dashed #000000; border-radius: 12px; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: #ffffff;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #333333; margin-bottom: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span id="sampleImgLabel" style="font-size: 11px; color: #333333; text-align: center; font-weight: 500;">Bấm hoặc Kéo thả ảnh mẫu tham khảo</span>
                 <input type="file" id="sampleImgFile" accept="image/*" style="display: none;" onchange="handleSampleImageSelect(this.files)">
               </div>
               
               <!-- Ô dán URL riêng biệt -->
-              <input type="text" id="sampleImgUrlInput" placeholder="Hoặc dán link URL ảnh mẫu vào đây..." oninput="handleSampleImageUrlChange(this.value)" style="width: 100%; height: 26px; font-size: 10px; border-radius: 8px; border: 1px solid var(--panel-border); padding: 0 10px; background: rgba(0,0,0,0.3); color: var(--text); outline: none;">
+              <input type="text" id="sampleImgUrlInput" placeholder="Hoặc dán link URL ảnh mẫu vào đây..." oninput="handleSampleImageUrlChange(this.value)" style="width: 100%; height: 26px; font-size: 10px; border-radius: 8px; border: 1px solid #000000; padding: 0 10px; background: #ffffff; color: #000000; outline: none;">
             </div>
           </div>
           
           <!-- Thông tin sản phẩm từ Notion -->
           <div style="display: flex; flex-direction: column; gap: 6px;">
-            <label for="notionContentInput" style="font-weight: 600; font-size: 13px;">Thông tin sản phẩm từ Notion</label>
-            <textarea id="notionContentInput" placeholder="Dán nội dung thuộc tính từ Notion..." style="width: 100%; height: 60px; min-height: 60px; resize: none; font-size: 12px; line-height: 1.4; border-radius: 8px; padding: 8px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); color: var(--text);"></textarea>
+            <label for="notionContentInput" style="font-weight: 600; font-size: 13px; color: #000000;">Thông tin sản phẩm từ Notion</label>
+            <textarea id="notionContentInput" placeholder="Dán nội dung thuộc tính từ Notion..." style="width: 100%; height: 60px; min-height: 60px; resize: none; font-size: 12px; line-height: 1.4; border-radius: 8px; padding: 8px; background: #ffffff; border: 1px solid #000000; color: #000000;"></textarea>
           </div>
           
           <!-- Từ khóa chính của insight -->
           <div style="display: flex; flex-direction: column; gap: 6px;">
-            <label for="keywordsInput" style="font-weight: 600; font-size: 13px;">Từ khóa chính của insight</label>
-            <input type="text" id="keywordsInput" placeholder="Ví dụ: trẻ trung, sang trọng, năng động..." style="width: 100%; min-height: 36px; padding: 6px 12px; font-size: 12px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); border-radius: 8px; color: var(--text);">
+            <label for="keywordsInput" style="font-weight: 600; font-size: 13px; color: #000000;">Từ khóa chính của insight</label>
+            <input type="text" id="keywordsInput" placeholder="Ví dụ: trẻ trung, sang trọng, năng động..." style="width: 100%; min-height: 36px; padding: 6px 12px; font-size: 12px; background: #ffffff; border: 1px solid #000000; border-radius: 8px; color: #000000;">
           </div>
           
           <!-- Nội dung Prompt soạn thảo -->
-          <div style="display: flex; flex-direction: column; flex: 1; min-height: 140px;">
-            <label for="contentEditorPrompt" style="margin-bottom: 8px; display: block; font-weight: 600; font-size: 13px;">Nội dung Prompt</label>
-            <textarea id="contentEditorPrompt" placeholder="Nhập yêu cầu bối cảnh ở đây hoặc click chọn từ thư viện bên trái..." style="flex: 1; width: 100%; min-height: 100px; resize: none; font-size: 13px; line-height: 1.4; border-radius: 8px; padding: 10px; background: rgba(0,0,0,0.12); border: 1px solid var(--panel-border); color: var(--text);"></textarea>
+          <div style="display: flex; flex-direction: column; height: 120px; min-height: 120px;">
+            <label for="contentEditorPrompt" style="margin-bottom: 8px; display: block; font-weight: 600; font-size: 13px; color: #000000;">Nội dung Prompt</label>
+            <textarea id="contentEditorPrompt" placeholder="Nhập yêu cầu bối cảnh ở đây hoặc click chọn từ thư viện bên trái..." style="width: 100%; height: 85px; min-height: 85px; resize: none; font-size: 13px; line-height: 1.4; border-radius: 8px; padding: 10px; background: #ffffff; border: 1px solid #000000; color: #000000;"></textarea>
           </div>
           
           <!-- Khung gửi tin nhắn -->
@@ -1368,9 +1407,9 @@ HTML = r"""
           </div>
           
           <!-- Nhật ký tiến trình (Live Log) -->
-          <div style="display: flex; flex-direction: column; height: 240px; min-height: 240px;">
-            <label style="margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--muted);">Nhật ký tiến trình (Realtime Log)</label>
-            <div id="automationLogBox" style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11px; overflow-y: auto; color: var(--muted); line-height: 1.5; height: 210px;">
+          <div style="display: flex; flex-direction: column; height: 180px; min-height: 180px; margin-bottom: 4px;">
+            <label style="margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #000000;">Nhật ký tiến trình (Realtime Log)</label>
+            <div id="automationLogBox" style="flex: 1; background: #ffffff; border: 1px solid #000000; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11.5px; overflow-y: auto; color: #000000; line-height: 1.5; height: 145px;">
               Chưa có hoạt động nào. Hãy kết nối Chrome và gửi ảnh để bắt đầu.
             </div>
           </div>
@@ -1490,7 +1529,7 @@ HTML = r"""
   </main>
 </div>
 <script>
-  const logBox=document.getElementById("log"); let eventCount=0,lastId=0,poller=null,busy=false;
+  const logBox=document.getElementById("log"); let eventCount=0,lastId=0,poller=null,busy=false,lastAutomationId=0,automationPoller=null;
   
   function initTheme() {
     const theme = localStorage.getItem('theme') || 'dark';
@@ -1584,17 +1623,11 @@ HTML = r"""
       
       // Tích hợp Realtime Log cho Content Helper Tool
       if (step === "chatgpt_automation" || step === "chatgpt_done" || step === "gemini_automation" || step === "gemini_done" || step === "error") {
-        const autoLogBox = document.getElementById("automationLogBox");
-        if (autoLogBox) {
-          const timeStr = new Date().toLocaleTimeString();
-          const color = step === "error" ? "#ef4444" : (step === "chatgpt_done" ? "#22c55e" : "var(--text)");
-          autoLogBox.innerHTML += `<div style="color: ${color}; margin-bottom: 4px;">[${timeStr}] ${escapeHtml(v.message || text)}</div>`;
-          autoLogBox.scrollTop = autoLogBox.scrollHeight;
-        }
         if (step === "chatgpt_done" || step === "gemini_done") {
           loadDownloadedImages();
         }
       }
+
       // Tích hợp log cho Shopee Sync
       if (step === "shopee_sync") {
         const shopeeLogBox = document.getElementById("shopeeSyncLogBox");
@@ -1637,6 +1670,70 @@ HTML = r"""
   async function pull(){const d=await api(`/api/events?after=${lastId}`);for(const e of d.events||[]){lastId=Math.max(lastId,e.id||0);log(e.payload)}}
   function startPoll(){if(!poller){pull().catch(()=>{});poller=setInterval(()=>pull().catch(()=>{}),700)}}
   async function stopPoll(){if(poller){clearInterval(poller);poller=null}await pull().catch(()=>{})}
+
+  async function pullAutomation() {
+    const d = await api(`/api/events?after=${lastAutomationId}`);
+    for (const e of d.events || []) {
+      lastAutomationId = Math.max(lastAutomationId, e.id || 0);
+      
+      const step = e.payload ? e.payload.step : null;
+      const msgText = e.payload ? (e.payload.message || e.payload.text || "") : "";
+      
+      if (step === "chatgpt_automation" || step === "chatgpt_done" || step === "gemini_automation" || step === "gemini_done" || step === "error") {
+        const autoLogBox = document.getElementById("automationLogBox");
+        if (autoLogBox) {
+          const timeStr = new Date().toLocaleTimeString();
+          let color = "#1e293b";
+          let icon = "⚙️";
+          const isLight = document.body.classList.contains("theme-light");
+          if (!isLight) color = "#f8fafc";
+          
+          if (step === "error" || msgText.toLowerCase().includes("lỗi") || msgText.toLowerCase().includes("error") || msgText.toLowerCase().includes("failed")) {
+            color = "#ef4444";
+            icon = "❌";
+          } else if (step === "chatgpt_done" || step === "gemini_done" || msgText.toLowerCase().includes("thành công") || msgText.toLowerCase().includes("hoàn thành") || msgText.toLowerCase().includes("success")) {
+            color = isLight ? "#15803d" : "#22c55e";
+            icon = "✅";
+          } else if (msgText.toLowerCase().includes("cảnh báo") || msgText.toLowerCase().includes("warning")) {
+            color = isLight ? "#b45309" : "#eab308";
+            icon = "⚠️";
+          }
+          
+          const borderCol = isLight ? "#e2e8f0" : "#334155";
+          const timeCol = isLight ? "#64748b" : "#94a3b8";
+          
+          autoLogBox.innerHTML += `<div style="margin-bottom: 6px; border-bottom: 1px dashed ${borderCol}; padding-bottom: 6px; display: flex; align-items: start; gap: 8px; font-family: 'Consolas', 'Courier New', monospace;">` +
+            `<span style="color: ${timeCol}; font-weight: 600; white-space: nowrap;">[${timeStr}]</span>` +
+            `<span style="margin-right: 4px;">${icon}</span>` +
+            `<span style="color: ${color}; font-weight: 500; flex: 1; word-break: break-word;">${escapeHtml(msgText)}</span>` +
+            `</div>`;
+          autoLogBox.scrollTop = autoLogBox.scrollHeight;
+        }
+        
+        if (step === "chatgpt_done" || step === "gemini_done") {
+          loadDownloadedImages();
+          stopAutomationPoll();
+        }
+      }
+      
+      // Vẫn ghi vào main stream log của hệ thống
+      log(e.payload);
+    }
+  }
+  function startAutomationPoll() {
+    if (!automationPoller) {
+      pullAutomation().catch(()=>{});
+      automationPoller = setInterval(() => pullAutomation().catch(()=>{}), 700);
+    }
+  }
+  async function stopAutomationPoll() {
+    if (automationPoller) {
+      clearInterval(automationPoller);
+      automationPoller = null;
+    }
+    await pullAutomation().catch(()=>{});
+  }
+
   function selected(){return document.getElementById("folderSelect").value}
   function requireFolder(){if(!selected()){log({error:"Hãy chọn hoặc tạo thư mục sản phẩm trước khi chụp/quay."});return false}return true}
   function setBusy(v){busy=v;document.querySelectorAll("button").forEach(b=>{if(b.id!=="btnStop"&&!b.classList.contains("btn-stop"))b.disabled=v});document.getElementById("themeToggleBtn").disabled=false;if(document.querySelector("#wifiIpGroup button")) document.querySelectorAll("#wifiIpGroup button").forEach(b=>b.disabled=v);}
@@ -1985,7 +2082,7 @@ HTML = r"""
   // ==========================================
   // CONTENT IMAGE HELPER TOOL JS
   // ==========================================
-  const CURRENT_VERSION = "v2.1.2";
+  const CURRENT_VERSION = "v2.1.3";
   let promptsList = [];
   let categoriesList = ["Shopee", "Facebook", "General"];
   let editingCategories = [];
@@ -2464,14 +2561,34 @@ HTML = r"""
 
   function appendAutomationLog(msg) {
     const logBox = document.getElementById("automationLogBox");
+    if (!logBox) return;
     const now = new Date();
-    const hrs = String(now.getHours()).padStart(2, "0");
-    const mins = String(now.getMinutes()).padStart(2, "0");
-    const secs = String(now.getSeconds()).padStart(2, "0");
-    const time = `${hrs}:${mins}:${secs}`;
-    logBox.innerHTML += `<div>[${time}] ${msg}</div>`;
+    const timeStr = now.toLocaleTimeString();
+    const isLight = document.body.classList.contains("theme-light");
+    const borderCol = isLight ? "#e2e8f0" : "#334155";
+    const timeCol = isLight ? "#64748b" : "#94a3b8";
+    let color = isLight ? "#1e293b" : "#f8fafc";
+    let icon = "⚙️";
+    
+    if (msg.toLowerCase().includes("lỗi") || msg.toLowerCase().includes("error") || msg.toLowerCase().includes("failed")) {
+      color = "#ef4444";
+      icon = "❌";
+    } else if (msg.toLowerCase().includes("thành công") || msg.toLowerCase().includes("hoàn thành") || msg.toLowerCase().includes("success")) {
+      color = isLight ? "#15803d" : "#22c55e";
+      icon = "✅";
+    } else if (msg.toLowerCase().includes("cảnh báo") || msg.toLowerCase().includes("warning")) {
+      color = isLight ? "#b45309" : "#eab308";
+      icon = "⚠️";
+    }
+    
+    logBox.innerHTML += `<div style="margin-bottom: 6px; border-bottom: 1px dashed ${borderCol}; padding-bottom: 6px; display: flex; align-items: start; gap: 8px; font-family: 'Consolas', 'Courier New', monospace;">` +
+      `<span style="color: ${timeCol}; font-weight: 600; white-space: nowrap;">[${timeStr}]</span>` +
+      `<span style="margin-right: 4px;">${icon}</span>` +
+      `<span style="color: ${color}; font-weight: 500; flex: 1; word-break: break-word;">${escapeHtml(msg)}</span>` +
+      `</div>`;
     logBox.scrollTop = logBox.scrollHeight;
   }
+
 
   async function sendToChatGPT() {
     const prompt = document.getElementById("contentEditorPrompt").value.trim();
@@ -2483,10 +2600,16 @@ HTML = r"""
     const notionContent = document.getElementById("notionContentInput").value.trim();
     const keywords = document.getElementById("keywordsInput").value.trim();
     
+    // Clear log ở cả backend và frontend để nhận log mới tinh từ after=0
+    try {
+      await fetch("/api/events/clear", { method: "POST" });
+    } catch(e) {}
+    lastAutomationId = 0;
+    
     document.getElementById("automationLogBox").innerHTML = "";
     appendAutomationLog("Bắt đầu tiến trình gửi yêu cầu lên ChatGPT...");
     
-    startPoll();
+    startAutomationPoll();
     
     try {
       const response = await fetch("/api/automation/chatgpt/send", {
@@ -2521,10 +2644,16 @@ HTML = r"""
     const notionContent = document.getElementById("notionContentInput").value.trim();
     const keywords = document.getElementById("keywordsInput").value.trim();
     
+    // Clear log ở cả backend và frontend để nhận log mới tinh từ after=0
+    try {
+      await fetch("/api/events/clear", { method: "POST" });
+    } catch(e) {}
+    lastAutomationId = 0;
+    
     document.getElementById("automationLogBox").innerHTML = "";
     appendAutomationLog("Bắt đầu tiến trình gửi yêu cầu lên Gemini...");
     
-    startPoll();
+    startAutomationPoll();
     
     try {
       const response = await fetch("/api/automation/gemini/send", {
