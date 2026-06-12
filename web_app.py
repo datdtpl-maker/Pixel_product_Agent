@@ -4258,8 +4258,8 @@ if %errorlevel% LSS 8 (
 @app.get("/api/app/check-update")
 def api_check_update():
     try:
-        url = "https://api.github.com/repos/datdtpl-maker/Pixel-Drive-Capture/releases/latest"
-        headers = {"User-Agent": "PixelDriveCapture-Updater"}
+        url = "https://api.github.com/repos/datdtpl-maker/MCP-Shopee_Khai-Hoan/releases/latest"
+        headers = {"User-Agent": "MCPShopee-Updater"}
 
         r = requests.get(url, headers=headers, timeout=5)
         if r.status_code == 404:
