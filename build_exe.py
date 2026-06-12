@@ -58,7 +58,7 @@ def build():
     # 2. Xac dinh duong dan
     root = Path(__file__).resolve().parent
     web_app_py = root / "web_app.py"
-    dist_dir = root / "dist" / "PixelDriveCapture"
+    dist_dir = root / "dist" / "MCPShopee"
     
     # Don dep thu muc build cu truoc de tranh loi lock file
     if dist_dir.exists():
@@ -74,7 +74,7 @@ def build():
         sys.executable,
         "-m",
         "PyInstaller",
-        "--name=PixelDriveCapture",
+        "--name=MCPShopee",
         "--onedir",
         "--clean",
         "--noconfirm",
@@ -103,7 +103,7 @@ def build():
             setup_res = subprocess.run([iscc_path, str(iss_file)], shell=False, cwd=str(root))
             if setup_res.returncode == 0:
                 print("\n=== TAO BO CAI DAT SETUP THANH CONG! ===")
-                print(f"File cai dat cua ban nam tai: {root / 'dist' / 'PixelDriveCaptureSetup.exe'}")
+                print(f"File cai dat cua ban nam tai: {root / 'dist' / 'MCPShopeeSetup.exe'}")
                 print("Ban co the gui file nay cho may khac de cai dat truc tiep.")
             else:
                 print(f"\n=== LOI: Bien dich Inno Setup that bai! Ma loi: {setup_res.returncode} ===")

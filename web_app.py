@@ -40,7 +40,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v2.0.1"
+CURRENT_VERSION = "v2.1.0"
 
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
@@ -162,26 +162,26 @@ HTML = r"""
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=1.1.0">
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=1.1.0">
-  <title>Pixel Drive Capture</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2.1.0">
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=2.1.0">
+  <title>MCP Shopee - Khải Hoàn</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
       color-scheme: dark;
-      --bg: #07090e;
-      --panel: rgba(17, 22, 37, 0.65);
+      --bg: #0b0d17;
+      --panel: rgba(26, 32, 53, 0.75);
       --panel-border: rgba(255, 255, 255, 0.08);
-      --soft: rgba(255, 255, 255, 0.03);
+      --soft: rgba(255, 255, 255, 0.04);
       --line: rgba(255, 255, 255, 0.06);
-      --text: #f3f4f6;
+      --text: #f9fafb;
       --muted: #9ca3af;
-      --brand: #3b82f6;
-      --brand-hover: #2563eb;
-      --brand-gradient: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-      --brand-glow: rgba(59, 130, 246, 0.3);
+      --brand: #ee4d2d;
+      --brand-hover: #f14d2a;
+      --brand-gradient: linear-gradient(135deg, #ee4d2d 0%, #ff7337 100%);
+      --brand-glow: rgba(238, 77, 45, 0.25);
       --ok: #10b981;
       --okbg: rgba(16, 185, 129, 0.1);
       --warn: #f59e0b;
@@ -195,23 +195,23 @@ HTML = r"""
     
     body.theme-light {
       color-scheme: light;
-      --bg: #f4f7fa;
-      --panel: rgba(255, 255, 255, 0.85);
-      --panel-border: rgba(0, 0, 0, 0.07);
+      --bg: #f5f6fa;
+      --panel: rgba(255, 255, 255, 0.88);
+      --panel-border: rgba(0, 0, 0, 0.06);
       --soft: rgba(0, 0, 0, 0.02);
-      --line: rgba(0, 0, 0, 0.05);
+      --line: rgba(0, 0, 0, 0.04);
       --text: #1e293b;
       --muted: #64748b;
-      --brand: #2563eb;
-      --brand-hover: #1d4ed8;
-      --brand-glow: rgba(37, 99, 235, 0.15);
+      --brand: #ee4d2d;
+      --brand-hover: #d73d1e;
+      --brand-glow: rgba(238, 77, 45, 0.15);
       --ok: #059669;
       --okbg: rgba(5, 150, 105, 0.08);
       --warn: #d97706;
       --warnbg: rgba(217, 119, 6, 0.08);
       --danger: #dc2626;
       --danger-hover: #b91c1c;
-      --shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+      --shadow: 0 10px 30px rgba(238, 77, 45, 0.03);
     }
     
     @keyframes pulseWarn {
@@ -228,8 +228,8 @@ HTML = r"""
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.07), transparent 45%),
-                  radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.07), transparent 45%),
+      background: radial-gradient(circle at top left, rgba(238, 77, 45, 0.08), transparent 45%),
+                  radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.06), transparent 45%),
                   var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -905,7 +905,7 @@ HTML = r"""
     }
     .poster-card:hover {
       transform: translateY(-4px);
-      border-color: rgba(59,130,246,0.3);
+      border-color: rgba(238, 77, 45, 0.3);
     }
     .poster-card img {
       width: 100%;
@@ -935,12 +935,77 @@ HTML = r"""
       min-height: 38px;
       padding: 4px;
     }
+    
+    /* Dropdown CSS cho thanh dieu khien */
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+    .dropdown-content {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 100%;
+      margin-top: 6px;
+      background: var(--panel);
+      min-width: 220px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 100;
+      padding: 6px;
+      animation: dropdownFade 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .dropdown-content::before {
+      content: '';
+      position: absolute;
+      top: -8px;
+      left: 0;
+      right: 0;
+      height: 8px;
+      background: transparent;
+    }
+    @keyframes dropdownFade {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .dropdown:hover .dropdown-content {
+      display: block;
+    }
+    .dropdown-content button, .dropdown-content a {
+      width: 100%;
+      text-align: left;
+      justify-content: flex-start;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--text);
+      min-height: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .dropdown-content button:hover {
+      background: var(--soft);
+      transform: none;
+      box-shadow: none;
+      color: var(--brand);
+    }
+    .dropdown-content button svg {
+      opacity: 0.8;
+    }
   </style>
 </head>
 <body>
 <div class="shell">
   <aside class="sidebar">
-    <div class="brand"><h1>Pixel Drive Capture</h1><p>Chụp ảnh và quay video sản phẩm trực tiếp vào Google Drive đồng bộ.</p></div>
+    <div class="brand"><h1>MCP Shopee - Khải Hoàn</h1><p>Giải pháp đồng bộ sản phẩm Notion & Telegram thông minh.</p></div>
     <div class="nav">
       <div class="active"><span>Bảng điều khiển</span><span>Live</span></div>
       <div><span>Thư mục sản phẩm</span><span id="navFolders">0</span></div>
@@ -951,63 +1016,82 @@ HTML = r"""
   <main class="main" style="display: flex; flex-direction: column;">
     <div id="captureDashboard" style="display: block; width: 100%;">
       <header class="topbar">
-        <div>
-          <h2>Trung tâm chụp sản phẩm</h2>
-          <p>Chọn thư mục trước, sau đó chụp hoặc quay từ Pixel.</p>
+        <div style="display: flex; align-items: center; gap: 15px;">
+          <img src="/favicon.ico" style="width: 50px; height: 50px; border-radius: 50%; border: 2.5px solid var(--brand); box-shadow: 0 0 15px var(--brand-glow); background: #fff;" />
+          <div>
+            <h2 style="font-size: 24px; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; align-items: center; gap: 8px; margin: 0;">
+              MCP Shopee - Khải Hoàn <span style="font-size: 11px; padding: 2px 8px; border-radius: 20px; background: rgba(238, 77, 45, 0.12); color: var(--brand); font-weight: 700; border: 1.5px solid rgba(238, 77, 45, 0.2);">Pro</span>
+            </h2>
+            <p style="margin: 4px 0 0; color: var(--muted); font-size: 13.5px;">Hệ thống chụp sản phẩm và đồng bộ dữ liệu Notion & Telegram sang BigSeller</p>
+          </div>
         </div>
-        <div class="actions">
-          <!-- Nhóm 1: Hệ thống & Giao diện -->
-          <div class="action-group">
-            <span class="action-group-label">Hệ thống</span>
-            <button id="updateAppBtn" class="secondary group-btn" onclick="checkAppUpdate(false)" style="color: var(--brand); font-weight: 700; display: flex; align-items: center; gap: 6px; font-size: 13px;" title="Kiểm tra cập nhật phần mềm">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-              <span id="updateAppText">v1.1.0</span>
+        <div class="actions" style="display: flex; align-items: center; gap: 10px;">
+          <!-- Dropdown 1: Thiết bị & Hệ thống -->
+          <div class="dropdown">
+            <button class="secondary" style="font-size: 13px; font-weight: 600; min-height: 38px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              Hệ thống & Thiết bị
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7; margin-left: 2px;"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
-            <button id="themeToggleBtn" class="secondary group-btn" onclick="toggleTheme()" title="Chuyển đổi giao diện Sáng/Tối">
-              <!-- Chèn icon SVG tự động bằng Javascript -->
-            </button>
-            <button class="ghost group-btn" onclick="refresh()" title="Làm mới trang">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-              Làm mới
-            </button>
+            <div class="dropdown-content">
+              <button id="updateAppBtn" onclick="checkAppUpdate(false)" style="color: var(--brand); font-weight: 700;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                Cập nhật: <span id="updateAppText">v1.1.0</span>
+              </button>
+              <button id="themeToggleBtn" onclick="toggleTheme()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                Giao diện Sáng/Tối
+              </button>
+              <button onclick="refresh()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                Làm mới trang
+              </button>
+              <hr style="border: 0; border-top: 1px solid var(--line); margin: 6px 0;" />
+              <button onclick="togglePixelScreen()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+                Bật/Tắt màn hình Pixel
+              </button>
+              <button id="previewBtn" onclick="togglePreview()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                <span id="previewBtnText">Xem Pixel</span>
+              </button>
+            </div>
           </div>
 
-          <!-- Nhóm 2: Điều khiển thiết bị Pixel -->
-          <div class="action-group">
-            <span class="action-group-label">Thiết bị</span>
-            <button class="secondary group-btn" onclick="togglePixelScreen()" title="Bật hoặc tắt màn hình điện thoại Pixel">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
-              Màn hình
+          <!-- Dropdown 2: Tính năng mở rộng -->
+          <div class="dropdown">
+            <button class="secondary" style="font-size: 13px; font-weight: 600; min-height: 38px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; background: linear-gradient(135deg, rgba(238, 77, 45, 0.08) 0%, rgba(255, 115, 55, 0.08) 100%); border-color: rgba(238, 77, 45, 0.25);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+              Tính năng mở rộng
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7; margin-left: 2px;"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
-            <button id="previewBtn" class="secondary group-btn" onclick="togglePreview()" title="Bật/Tắt xem trực tiếp màn hình Pixel qua Scrcpy">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-              <span id="previewBtnText">Xem Pixel</span>
-            </button>
+            <div class="dropdown-content">
+              <button onclick="showPosterDashboard()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a855f7;"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                AI Edit Image/Video
+              </button>
+              <button onclick="showShopeeSyncDashboard()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #ee4d2d;"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                Đồng bộ Shopee
+              </button>
+            </div>
           </div>
 
-          <!-- Nhóm 3: Sáng tạo & Chụp/Quay -->
-          <div class="action-group">
-            <span class="action-group-label">Tác vụ</span>
-            <button class="secondary group-btn" onclick="showPosterDashboard()" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%); border-color: rgba(168, 85, 247, 0.3);" title="AI Edit Image/Video">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a855f7;"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-              AI Edit Image/Video
-            </button>
-            <button class="secondary group-btn" onclick="showShopeeSyncDashboard()" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%); border-color: rgba(16, 185, 129, 0.3);" title="Đồng bộ Notion -> BigSeller Excel">
-              Đồng bộ Shopee
-            </button>
-            <button class="btn-capture group-btn" onclick="capture()" title="Chụp ảnh sản phẩm">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-              Chụp ảnh
-            </button>
-            <button class="btn-record group-btn" onclick="record()" title="Quay video sản phẩm">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
-              Quay video
-            </button>
-            <button id="btnStop" class="btn-stop group-btn" onclick="stopOperation()" title="Dừng tác vụ hiện tại">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect></svg>
-              Dừng
-            </button>
-          </div>
+          <div style="width: 1px; height: 20px; background: var(--line); margin: 0 4px;"></div>
+
+          <!-- Các nút tác vụ chính -->
+          <button class="btn-capture" onclick="capture()" style="min-height: 38px; padding: 6px 14px; border-radius: 8px; font-size: 13.5px;" title="Chụp ảnh sản phẩm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            Chụp ảnh
+          </button>
+          <button class="btn-record" onclick="record()" style="min-height: 38px; padding: 6px 14px; border-radius: 8px; font-size: 13.5px;" title="Quay video sản phẩm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            Quay video
+          </button>
+          <button id="btnStop" class="btn-stop" onclick="stopOperation()" style="min-height: 38px; padding: 6px 14px; border-radius: 8px; font-size: 13.5px;" title="Dừng tác vụ hiện tại">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect></svg>
+            Dừng
+          </button>
         </div>
       </header>
       <div class="content">
@@ -4066,11 +4150,11 @@ def run_update_in_background(download_url):
             zip_ref.extractall(extract_dir)
 
         extract_source = extract_dir
-        sub_dir = extract_dir / "PixelDriveCapture"
+        sub_dir = extract_dir / "MCPShopee"
         if sub_dir.exists() and sub_dir.is_dir():
             extract_source = sub_dir
 
-        exe_path = ROOT / "PixelDriveCapture.exe"
+        exe_path = ROOT / "MCPShopee.exe"
         bat_path = ROOT / "updater.bat"
 
         # Định nghĩa các đường dẫn dạng chuỗi không chứa dấu gạch chéo ngược trong f-string
@@ -4082,7 +4166,7 @@ def run_update_in_background(download_url):
 
         bat_content = f"""@echo off
 chcp 65001 > nul
-title Pixel Drive Capture - Updater
+title MCP Shopee - Updater
 echo ==================================================
 echo   DANG CAP NHAT PHAN MEM - VUI LONG CHO...
 echo ==================================================
@@ -4098,12 +4182,12 @@ if %errorlevel% neq 0 (
 )
 
 :: Force kill truoc de day nhanh tien trinh
-taskkill /F /IM PixelDriveCapture.exe >nul 2>&1
+taskkill /F /IM MCPShopee.exe >nul 2>&1
 
 :wait_close
-tasklist /FI "IMAGENAME eq PixelDriveCapture.exe" 2>nul | find /I /N "PixelDriveCapture.exe" >nul
+tasklist /FI "IMAGENAME eq MCPShopee.exe" 2>nul | find /I /N "MCPShopee.exe" >nul
 if "%ERRORLEVEL%"=="0" (
-    echo Dang cho Pixel Drive Capture tat hoan toan...
+    echo Dang cho MCP Shopee tat hoan toan...
     ping 127.0.0.1 -n 2 > nul
     goto wait_close
 )
@@ -4120,7 +4204,7 @@ if exist "{root_internal}" (
 )
 if exist "{exe_path_str}" (
     del /f /q "{exe_path_str}.old" >nul 2>&1
-    ren "{exe_path_str}" "PixelDriveCapture.exe.old" >nul 2>&1
+    ren "{exe_path_str}" "MCPShopee.exe.old" >nul 2>&1
     del /f /q "{exe_path_str}" >nul 2>&1
 )
 
@@ -4140,7 +4224,7 @@ if %errorlevel% LSS 8 (
     echo.
     echo ==================================================
     echo   CAP NHAT THANH CONG!
-    echo   Dang khoi dong lai Pixel Drive Capture...
+    echo   Dang khoi dong lai MCP Shopee...
     echo ==================================================
     start "" "{exe_path_str}"
 ) else (
@@ -5717,7 +5801,7 @@ def launch_desktop_gui():
     
     try:
         # Đường dẫn profile trình duyệt tạm thời để cô lập tiến trình
-        profile_dir = Path(os.environ.get("LOCALAPPDATA", "C:\\Users\\datdt\\AppData\\Local")) / "PixelDriveCapture" / "browser_profile"
+        profile_dir = Path(os.environ.get("LOCALAPPDATA", "C:\\Users\\datdt\\AppData\\Local")) / "MCPShopee" / "browser_profile"
         profile_dir.mkdir(parents=True, exist_ok=True)
         
         start_time = time.time()
@@ -5769,25 +5853,25 @@ def cleanup_old_instances():
     current_pid = os.getpid()
     print(f"[Cleanup] Đang dọn dẹp các tiến trình cũ (PID hiện tại: {current_pid})...")
     
-    # 1. Tắt các tiến trình PixelDriveCapture.exe cũ đang chạy ngầm (trừ chính nó)
+    # 1. Tắt các tiến trình MCPShopee.exe cũ đang chạy ngầm (trừ chính nó)
     if getattr(sys, 'frozen', False):
         try:
-            cmd_app = f'wmic process where "name=\'PixelDriveCapture.exe\' and ProcessID!={current_pid}" call terminate'
+            cmd_app = f'wmic process where "name=\'MCPShopee.exe\' and ProcessID!={current_pid}" call terminate'
             subprocess.run(cmd_app, shell=True, capture_output=True)
-            print("[Cleanup] Đã dọn dẹp các tiến trình PixelDriveCapture.exe cũ.")
+            print("[Cleanup] Đã dọn dẹp các tiến trình MCPShopee.exe cũ.")
         except Exception as e:
             print(f"[Cleanup] Lỗi tắt app cũ: {e}")
             
-    # 2. Tắt các tiến trình Chrome/Edge sử dụng profile PixelDriveCapture
+    # 2. Tắt các tiến trình Chrome/Edge sử dụng profile MCPShopee
     try:
-        cmd_chrome = 'wmic process where "name=\'chrome.exe\' and CommandLine like \'%PixelDriveCapture%\'" call terminate'
+        cmd_chrome = 'wmic process where "name=\'chrome.exe\' and CommandLine like \'%MCPShopee%\'" call terminate'
         subprocess.run(cmd_chrome, shell=True, capture_output=True)
         print("[Cleanup] Đã dọn dẹp các tiến trình Chrome cũ liên quan đến ứng dụng.")
     except Exception as e:
         print(f"[Cleanup] Lỗi tắt Chrome cũ: {e}")
         
     try:
-        cmd_edge = 'wmic process where "name=\'msedge.exe\' and CommandLine like \'%PixelDriveCapture%\'" call terminate'
+        cmd_edge = 'wmic process where "name=\'msedge.exe\' and CommandLine like \'%MCPShopee%\'" call terminate'
         subprocess.run(cmd_edge, shell=True, capture_output=True)
         print("[Cleanup] Đã dọn dẹp các tiến trình Edge cũ liên quan đến ứng dụng.")
     except Exception as e:
