@@ -6344,94 +6344,119 @@ def api_save_shopee_config():
 
 @app.get("/api/shopee/bot/status")
 def api_get_shopee_bot_status():
-    global shopee_bot_thread
-    from shopee_sync.src import telegram_bot
-    is_alive = shopee_bot_thread is not None and shopee_bot_thread.is_alive() and not telegram_bot.should_stop
-    return jsonify({
-        "running": is_alive,
-        "message": "Bot Telegram đang hoạt động." if is_alive else "Bot Telegram đã dừng."
-    })
+    try:
+        global shopee_bot_thread
+        try:
+            from shopee_sync.src import telegram_bot
+        except ImportError:
+            from src import telegram_bot
+        is_alive = shopee_bot_thread is not None and shopee_bot_thread.is_alive() and not telegram_bot.should_stop
+        return jsonify({
+            "running": is_alive,
+            "message": "Bot Telegram đang hoạt động." if is_alive else "Bot Telegram đã dừng."
+        })
+    except Exception as exc:
+        return error_response(exc, 500)
 
 @app.post("/api/shopee/bot/start")
 def api_start_shopee_bot():
-    global shopee_bot_thread
-    from shopee_sync.src import telegram_bot
-    
-    # Kiểm tra cấu hình trước
-    env_file = SHOPEE_SYNC_ROOT / ".env"
-    if not env_file.exists():
-        return jsonify({"success": False, "error": "Chưa cấu hình các thông số Notion/Telegram. Vui lòng cấu hình trước."}), 400
-        
-    is_alive = shopee_bot_thread is not None and shopee_bot_thread.is_alive() and not telegram_bot.should_stop
-    if is_alive:
-        return jsonify({"success": True, "message": "Bot Telegram đã đang chạy sẵn rồi."})
-        
-    # Thiết lập lại state và khởi chạy
-    telegram_bot.should_stop = False
-    
-    def run_telegram_bot_wrapper():
+    try:
+        global shopee_bot_thread
         try:
-            telegram_bot.run_bot()
-        except Exception as e:
-            add_event({"step": "shopee_sync", "message": f"Lỗi trong quá trình chạy Bot Telegram: {e}"})
+            from shopee_sync.src import telegram_bot
+        except ImportError:
+            from src import telegram_bot
+        
+        # Kiểm tra cấu hình trước
+        env_file = SHOPEE_SYNC_ROOT / ".env"
+        if not env_file.exists():
+            return jsonify({"success": False, "error": "Chưa cấu hình các thông số Notion/Telegram. Vui lòng cấu hình trước."}), 400
             
-    shopee_bot_thread = threading.Thread(target=run_telegram_bot_wrapper, daemon=True)
-    shopee_bot_thread.start()
-    
-    add_event({"step": "shopee_sync", "message": "Đã khởi động Bot Telegram thành công!"})
-    return jsonify({"success": True, "message": "Khởi động Bot Telegram thành công!"})
+        is_alive = shopee_bot_thread is not None and shopee_bot_thread.is_alive() and not telegram_bot.should_stop
+        if is_alive:
+            return jsonify({"success": True, "message": "Bot Telegram đã đang chạy sẵn rồi."})
+            
+        # Thiết lập lại state và khởi chạy
+        telegram_bot.should_stop = False
+        
+        def run_telegram_bot_wrapper():
+            try:
+                telegram_bot.run_bot()
+            except Exception as e:
+                add_event({"step": "shopee_sync", "message": f"Lỗi trong quá trình chạy Bot Telegram: {e}"})
+                
+        shopee_bot_thread = threading.Thread(target=run_telegram_bot_wrapper, daemon=True)
+        shopee_bot_thread.start()
+        
+        add_event({"step": "shopee_sync", "message": "Đã khởi động Bot Telegram thành công!"})
+        return jsonify({"success": True, "message": "Khởi động Bot Telegram thành công!"})
+    except Exception as exc:
+        return error_response(exc, 500)
 
 @app.post("/api/shopee/bot/stop")
 def api_stop_shopee_bot():
-    global shopee_bot_thread
-    from shopee_sync.src import telegram_bot
-    
-    telegram_bot.stop_bot_process()
-    add_event({"step": "shopee_sync", "message": "Đang tắt Bot Telegram..."})
-    return jsonify({"success": True, "message": "Đã gửi lệnh dừng Bot Telegram."})
+    try:
+        global shopee_bot_thread
+        try:
+            from shopee_sync.src import telegram_bot
+        except ImportError:
+            from src import telegram_bot
+        
+        telegram_bot.stop_bot_process()
+        add_event({"step": "shopee_sync", "message": "Đang tắt Bot Telegram..."})
+        return jsonify({"success": True, "message": "Đã gửi lệnh dừng Bot Telegram."})
+    except Exception as exc:
+        return error_response(exc, 500)
 
 @app.post("/api/shopee/sync/run")
 def api_run_shopee_sync():
-    global shopee_sync_thread, shopee_sync_active
-    from shopee_sync.src import notion_sync
-    
-    if shopee_sync_active:
-        return jsonify({"success": False, "error": "Tiến trình đồng bộ đang chạy ngầm, vui lòng đợi..."}), 400
-        
-    # Thiết lập thư mục export Downloads
-    config = load_config()
-    export_dir = config.get("openai", {}).get("export_dir", "").strip()
-    if not export_dir:
-        export_dir = str(Path.home() / "Downloads")
-        
-    os.environ["BIGSELLER_EXPORT_DIR"] = export_dir
-    
-    shopee_sync_active = True
-    add_event({"step": "shopee_sync", "message": "Bắt đầu tiến trình đồng bộ Notion -> BigSeller thủ công..."})
-    
-    def run_sync_wrapper():
-        global shopee_sync_active
+    try:
+        global shopee_sync_thread, shopee_sync_active
         try:
-            excel_path, titles = notion_sync.sync_notion_to_bigseller_excel()
-            if not titles:
-                add_event({
-                    "step": "shopee_sync",
-                    "message": "Không tìm thấy sản phẩm mới nào cần đồng bộ (Bài viết = True và Trạng thái shopee = False)."
-                })
-            else:
-                add_event({
-                    "step": "shopee_sync",
-                    "message": f"🎉 Đồng bộ thành công {len(titles)} sản phẩm! File đã xuất: {Path(excel_path).name}"
-                })
-        except Exception as e:
-            add_event({"step": "shopee_sync", "message": f"❌ Lỗi đồng bộ: {str(e)}"})
-        finally:
-            shopee_sync_active = False
+            from shopee_sync.src import notion_sync
+        except ImportError:
+            from src import notion_sync
+        
+        if shopee_sync_active:
+            return jsonify({"success": False, "error": "Tiến trình đồng bộ đang chạy ngầm, vui lòng đợi..."}), 400
             
-    shopee_sync_thread = threading.Thread(target=run_sync_wrapper, daemon=True)
-    shopee_sync_thread.start()
-    
-    return jsonify({"success": True, "message": "Tiến trình đồng bộ Notion đã bắt đầu chạy ngầm."})
+        # Thiết lập thư mục export Downloads
+        config = load_config()
+        export_dir = config.get("openai", {}).get("export_dir", "").strip()
+        if not export_dir:
+            export_dir = str(Path.home() / "Downloads")
+            
+        os.environ["BIGSELLER_EXPORT_DIR"] = export_dir
+        
+        shopee_sync_active = True
+        add_event({"step": "shopee_sync", "message": "Bắt đầu tiến trình đồng bộ Notion -> BigSeller thủ công..."})
+        
+        def run_sync_wrapper():
+            global shopee_sync_active
+            try:
+                excel_path, titles = notion_sync.sync_notion_to_bigseller_excel()
+                if not titles:
+                    add_event({
+                        "step": "shopee_sync",
+                        "message": "Không tìm thấy sản phẩm mới nào cần đồng bộ (Bài viết = True và Trạng thái shopee = False)."
+                    })
+                else:
+                    add_event({
+                        "step": "shopee_sync",
+                        "message": f"🎉 Đồng bộ thành công {len(titles)} sản phẩm! File đã xuất: {Path(excel_path).name}"
+                    })
+            except Exception as e:
+                add_event({"step": "shopee_sync", "message": f"❌ Lỗi đồng bộ: {str(e)}"})
+            finally:
+                shopee_sync_active = False
+                
+        shopee_sync_thread = threading.Thread(target=run_sync_wrapper, daemon=True)
+        shopee_sync_thread.start()
+        
+        return jsonify({"success": True, "message": "Tiến trình đồng bộ Notion đã bắt đầu chạy ngầm."})
+    except Exception as exc:
+        return error_response(exc, 500)
+
 
 @app.get("/api/shopee/excel/list")
 def api_list_shopee_excel():
