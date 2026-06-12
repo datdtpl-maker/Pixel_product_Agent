@@ -23,6 +23,6 @@ echo Da tim thay Chrome tai: %CHROME_PATH%
 echo Dang khoi dong Chrome o che do Cua so Doc lap (App Mode) voi debug port 9222...
 echo (Dieu nay giup an thanh URL, tao trai nghiem gop chung sang trong giong Widget ung dung)
 
-start "" "%CHROME_PATH%" --app="https://chatgpt.com" --remote-debugging-port=9222 --user-data-dir="%LOCALAPPDATA%\Google\Chrome\User Data Debug"
+start "" "%CHROME_PATH%" https://chatgpt.com --remote-debugging-port=9222 --user-data-dir="%~dp0chrome_profile_debug"
 echo Chrome Debug App da duoc khoi dong!
-exit
+pause

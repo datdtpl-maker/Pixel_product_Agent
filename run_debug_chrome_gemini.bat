@@ -22,6 +22,6 @@ if "%CHROME_PATH%"=="" (
 echo Da tim thay Chrome tai: %CHROME_PATH%
 echo Dang khoi dong Chrome Gemini o che do Cua so Doc lap (App Mode) voi debug port 9223...
 
-start "" "%CHROME_PATH%" --app="https://gemini.google.com" --remote-debugging-port=9223 --user-data-dir="%LOCALAPPDATA%\Google\Chrome\User Data Debug Gemini"
+start "" "%CHROME_PATH%" https://gemini.google.com --remote-debugging-port=9223 --user-data-dir="%~dp0chrome_profile_debug_gemini"
 echo Chrome Gemini Debug App da duoc khoi dong!
-exit
+pause

@@ -40,7 +40,7 @@ else:
     BUNDLE_DIR = ROOT
 
 CONFIG_PATH = ROOT / "config.json"
-CURRENT_VERSION = "v2.1.0"
+CURRENT_VERSION = "v2.1.1"
 
 
 # Tu dong khoi tao cac file config va data tu bundle neu chua ton tai o ngoai
@@ -162,8 +162,8 @@ HTML = r"""
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2.1.0">
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=2.1.0">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2.1.1">
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=2.1.1">
   <title>MCP Shopee - Khải Hoàn</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1317,16 +1317,23 @@ HTML = r"""
           <!-- File ảnh mẫu tham khảo -->
           <div>
             <label style="margin-bottom: 6px; display: block; font-weight: 600; font-size: 13px;">Ảnh mẫu tham khảo phong cách (Tùy chọn)</label>
-            <div style="display: grid; grid-template-columns: 1fr auto; gap: 12px;">
-              <div id="sampleImgDropzone" onclick="document.getElementById('sampleImgFile').click()" style="border: 2px dashed var(--panel-border); border-radius: 12px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: rgba(0,0,0,0.12); flex: 1;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); margin-bottom: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span id="sampleImgLabel" style="font-size: 11px; color: var(--muted); text-align: center; padding: 0 10px; font-weight: 500;">Bấm hoặc Kéo thả ảnh mẫu tham khảo</span>
+            <!-- Vùng hiển thị ảnh Preview (khi đã chọn/dán thành công) -->
+            <div id="sampleImgPreviewContainer" style="width: 100%; height: 120px; border-radius: 12px; border: 1px solid var(--panel-border); display: none; overflow: hidden; position: relative; background: var(--bg); margin-bottom: 8px;">
+              <img id="sampleImgPreview" src="" style="width: 100%; height: 100%; object-fit: contain;">
+              <button type="button" onclick="clearSampleImage()" style="position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.7); border: none; border-radius: 50%; width: 22px; height: 22px; display: grid; place-items: center; color: #fff; cursor: pointer; font-size: 12px; z-index: 10;">×</button>
+            </div>
+            
+            <!-- Vùng chọn ảnh (chỉ hiển thị khi chưa có ảnh) -->
+            <div id="sampleImgSelectorContainer" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Dropzone kéo thả/chọn file -->
+              <div id="sampleImgDropzone" onclick="document.getElementById('sampleImgFile').click()" style="border: 2px dashed var(--panel-border); border-radius: 12px; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: rgba(0,0,0,0.12);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); margin-bottom: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span id="sampleImgLabel" style="font-size: 11px; color: var(--muted); text-align: center; font-weight: 500;">Bấm hoặc Kéo thả ảnh mẫu tham khảo</span>
                 <input type="file" id="sampleImgFile" accept="image/*" style="display: none;" onchange="handleSampleImageSelect(this.files)">
               </div>
-              <div id="sampleImgPreviewContainer" style="width: 70px; height: 70px; border-radius: 12px; border: 1px solid var(--panel-border); display: none; overflow: hidden; position: relative; background: var(--bg);">
-                <img id="sampleImgPreview" src="" style="width: 100%; height: 100%; object-fit: contain;">
-                <button type="button" onclick="clearSampleImage()" style="position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); border: none; border-radius: 50%; width: 20px; height: 20px; display: grid; place-items: center; color: #fff; cursor: pointer; font-size: 11px; z-index: 10;">×</button>
-              </div>
+              
+              <!-- Ô dán URL riêng biệt -->
+              <input type="text" id="sampleImgUrlInput" placeholder="Hoặc dán link URL ảnh mẫu vào đây..." oninput="handleSampleImageUrlChange(this.value)" style="width: 100%; height: 26px; font-size: 10px; border-radius: 8px; border: 1px solid var(--panel-border); padding: 0 10px; background: rgba(0,0,0,0.3); color: var(--text); outline: none;">
             </div>
           </div>
           
@@ -1978,7 +1985,7 @@ HTML = r"""
   // ==========================================
   // CONTENT IMAGE HELPER TOOL JS
   // ==========================================
-  const CURRENT_VERSION = "v2.1.0";
+  const CURRENT_VERSION = "v2.1.1";
   let promptsList = [];
   let categoriesList = ["Shopee", "Facebook", "General"];
   let editingCategories = [];
@@ -2391,17 +2398,36 @@ HTML = r"""
       imgPreview.src = sampleSelectedImageBase64;
       
       document.getElementById("sampleImgPreviewContainer").style.display = "block";
-      document.getElementById("sampleImgDropzone").style.display = "none";
+      document.getElementById("sampleImgSelectorContainer").style.display = "none";
     };
     reader.readAsDataURL(file);
+  }
+
+  function handleSampleImageUrlChange(url) {
+    if (typeof url !== 'string') {
+      const urlInput = document.getElementById("sampleImgUrlInput");
+      url = urlInput ? urlInput.value : "";
+    }
+    url = url.trim();
+    if (!url) {
+      clearSampleImage();
+      return;
+    }
+    sampleSelectedImageBase64 = url;
+    const imgPreview = document.getElementById("sampleImgPreview");
+    imgPreview.src = "/api/proxy-image?url=" + encodeURIComponent(url);
+    document.getElementById("sampleImgPreviewContainer").style.display = "block";
+    document.getElementById("sampleImgSelectorContainer").style.display = "none";
   }
 
   function clearSampleImage() {
     sampleSelectedImageBase64 = null;
     document.getElementById("sampleImgPreview").src = "";
     document.getElementById("sampleImgPreviewContainer").style.display = "none";
-    document.getElementById("sampleImgDropzone").style.display = "flex";
+    document.getElementById("sampleImgSelectorContainer").style.display = "flex";
     document.getElementById("sampleImgFile").value = "";
+    const urlInput = document.getElementById("sampleImgUrlInput");
+    if (urlInput) urlInput.value = "";
   }
 
   async function useLatestPixelPhoto() {
@@ -4447,11 +4473,11 @@ def api_chrome_start():
         import time
         time.sleep(0.3)
             
-        # Khởi chạy trực tiếp chrome.exe GUI độc lập, không truyền cờ ẩn để tránh làm ẩn cửa sổ Chrome
-        user_data_dir = os.path.expandvars(r"%LocalAppData%\Google\Chrome\User Data Debug")
+        # Khởi chạy trực tiếp chrome.exe GUI độc lập, sử dụng profile cục bộ trong dự án và mở cửa sổ bình thường
+        user_data_dir = str(ROOT / "chrome_profile_debug")
         cmd = [
             chrome_path,
-            "--app=https://chatgpt.com",
+            "https://chatgpt.com",
             "--remote-debugging-port=9222",
             f"--user-data-dir={user_data_dir}"
         ]
@@ -4488,11 +4514,11 @@ def api_chrome_gemini_start():
         import time
         time.sleep(0.3)
             
-        # Khởi chạy trực tiếp chrome.exe GUI độc lập cho Gemini
-        user_data_dir = os.path.expandvars(r"%LocalAppData%\Google\Chrome\User Data Debug Gemini")
+        # Khởi chạy trực tiếp chrome.exe GUI độc lập cho Gemini, sử dụng profile cục bộ trong dự án và mở cửa sổ bình thường
+        user_data_dir = str(ROOT / "chrome_profile_debug_gemini")
         cmd = [
             chrome_path,
-            "--app=https://gemini.google.com",
+            "https://gemini.google.com",
             "--remote-debugging-port=9223",
             f"--user-data-dir={user_data_dir}"
         ]
@@ -4834,14 +4860,25 @@ def api_chatgpt_send():
         # 2. Lưu ảnh mẫu phong cách (nếu có)
         temp_sample_path = None
         if sample_base64:
-            if "," in sample_base64:
-                header, encoded = sample_base64.split(",", 1)
-            else:
-                encoded = sample_base64
-            sample_data = base64.b64decode(encoded)
             temp_sample_path = str(inbox_path / "temp_chatgpt_sample.png")
-            with open(temp_sample_path, "wb") as f:
-                f.write(sample_data)
+            if sample_base64.startswith("http://") or sample_base64.startswith("https://"):
+                import requests
+                try:
+                    response = requests.get(sample_base64, timeout=30)
+                    response.raise_for_status()
+                    img_data = response.content
+                    with open(temp_sample_path, "wb") as f:
+                        f.write(img_data)
+                except Exception as e:
+                    raise ValueError(f"Không thể tải ảnh mẫu từ URL: {e}")
+            else:
+                if "," in sample_base64:
+                    header, encoded = sample_base64.split(",", 1)
+                else:
+                    encoded = sample_base64
+                img_data = base64.b64decode(encoded)
+                with open(temp_sample_path, "wb") as f:
+                    f.write(img_data)
 
         # Thay thế động các biến trong prompt
         final_prompt = prompt_text
@@ -5756,6 +5793,25 @@ def api_view_downloaded_image():
         return send_from_directory(export_dir, filename)
     except Exception as exc:
         return error_response(exc, 400)
+
+
+@app.get("/api/proxy-image")
+def api_proxy_image():
+    from flask import Response
+    url = request.args.get("url", "").strip()
+    if not url:
+        return "Thiếu tham số url", 400
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        res = requests.get(url, headers=headers, timeout=15)
+        res.raise_for_status()
+        content_type = res.headers.get("Content-Type", "image/png")
+        return Response(res.content, mimetype=content_type)
+    except Exception as e:
+        return f"Lỗi tải ảnh: {e}", 500
+
 
 
 @app.get("/api/automation/latest-photo")
